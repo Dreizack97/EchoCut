@@ -42,12 +42,44 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ steps.get_version.outputs.VERSION }}"
-          $hashes = Get-Content "./dist/SHA256SUMS.txt"
+          $hashes = Get-Content "./dist/SHA256SUMS.txt" -Raw
           
+          # Extraer automáticamente la sección de cambios de esta versión desde CHANGELOG.md
+          $changelogPath = "CHANGELOG.md"
+          $extractedNotes = ""
+          if (Test-Path $changelogPath) {
+              $changelogLines = Get-Content $changelogPath
+              $inTarget = $false
+              $extracted = [System.Collections.Generic.List[string]]::new()
+
+              foreach ($line in $changelogLines) {
+                  if ($line -match "^##\s+\[$([regex]::Escape($version))\]") {
+                      $inTarget = $true
+                      continue
+                  }
+                  if ($inTarget) {
+                      if ($line -match "^##\s+\[" -or $line -match "^---\s*$") {
+                          break
+                      }
+                      $extracted.Add($line)
+                  }
+              }
+              $extractedNotes = ($extracted -join "`n").Trim()
+          }
+
+          if ([string]::IsNullOrWhiteSpace($extractedNotes)) {
+              $extractedNotes = "* Consulte el [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) para más detalles."
+          }
+
           $body = @"
           # EchoCut v$version 🎵
 
           Versión oficial de **EchoCut**, el recortador inteligente y sin pérdidas de silencio final para bibliotecas masivas de audio con .NET 10 y FFmpeg.
+
+          ## 🚀 Novedades y Cambios en esta Versión
+          $extractedNotes
+
+          ---
 
           ### 📦 ¿Qué archivo debo descargar?
           * **`EchoCut-v$version-win-x64-standalone.zip` (Recomendado)**: No requiere instalar nada. Incluye el motor .NET 10 compilado con ReadyToRun. Descomprime y ejecuta `EchoCut.exe`.
@@ -57,12 +89,14 @@ jobs:
           > EchoCut utiliza FFmpeg para el análisis y corte sin pérdida. Asegúrate de tener `ffmpeg.exe` en tu sistema o selecciónalo en el diálogo al iniciar el programa.
 
           ---
+
           ### 🔒 Verificación de Integridad (SHA-256)
           ```text
-          $($hashes -join "`n")
+          $hashes
           ```
 
-          Para ver el historial detallado de cambios, consulta el [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md).
+          ---
+          Para consultar el historial completo de versiones anteriores, visita el [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md).
           "@
           
           Set-Content -Path "./dist/RELEASE_BODY.md" -Value $body -Encoding utf8

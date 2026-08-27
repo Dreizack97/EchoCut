@@ -1,4 +1,4 @@
-﻿namespace EchoCut
+namespace EchoCut
 {
     partial class Main
     {
@@ -38,6 +38,7 @@
             contextMenuStrip = new ContextMenuStrip(components);
             mnuOpenFolder = new ToolStripMenuItem();
             mnuOpenAudacity = new ToolStripMenuItem();
+            mnuEditSong = new ToolStripMenuItem();
             btnAnalyze = new Button();
             btnCancel = new Button();
             btnCropAll = new Button();
@@ -53,6 +54,9 @@
             progressBar = new ProgressBar();
             lblStatus = new Label();
             saveFileDialog = new SaveFileDialog();
+            btnFile = new Button();
+            openFileDialog = new OpenFileDialog();
+            mnuDeleteSong = new ToolStripMenuItem();
             ((System.ComponentModel.ISupportInitialize)dataGrid).BeginInit();
             contextMenuStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numericTolerance).BeginInit();
@@ -64,29 +68,29 @@
             label1.AutoSize = true;
             label1.Location = new Point(12, 15);
             label1.Name = "label1";
-            label1.Size = new Size(60, 19);
+            label1.Size = new Size(74, 19);
             label1.TabIndex = 0;
-            label1.Text = "Carpeta:";
+            label1.Text = "Carpeta(s):";
             // 
             // txtPath
             // 
             txtPath.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             txtPath.BackColor = SystemColors.Window;
-            txtPath.Location = new Point(78, 12);
+            txtPath.Location = new Point(92, 12);
             txtPath.Name = "txtPath";
             txtPath.ReadOnly = true;
-            txtPath.Size = new Size(869, 25);
+            txtPath.Size = new Size(686, 25);
             txtPath.TabIndex = 1;
             // 
             // btnPath
             // 
             btnPath.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnPath.AutoSize = true;
-            btnPath.Location = new Point(953, 10);
+            btnPath.Location = new Point(784, 9);
             btnPath.Name = "btnPath";
-            btnPath.Size = new Size(135, 29);
+            btnPath.Size = new Size(149, 29);
             btnPath.TabIndex = 2;
-            btnPath.Text = "Seleccionar carpeta";
+            btnPath.Text = "Seleccionar carpeta(s)";
             btnPath.UseVisualStyleBackColor = true;
             btnPath.Click += btnPath_Click;
             // 
@@ -104,7 +108,6 @@
             dataGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             dataGrid.ContextMenuStrip = contextMenuStrip;
             dataGrid.Location = new Point(12, 134);
-            dataGrid.MultiSelect = false;
             dataGrid.Name = "dataGrid";
             dataGrid.ReadOnly = true;
             dataGrid.RowHeadersVisible = false;
@@ -112,15 +115,17 @@
             dataGrid.Size = new Size(1076, 428);
             dataGrid.TabIndex = 11;
             dataGrid.CellContentClick += dataGrid_CellContentClick;
+            dataGrid.CellDoubleClick += dataGrid_CellDoubleClick;
             dataGrid.CellFormatting += dataGrid_CellFormatting;
             dataGrid.CellMouseDown += dataGrid_CellMouseDown;
             dataGrid.DataBindingComplete += dataGrid_DataBindingComplete;
+            dataGrid.KeyDown += dataGrid_KeyDown;
             // 
             // contextMenuStrip
             // 
-            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuOpenFolder, mnuOpenAudacity });
+            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuOpenFolder, mnuOpenAudacity, mnuEditSong, mnuDeleteSong });
             contextMenuStrip.Name = "contextMenuStrip";
-            contextMenuStrip.Size = new Size(213, 48);
+            contextMenuStrip.Size = new Size(213, 114);
             // 
             // mnuOpenFolder
             // 
@@ -135,6 +140,13 @@
             mnuOpenAudacity.Size = new Size(212, 22);
             mnuOpenAudacity.Text = "Abrir en Audacity";
             mnuOpenAudacity.Click += mnuOpenAudacity_Click;
+            // 
+            // mnuEditSong
+            // 
+            mnuEditSong.Name = "mnuEditSong";
+            mnuEditSong.Size = new Size(212, 22);
+            mnuEditSong.Text = "Editar propiedades";
+            mnuEditSong.Click += mnuEditSong_Click;
             // 
             // btnAnalyze
             // 
@@ -210,6 +222,11 @@
             numericTolerance.Size = new Size(50, 25);
             numericTolerance.TabIndex = 4;
             numericTolerance.Value = new decimal(new int[] { 3, 0, 0, 65536 });
+            numericTolerance.ValueChanged += numericTolerance_ValueChanged;
+            // 
+            // folderBrowserDialog
+            // 
+            folderBrowserDialog.Multiselect = true;
             // 
             // label3
             // 
@@ -276,11 +293,37 @@
             saveFileDialog.Filter = "Archivo CSV|*.csv";
             saveFileDialog.Title = "Exportar resultados";
             // 
+            // btnFile
+            // 
+            btnFile.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnFile.AutoSize = true;
+            btnFile.Location = new Point(939, 9);
+            btnFile.Name = "btnFile";
+            btnFile.Size = new Size(149, 29);
+            btnFile.TabIndex = 17;
+            btnFile.Text = "Seleccionar archivo(s)";
+            btnFile.UseVisualStyleBackColor = true;
+            btnFile.Click += btnFile_Click;
+            // 
+            // openFileDialog
+            // 
+            openFileDialog.Filter = resources.GetString("openFileDialog.Filter");
+            openFileDialog.Multiselect = true;
+            // 
+            // mnuDeleteSong
+            // 
+            mnuDeleteSong.Name = "mnuDeleteSong";
+            mnuDeleteSong.Size = new Size(212, 22);
+            mnuDeleteSong.Text = "Eliminar archivo(s)";
+            mnuDeleteSong.Click += mnuDeleteSong_Click;
+            // 
             // Main
             // 
+            AllowDrop = true;
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1100, 611);
+            Controls.Add(btnFile);
             Controls.Add(lblStatus);
             Controls.Add(progressBar);
             Controls.Add(btnAdvanced);
@@ -304,6 +347,8 @@
             Name = "Main";
             Text = "Analizador de Audios";
             FormClosing += Main_FormClosing;
+            DragDrop += Main_DragDrop;
+            DragEnter += Main_DragEnter;
             ((System.ComponentModel.ISupportInitialize)dataGrid).EndInit();
             contextMenuStrip.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)numericTolerance).EndInit();
@@ -336,5 +381,9 @@
         private ContextMenuStrip contextMenuStrip;
         private ToolStripMenuItem mnuOpenFolder;
         private ToolStripMenuItem mnuOpenAudacity;
+        private Button btnFile;
+        private OpenFileDialog openFileDialog;
+        private ToolStripMenuItem mnuEditSong;
+        private ToolStripMenuItem mnuDeleteSong;
     }
 }

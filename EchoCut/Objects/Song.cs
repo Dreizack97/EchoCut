@@ -128,7 +128,25 @@ public sealed class Song : INotifyPropertyChanged
     /// <summary>Pista que representa la fila.</summary>
     /// <value>Metadatos leídos al escanear la carpeta.</value>
     [Browsable(false)]
-    public TrackInfo Track { get; }
+    public TrackInfo Track { get; private set; }
+
+    /// <summary>Actualiza la pista representada tras modificar sus metadatos o su nombre de archivo.</summary>
+    /// <param name="track">Pista con los datos actualizados.</param>
+    public void UpdateTrack(TrackInfo track)
+    {
+        Track = track;
+        OnPropertyChanged(nameof(Track));
+        OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(Artist));
+        OnPropertyChanged(nameof(Album));
+        OnPropertyChanged(nameof(Duration));
+        OnPropertyChanged(nameof(Extension));
+        OnPropertyChanged(nameof(Bitrate));
+        OnPropertyChanged(nameof(Size));
+        OnPropertyChanged(nameof(FilePath));
+        OnPropertyChanged(nameof(DurationSeconds));
+    }
 
     /// <summary>
     /// Resultado del análisis. Asignarlo repinta las columnas que dependen de él.

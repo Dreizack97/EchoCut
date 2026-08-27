@@ -9,7 +9,7 @@ namespace EchoCut
     /// </summary>
     /// <remarks>
     /// La rejilla se construye a partir de los atributos de <see cref="SilenceOptions"/> en lugar de
-    /// llevar un control por parámetro. Con veintiún parámetros, la versión manual obligaba a tocar
+    /// llevar un control por parámetro. Con veintidós parámetros, la versión manual obligaba a tocar
     /// tres sitios —el diseñador, la carga y el volcado— por cada uno que se añadiera, y de hecho
     /// solo siete llegaron a exponerse: los otros catorce únicamente se podían cambiar editando el
     /// JSON a mano.
