@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="EchoCut/EchoCut.csproj" />
+  <Project Path="EchoCut.Core/EchoCut.Core.csproj" />
+</Solution>

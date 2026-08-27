@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+    La capa de presentación. Vive en su propia carpeta y no en la raíz: mientras estuvo allí,
+    su glob **/*.cs alcanzaba a los proyectos anidados y hacía falta excluirlos uno a uno.
+  -->
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<UseWindowsForms>true</UseWindowsForms>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<ApplicationIcon>Ico.ico</ApplicationIcon>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Content Include="Ico.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\EchoCut.Core\EchoCut.Core.csproj" />
+	</ItemGroup>
+
+</Project>

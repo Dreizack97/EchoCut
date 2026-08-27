@@ -1,0 +1,833 @@
+using EchoCut.Audio;
+using EchoCut.Export;
+using EchoCut.Library;
+using EchoCut.Objects;
+using EchoCut.Options;
+using EchoCut.Playback;
+using EchoCut.Processing;
+using EchoCut.Shell;
+using System.ComponentModel;
+
+namespace EchoCut
+{
+    /// <summary>Ventana principal de EchoCut: escaneo de carpeta, análisis, recorte y exportación.</summary>
+    /// <remarks>
+    /// Es el único formulario de la aplicación y, desde la separación del núcleo, su única
+    /// responsabilidad es de presentación: recoge lo que el usuario pide, se lo encarga a
+    /// <see cref="AnalysisService"/> y <see cref="TrimService"/>, y vuelca de vuelta a la rejilla
+    /// lo que esos servicios van notificando. El algoritmo, FFmpeg y el paralelismo viven en
+    /// EchoCut.Core y este archivo no sabe nada de ellos.
+    /// </remarks>
+    public partial class Main : Form
+    {
+        private readonly AppSettings _settings = AppSettings.Load();
+        private readonly FFmpegLocator _locator = new();
+        private readonly SortableBindingList<Song> _songs = new();
+
+        /// <summary>Fila de cada pista, por ruta. Es cómo se vuelve del aviso del lote a la rejilla.</summary>
+        private readonly Dictionary<string, Song> _rows = new(StringComparer.OrdinalIgnoreCase);
+
+        private readonly AnalysisService _analysis;
+        private readonly TrimService _trimmer;
+
+        private CancellationTokenSource? _analysisCts;
+        private CancellationTokenSource? _trimCts;
+
+        /// <summary>Reproducción de previsualización, creada al primer uso porque necesita FFmpeg.</summary>
+        private AudioPreviewPlayer? _preview;
+        private CancellationTokenSource? _previewCts;
+        private System.Windows.Forms.Timer? _previewTimer;
+        private Song? _playingSong;
+
+        /// <summary>Carpeta escaneada, origen de las copias recortadas.</summary>
+        private string _sourceDirectory = string.Empty;
+
+        /// <summary>
+        /// Lote en curso. Cerrar la ventana debe esperarlo: cancelar sin esperar deja procesos de
+        /// ffmpeg.exe huérfanos y acciones ya encoladas que se ejecutarían sobre controles destruidos.
+        /// </summary>
+        private Task? _running;
+
+        /// <summary>Inicializa la ventana, restaura los parámetros guardados y enlaza la rejilla.</summary>
+        public Main()
+        {
+            InitializeComponent();
+
+            _analysis = new AnalysisService(_locator);
+            _trimmer = new TrimService(_locator);
+
+            numericTolerance.Value = Clamp(numericTolerance, _settings.Silence.ToleranceSeconds);
+            numericThreads.Value = Clamp(
+                numericThreads,
+                _settings.ThreadCount > 0 ? _settings.ThreadCount : AppSettings.DefaultThreadCount);
+
+            dataGrid.DefaultCellStyle.SelectionBackColor = SongPresentation.Selection;
+            dataGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dataGrid.DataSource = _songs;
+
+            _songs.ListChanged += Songs_ListChanged;
+
+            UpdateButtons();
+        }
+
+        /// <summary>
+        /// Fuerza el repintado de toda la fila cuando cambia <see cref="Song.Estatus"/>.
+        /// </summary>
+        /// <remarks>
+        /// El color de texto de cada columna depende del estado, pero <c>ListChanged</c> solo marca
+        /// como sucia la celda de la propiedad que cambió: sin este repintado explícito, el resto de
+        /// la fila se queda pintada con el color del estado anterior hasta que algo más —como
+        /// seleccionarla— fuerza un repintado completo.
+        /// </remarks>
+        private void Songs_ListChanged(object? sender, ListChangedEventArgs e)
+        {
+            if (!IsAlive
+                || e.ListChangedType != ListChangedType.ItemChanged
+                || e.PropertyDescriptor?.Name != nameof(Song.Estatus)
+                || e.NewIndex < 0 || e.NewIndex >= dataGrid.Rows.Count)
+            {
+                return;
+            }
+
+            dataGrid.InvalidateRow(e.NewIndex);
+        }
+
+        private bool IsBusy => _analysisCts is not null || _trimCts is not null;
+
+        /// <summary>
+        /// Si la ventana sigue viva. Un lote que ya había terminado hace que la espera del cierre
+        /// continúe de forma síncrona y destruya el formulario antes de que corra el <c>finally</c>
+        /// del manejador del lote, que entonces tocaría controles ya liberados.
+        /// </summary>
+        private bool IsAlive => !IsDisposed && !Disposing;
+
+        // ---------------------------------------------------------------- Selección de carpeta
+
+        private void btnPath_Click(object sender, EventArgs e)
+        {
+            if (folderBrowserDialog.ShowDialog() != DialogResult.OK)
+            {
+                return;
+            }
+
+            _sourceDirectory = folderBrowserDialog.SelectedPath;
+            txtPath.Text = _sourceDirectory;
+
+            ScanResult scan = TrackScanner.Scan(_sourceDirectory);
+
+            _songs.RaiseListChangedEvents = false;
+            _songs.Clear();
+            _rows.Clear();
+
+            foreach (TrackInfo track in scan.Tracks)
+            {
+                Song song = new(track);
+                _songs.Add(song);
+                _rows[track.FilePath] = song;
+            }
+
+            _songs.RaiseListChangedEvents = true;
+            _songs.ResetBindings();
+
+            // Cargar otra carpeta no debe dejar la cabecera marcada con una flecha de orden que ya
+            // no se corresponde con lo que se ve.
+            _songs.ReapplySort();
+
+            lblStatus.Text = scan.SkippedCount == 0
+                ? $"{_songs.Count} archivo(s) encontrados."
+                : $"{_songs.Count} archivo(s) encontrados; {scan.SkippedCount} ilegible(s) omitido(s).";
+
+            progressBar.Value = 0;
+            UpdateButtons();
+        }
+
+        // ---------------------------------------------------------------------------- Análisis
+
+        private async void btnAnalyze_Click(object sender, EventArgs e)
+        {
+            if (IsBusy || _songs.Count == 0 || !EnsureFFmpeg())
+            {
+                return;
+            }
+
+            StopPreview();
+
+            List<TrackInfo> pending = _songs.Select(x => x.Track).ToList();
+
+            using CancellationTokenSource cts = new();
+            _analysisCts = cts;
+            UpdateButtons();
+
+            StartProgress(pending.Count, "Analizando…");
+
+            try
+            {
+                _running = _analysis.AnalyzeAsync(
+                    pending,
+                    CurrentOptions(),
+                    (int)numericThreads.Value,
+                    CreateProgress<TrackAnalysis>(ApplyAnalysis),
+                    cts.Token);
+
+                await _running.ConfigureAwait(true);
+
+                int trimmable = _songs.Count(x => x.ShouldTrim);
+                SetStatus($"Análisis completado. {trimmable} de {_songs.Count} con cola recortable.");
+            }
+            catch (OperationCanceledException)
+            {
+                SetStatus("Análisis cancelado.");
+            }
+            catch (Exception exception)
+            {
+                ShowError("No se pudo completar el análisis.", exception);
+            }
+            finally
+            {
+                _analysisCts = null;
+                _running = null;
+
+                if (IsAlive)
+                {
+                    EndProgress();
+                    UpdateButtons();
+                }
+            }
+        }
+
+        /// <summary>Vuelca a la rejilla lo que el servicio de análisis va notificando.</summary>
+        private void ApplyAnalysis(TrackProgress<TrackAnalysis> progress)
+        {
+            if (RowFor(progress.Track) is not { } song)
+            {
+                return;
+            }
+
+            switch (progress.State)
+            {
+                case TrackState.Running:
+                    song.Estatus = Song.StatusAnalyzing;
+                    break;
+
+                case TrackState.Completed when progress.Result is { } analysis:
+                    song.Complete(analysis);
+                    break;
+
+                case TrackState.Failed when progress.Error is { } error:
+                    song.Fail(error);
+                    break;
+
+                case TrackState.Cancelled:
+                    song.Estatus = Song.StatusCancelled;
+                    break;
+            }
+
+            AdvanceProgress(progress.CompletedCount);
+        }
+
+        private void btnCancel_Click(object sender, EventArgs e) => _analysisCts?.Cancel();
+
+        // ------------------------------------------------------------------ Acciones de fila
+
+        /// <summary>
+        /// Atiende la pulsación de las columnas de acción.
+        /// </summary>
+        /// <remarks>
+        /// <c>CellContentClick</c> y no <c>CellClick</c>: en una columna de botones solo se dispara
+        /// al pulsar el botón, no al seleccionar la fila, así que elegir una pista para verla no
+        /// desencadena nada.
+        /// </remarks>
+        private async void dataGrid_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || IsBusy)
+            {
+                return;
+            }
+
+            if (dataGrid.Rows[e.RowIndex].DataBoundItem is not Song song)
+            {
+                return;
+            }
+
+            string columnName = dataGrid.Columns[e.ColumnIndex].Name;
+
+            // El manejador es async void: una excepción que escape de aquí no tiene quién la
+            // recoja y termina el proceso. Las rutas internas ya informan de sus propios fallos;
+            // esto cubre lo que ocurra antes de entrar en ellas.
+            try
+            {
+                if (columnName == PlayColumnName)
+                {
+                    await TogglePreviewAsync(song).ConfigureAwait(true);
+                }
+                else if (columnName == TrimColumnName && SongPresentation.CanTrim(song))
+                {
+                    await TrimSingleAsync(song).ConfigureAwait(true);
+                }
+            }
+            catch (Exception exception)
+            {
+                ShowError("No se pudo completar la acción sobre la pista.", exception);
+            }
+        }
+
+        // ------------------------------------------------------------------- Previsualización
+
+        /// <summary>Reproduce el final resultante de una pista, o lo detiene si ya está sonando.</summary>
+        private async Task TogglePreviewAsync(Song song)
+        {
+            if (ReferenceEquals(song, _playingSong))
+            {
+                StopPreview();
+                return;
+            }
+
+            if (!EnsureFFmpeg())
+            {
+                return;
+            }
+
+            StopPreview();
+
+            PreviewWindow window = AudioPreview.WindowFor(
+                song.DurationSeconds,
+                song.CutSeconds,
+                song.Silence,
+                (double)numericTolerance.Value);
+
+            using CancellationTokenSource cts = new();
+            _previewCts = cts;
+
+            try
+            {
+                _preview ??= new AudioPreviewPlayer(_locator.Require().FFmpeg);
+                SetStatus($"Preparando el final de {song.Name}…");
+
+                TimeSpan duration = await _preview
+                    .PlayAsync(song.FilePath, window, cts.Token)
+                    .ConfigureAwait(true);
+
+                if (!IsAlive || cts.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                _playingSong = song;
+                SetStatus($"Reproduciendo el final de {song.Name}…");
+
+                // SoundPlayer no avisa de que terminó, así que el glifo se devuelve a su sitio con
+                // un temporizador de la duración ya conocida.
+                _previewTimer = new System.Windows.Forms.Timer
+                {
+                    Interval = (int)Math.Max(1, duration.TotalMilliseconds) + 100,
+                };
+                _previewTimer.Tick += (_, _) => StopPreview();
+                _previewTimer.Start();
+
+                RefreshPlayColumn();
+            }
+            catch (OperationCanceledException)
+            {
+                SetStatus("Previsualización cancelada.");
+            }
+            catch (Exception exception)
+            {
+                ShowError("No se pudo reproducir la previsualización.", exception);
+            }
+            finally
+            {
+                _previewCts = null;
+            }
+        }
+
+        private void StopPreview()
+        {
+            _previewCts?.Cancel();
+
+            if (_previewTimer is { } timer)
+            {
+                timer.Stop();
+                timer.Dispose();
+                _previewTimer = null;
+            }
+
+            _preview?.Stop();
+
+            if (_playingSong is null)
+            {
+                return;
+            }
+
+            _playingSong = null;
+            RefreshPlayColumn();
+        }
+
+        /// <summary>Repinta la columna de reproducción para que el glifo refleje qué está sonando.</summary>
+        private void RefreshPlayColumn()
+        {
+            if (IsAlive && dataGrid.Columns[PlayColumnName] is { } column)
+            {
+                dataGrid.InvalidateColumn(column.Index);
+            }
+        }
+
+        // ----------------------------------------------------------------------------- Recorte
+
+        private async void btnCropAll_Click(object sender, EventArgs e)
+        {
+            if (IsBusy || !EnsureFFmpeg())
+            {
+                return;
+            }
+
+            StopPreview();
+
+            List<TrimRequest> targets = _songs
+                .Where(x => x.ShouldTrim && x.CutSeconds is not null)
+                .Select(x => new TrimRequest(x.Track, x.CutSeconds!.Value))
+                .ToList();
+
+            if (targets.Count == 0)
+            {
+                MessageBox.Show(
+                    this,
+                    "No hay pistas con cola recortable. Ejecuta primero el análisis.",
+                    "Nada que recortar",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            string outputDirectory = TrimService.GetOutputDirectory(_sourceDirectory);
+            if (MessageBox.Show(
+                    this,
+                    $"Se escribirán {targets.Count} archivo(s) recortado(s) en:\n{outputDirectory}\n\n"
+                    + "Los archivos originales no se modificarán.",
+                    "Confirmar recorte",
+                    MessageBoxButtons.OKCancel,
+                    MessageBoxIcon.Question) != DialogResult.OK)
+            {
+                return;
+            }
+
+            using CancellationTokenSource cts = new();
+            _trimCts = cts;
+            UpdateButtons();
+
+            StartProgress(targets.Count, "Recortando…");
+
+            try
+            {
+                Task<BatchSummary> batch = _trimmer.TrimAsync(
+                    targets,
+                    outputDirectory,
+                    (int)numericThreads.Value,
+                    CreateProgress<TrimOutcome>(ApplyTrim),
+                    cts.Token);
+
+                _running = batch;
+                BatchSummary summary = await batch.ConfigureAwait(true);
+
+                SetStatus(summary.Failed == 0
+                    ? $"Recorte completado: {summary.Total} archivo(s) en «{TrimService.OutputFolderName}»."
+                    : $"Recorte completado con {summary.Failed} error(es) de {summary.Total}.");
+            }
+            catch (OperationCanceledException)
+            {
+                SetStatus("Recorte detenido.");
+            }
+            catch (Exception exception)
+            {
+                ShowError("No se pudo completar el recorte.", exception);
+            }
+            finally
+            {
+                _trimCts = null;
+                _running = null;
+
+                if (IsAlive)
+                {
+                    EndProgress();
+                    UpdateButtons();
+                }
+            }
+        }
+
+        /// <summary>Vuelca a la rejilla lo que el servicio de recorte va notificando.</summary>
+        private void ApplyTrim(TrackProgress<TrimOutcome> progress)
+        {
+            if (RowFor(progress.Track) is not { } song)
+            {
+                return;
+            }
+
+            song.Estatus = progress.State switch
+            {
+                TrackState.Running => Song.StatusTrimming,
+                TrackState.Completed => Song.StatusTrimmed,
+                TrackState.Cancelled => Song.StatusCancelled,
+                _ => song.Estatus,
+            };
+
+            if (progress is { State: TrackState.Failed, Error: { } error })
+            {
+                song.Fail(error);
+            }
+
+            AdvanceProgress(progress.CompletedCount);
+        }
+
+        private void btnStop_Click(object sender, EventArgs e) => _trimCts?.Cancel();
+
+        /// <summary>
+        /// Recorta una sola pista, la de la fila pulsada.
+        /// </summary>
+        /// <remarks>
+        /// Comparte el <see cref="_trimCts"/> del lote y se anota en <see cref="_running"/> aunque
+        /// sea un solo archivo: así el botón «Detener» la alcanza y, sobre todo, cerrar la ventana
+        /// espera a que termine. Un recorte que no pasara por ahí dejaría un ffmpeg.exe huérfano.
+        /// Tampoco pasa por <see cref="CreateProgress{T}"/>: aquí no hay hilo de trabajo del que
+        /// marshalar, y encolar la mutación la haría llegar después del «Recortado» que se fija
+        /// tras el <c>await</c>, dejando la fila clavada en «Recortando…».
+        /// </remarks>
+        private async Task TrimSingleAsync(Song song)
+        {
+            if (IsBusy || !EnsureFFmpeg() || song.CutSeconds is not { } cut)
+            {
+                return;
+            }
+
+            // El archivo que se va a reescribir no puede estar sonando.
+            if (ReferenceEquals(song, _playingSong))
+            {
+                StopPreview();
+            }
+
+            string outputDirectory = TrimService.GetOutputDirectory(
+                song.Track.Directory is { Length: > 0 } directory ? directory : _sourceDirectory);
+
+            using CancellationTokenSource cts = new();
+            _trimCts = cts;
+            UpdateButtons();
+
+            StartProgress(1, $"Recortando {song.Name}…");
+            song.Estatus = Song.StatusTrimming;
+
+            try
+            {
+                Task<TrimOutcome> trim = _trimmer.TrimOneAsync(
+                    new TrimRequest(song.Track, cut),
+                    outputDirectory,
+                    cts.Token);
+
+                _running = trim;
+                await trim.ConfigureAwait(true);
+
+                song.Estatus = Song.StatusTrimmed;
+                SetStatus($"Recortado en «{TrimService.OutputFolderName}»: {song.Name}.");
+            }
+            catch (OperationCanceledException)
+            {
+                song.Estatus = Song.StatusCancelled;
+                SetStatus("Recorte detenido.");
+            }
+            catch (Exception exception)
+            {
+                song.Fail(exception);
+                ShowError("No se pudo recortar la pista.", exception);
+            }
+            finally
+            {
+                _trimCts = null;
+                _running = null;
+
+                if (IsAlive)
+                {
+                    EndProgress();
+                    UpdateButtons();
+                }
+            }
+        }
+
+        // --------------------------------------------------------------------------- Exportar
+
+        private void btnExport_Click(object sender, EventArgs e)
+        {
+            if (_songs.Count == 0)
+            {
+                return;
+            }
+
+            saveFileDialog.FileName = $"echocut-{DateTime.Now:yyyyMMdd-HHmm}.csv";
+            if (saveFileDialog.ShowDialog() != DialogResult.OK)
+            {
+                return;
+            }
+
+            try
+            {
+                File.WriteAllText(
+                    saveFileDialog.FileName,
+                    CsvExporter.Build(_songs.Select(x => x.ToRecord())),
+                    CsvExporter.Encoding);
+
+                lblStatus.Text = $"Resultados exportados a {Path.GetFileName(saveFileDialog.FileName)}.";
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                ShowError("No se pudo escribir el archivo CSV.", exception);
+            }
+        }
+
+        // ------------------------------------------------------------------- Opciones y estado
+
+        private void btnAdvanced_Click(object sender, EventArgs e)
+        {
+            using AdvancedOptions dialog = new(_settings.Silence);
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                _settings.Silence = dialog.Result;
+                _settings.Save();
+                lblStatus.Text = "Parámetros avanzados actualizados.";
+            }
+        }
+
+        /// <summary>Parámetros efectivos: los avanzados más la tolerancia de la ventana principal.</summary>
+        private SilenceOptions CurrentOptions()
+        {
+            SilenceOptions options = _settings.Silence.Clone();
+            options.ToleranceSeconds = (double)numericTolerance.Value;
+            return options;
+        }
+
+        /// <summary>Localiza la fila de una pista notificada por un lote.</summary>
+        private Song? RowFor(TrackInfo track) =>
+            _rows.TryGetValue(track.FilePath, out Song? song) ? song : null;
+
+        /// <summary>
+        /// Canal para devolver al hilo de interfaz los avisos que nacen en los hilos de trabajo.
+        /// <see cref="Progress{T}"/> captura el contexto de sincronización en su construcción, así
+        /// que debe crearse aquí, en el hilo de la interfaz, y no dentro del cuerpo paralelo.
+        /// </summary>
+        /// <remarks>
+        /// Los avisos se encolan y se atienden más tarde, así que pueden llegar cuando el
+        /// formulario ya se está destruyendo; tocar un control en ese momento lanza
+        /// <see cref="ObjectDisposedException"/> sin nadie que la capture. Y una excepción que
+        /// escape de aquí viaja por el bucle de mensajes y termina el proceso, de modo que un fallo
+        /// al volcar el resultado de un solo archivo tumbaría el lote entero.
+        /// </remarks>
+        private IProgress<TrackProgress<T>> CreateProgress<T>(Action<TrackProgress<T>> apply)
+            where T : class => new Progress<TrackProgress<T>>(progress =>
+            {
+                if (IsDisposed || Disposing)
+                {
+                    return;
+                }
+
+                try
+                {
+                    apply(progress);
+                }
+                catch (Exception exception)
+                {
+                    lblStatus.Text = $"Error al actualizar la interfaz: {exception.Message}";
+                }
+            });
+
+        /// <summary>
+        /// Resuelve FFmpeg desde la carpeta guardada o el PATH y, si no aparece, deja que el
+        /// usuario la indique. No se distribuyen ni se descargan binarios.
+        /// </summary>
+        private bool EnsureFFmpeg()
+        {
+            if (_locator.IsResolved || _locator.TryResolve(_settings.FFmpegDirectory))
+            {
+                return true;
+            }
+
+            MessageBox.Show(
+                this,
+                "No se encontró FFmpeg en el PATH del sistema.\n\n"
+                + "Indica a continuación la carpeta que contiene ffmpeg.exe y ffprobe.exe.",
+                "FFmpeg no encontrado",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+
+            using FolderBrowserDialog picker = new() { Description = "Carpeta de FFmpeg" };
+            if (picker.ShowDialog(this) != DialogResult.OK)
+            {
+                return false;
+            }
+
+            if (!_locator.TryUseDirectory(picker.SelectedPath))
+            {
+                MessageBox.Show(
+                    this,
+                    "Esa carpeta no contiene ffmpeg.exe y ffprobe.exe.",
+                    "FFmpeg no encontrado",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return false;
+            }
+
+            _settings.FFmpegDirectory = picker.SelectedPath;
+            _settings.Save();
+            return true;
+        }
+
+        private void StartProgress(int total, string message)
+        {
+            progressBar.Maximum = Math.Max(1, total);
+            progressBar.Value = 0;
+            lblStatus.Text = message;
+        }
+
+        private void AdvanceProgress(int completed) =>
+            progressBar.Value = Math.Min(completed, progressBar.Maximum);
+
+        private void EndProgress() => progressBar.Value = progressBar.Maximum;
+
+        private void UpdateButtons()
+        {
+            bool analyzing = _analysisCts is not null;
+            bool trimming = _trimCts is not null;
+            bool hasSongs = _songs.Count > 0;
+
+            btnPath.Enabled = !IsBusy;
+            btnAnalyze.Enabled = !IsBusy && hasSongs;
+            btnCancel.Enabled = analyzing;
+            btnCropAll.Enabled = !IsBusy && hasSongs;
+            btnStop.Enabled = trimming;
+            btnExport.Enabled = !IsBusy && hasSongs;
+            btnAdvanced.Enabled = !IsBusy;
+            numericThreads.Enabled = !IsBusy;
+            numericTolerance.Enabled = !IsBusy;
+        }
+
+        private void SetStatus(string message)
+        {
+            if (IsAlive)
+            {
+                lblStatus.Text = message;
+            }
+        }
+
+        private void ShowError(string message, Exception exception)
+        {
+            if (!IsAlive)
+            {
+                return;
+            }
+
+            lblStatus.Text = message;
+            MessageBox.Show(
+                this,
+                $"{message}\n\n{exception.Message}",
+                "Error",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+
+        private async void Main_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            StopPreview();
+            _preview?.Dispose();
+            _preview = null;
+
+            _settings.Silence.ToleranceSeconds = (double)numericTolerance.Value;
+            _settings.ThreadCount = (int)numericThreads.Value;
+            _settings.Save();
+
+            if (_running is not { } running)
+            {
+                return;
+            }
+
+            // Cancelar y cerrar sin esperar deja procesos de ffmpeg.exe huérfanos: la señal de
+            // cancelación tarda en llegar al bucle de lectura que los mata. Se aborta el cierre,
+            // se espera al lote y solo entonces se vuelve a cerrar.
+            e.Cancel = true;
+            _analysisCts?.Cancel();
+            _trimCts?.Cancel();
+            SetStatus("Cerrando: esperando a que terminen las tareas en curso…");
+
+            try
+            {
+                await running.ConfigureAwait(true);
+            }
+            catch (Exception)
+            {
+                // El cierre no debe fallar por cómo terminara el lote; los manejadores del lote ya
+                // informaron del error en su propia ruta.
+            }
+
+            _running = null;
+            Close();
+        }
+
+        private static decimal Clamp(NumericUpDown control, double value) =>
+            Math.Clamp((decimal)value, control.Minimum, control.Maximum);
+
+        // ------------------------------------------------------------------- Menú contextual
+
+        private void dataGrid_CellMouseDown(object? sender, DataGridViewCellMouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Right && e.RowIndex >= 0 && e.ColumnIndex >= 0)
+            {
+                dataGrid.ClearSelection();
+                dataGrid.Rows[e.RowIndex].Selected = true;
+                dataGrid.CurrentCell = dataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex];
+            }
+        }
+
+        private Song? GetSelectedSong() =>
+            dataGrid.SelectedRows.Count > 0 && dataGrid.SelectedRows[0].DataBoundItem is Song song
+                ? song
+                : null;
+
+        private void mnuOpenFolder_Click(object? sender, EventArgs e)
+        {
+            if (GetSelectedSong() is not { } song)
+            {
+                return;
+            }
+
+            try
+            {
+                ExternalApps.RevealInExplorer(song.FilePath);
+            }
+            catch (Exception exception)
+            {
+                ShowError("No se pudo abrir la carpeta contenedora.", exception);
+            }
+        }
+
+        private void mnuOpenAudacity_Click(object? sender, EventArgs e)
+        {
+            if (GetSelectedSong() is not { } song)
+            {
+                return;
+            }
+
+            if (ExternalApps.FindAudacity() is not { } audacityPath)
+            {
+                MessageBox.Show(
+                    this,
+                    "No se encontró Audacity en las rutas por defecto. Por favor, instálelo o verifique su ubicación.",
+                    "Audacity no encontrado",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                ExternalApps.OpenInAudacity(audacityPath, song.FilePath);
+            }
+            catch (Exception exception)
+            {
+                ShowError("No se pudo abrir Audacity.", exception);
+            }
+        }
+    }
+}

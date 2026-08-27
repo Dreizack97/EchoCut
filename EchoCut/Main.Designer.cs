@@ -1,0 +1,340 @@
+﻿namespace EchoCut
+{
+    partial class Main
+    {
+        /// <summary>
+        ///  Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary>
+        ///  Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+
+        /// <summary>
+        ///  Required method for Designer support - do not modify
+        ///  the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            components = new System.ComponentModel.Container();
+            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Main));
+            label1 = new Label();
+            txtPath = new TextBox();
+            btnPath = new Button();
+            dataGrid = new DataGridView();
+            contextMenuStrip = new ContextMenuStrip(components);
+            mnuOpenFolder = new ToolStripMenuItem();
+            mnuOpenAudacity = new ToolStripMenuItem();
+            btnAnalyze = new Button();
+            btnCancel = new Button();
+            btnCropAll = new Button();
+            btnStop = new Button();
+            btnExport = new Button();
+            label2 = new Label();
+            numericTolerance = new NumericUpDown();
+            folderBrowserDialog = new FolderBrowserDialog();
+            label3 = new Label();
+            label4 = new Label();
+            numericThreads = new NumericUpDown();
+            btnAdvanced = new Button();
+            progressBar = new ProgressBar();
+            lblStatus = new Label();
+            saveFileDialog = new SaveFileDialog();
+            ((System.ComponentModel.ISupportInitialize)dataGrid).BeginInit();
+            contextMenuStrip.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)numericTolerance).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)numericThreads).BeginInit();
+            SuspendLayout();
+            // 
+            // label1
+            // 
+            label1.AutoSize = true;
+            label1.Location = new Point(12, 15);
+            label1.Name = "label1";
+            label1.Size = new Size(60, 19);
+            label1.TabIndex = 0;
+            label1.Text = "Carpeta:";
+            // 
+            // txtPath
+            // 
+            txtPath.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            txtPath.BackColor = SystemColors.Window;
+            txtPath.Location = new Point(78, 12);
+            txtPath.Name = "txtPath";
+            txtPath.ReadOnly = true;
+            txtPath.Size = new Size(869, 25);
+            txtPath.TabIndex = 1;
+            // 
+            // btnPath
+            // 
+            btnPath.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnPath.AutoSize = true;
+            btnPath.Location = new Point(953, 10);
+            btnPath.Name = "btnPath";
+            btnPath.Size = new Size(135, 29);
+            btnPath.TabIndex = 2;
+            btnPath.Text = "Seleccionar carpeta";
+            btnPath.UseVisualStyleBackColor = true;
+            btnPath.Click += btnPath_Click;
+            // 
+            // dataGrid
+            // 
+            dataGrid.AllowUserToAddRows = false;
+            dataGrid.AllowUserToDeleteRows = false;
+            dataGrid.AllowUserToResizeRows = false;
+            dataGridViewCellStyle1.BackColor = SystemColors.Control;
+            dataGrid.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
+            dataGrid.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            dataGrid.BorderStyle = BorderStyle.None;
+            dataGrid.CellBorderStyle = DataGridViewCellBorderStyle.None;
+            dataGrid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+            dataGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dataGrid.ContextMenuStrip = contextMenuStrip;
+            dataGrid.Location = new Point(12, 134);
+            dataGrid.MultiSelect = false;
+            dataGrid.Name = "dataGrid";
+            dataGrid.ReadOnly = true;
+            dataGrid.RowHeadersVisible = false;
+            dataGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dataGrid.Size = new Size(1076, 428);
+            dataGrid.TabIndex = 11;
+            dataGrid.CellContentClick += dataGrid_CellContentClick;
+            dataGrid.CellFormatting += dataGrid_CellFormatting;
+            dataGrid.CellMouseDown += dataGrid_CellMouseDown;
+            dataGrid.DataBindingComplete += dataGrid_DataBindingComplete;
+            // 
+            // contextMenuStrip
+            // 
+            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuOpenFolder, mnuOpenAudacity });
+            contextMenuStrip.Name = "contextMenuStrip";
+            contextMenuStrip.Size = new Size(213, 48);
+            // 
+            // mnuOpenFolder
+            // 
+            mnuOpenFolder.Name = "mnuOpenFolder";
+            mnuOpenFolder.Size = new Size(212, 22);
+            mnuOpenFolder.Text = "Abrir carpeta contenedora";
+            mnuOpenFolder.Click += mnuOpenFolder_Click;
+            // 
+            // mnuOpenAudacity
+            // 
+            mnuOpenAudacity.Name = "mnuOpenAudacity";
+            mnuOpenAudacity.Size = new Size(212, 22);
+            mnuOpenAudacity.Text = "Abrir en Audacity";
+            mnuOpenAudacity.Click += mnuOpenAudacity_Click;
+            // 
+            // btnAnalyze
+            // 
+            btnAnalyze.AutoSize = true;
+            btnAnalyze.Location = new Point(12, 99);
+            btnAnalyze.Name = "btnAnalyze";
+            btnAnalyze.Size = new Size(140, 29);
+            btnAnalyze.TabIndex = 6;
+            btnAnalyze.Text = "Analizar";
+            btnAnalyze.UseVisualStyleBackColor = true;
+            btnAnalyze.Click += btnAnalyze_Click;
+            // 
+            // btnCancel
+            // 
+            btnCancel.AutoSize = true;
+            btnCancel.Location = new Point(172, 99);
+            btnCancel.Name = "btnCancel";
+            btnCancel.Size = new Size(140, 29);
+            btnCancel.TabIndex = 7;
+            btnCancel.Text = "Cancelar";
+            btnCancel.UseVisualStyleBackColor = true;
+            btnCancel.Click += btnCancel_Click;
+            // 
+            // btnCropAll
+            // 
+            btnCropAll.AutoSize = true;
+            btnCropAll.Location = new Point(332, 99);
+            btnCropAll.Name = "btnCropAll";
+            btnCropAll.Size = new Size(140, 29);
+            btnCropAll.TabIndex = 8;
+            btnCropAll.Text = "Recortar todos";
+            btnCropAll.UseVisualStyleBackColor = true;
+            btnCropAll.Click += btnCropAll_Click;
+            // 
+            // btnStop
+            // 
+            btnStop.AutoSize = true;
+            btnStop.Location = new Point(492, 99);
+            btnStop.Name = "btnStop";
+            btnStop.Size = new Size(140, 29);
+            btnStop.TabIndex = 9;
+            btnStop.Text = "⏹ Detener";
+            btnStop.UseVisualStyleBackColor = true;
+            btnStop.Click += btnStop_Click;
+            // 
+            // btnExport
+            // 
+            btnExport.AutoSize = true;
+            btnExport.Location = new Point(652, 99);
+            btnExport.Name = "btnExport";
+            btnExport.Size = new Size(140, 29);
+            btnExport.TabIndex = 10;
+            btnExport.Text = "Exportar resultados";
+            btnExport.UseVisualStyleBackColor = true;
+            btnExport.Click += btnExport_Click;
+            // 
+            // label2
+            // 
+            label2.AutoSize = true;
+            label2.Location = new Point(12, 59);
+            label2.Name = "label2";
+            label2.Size = new Size(222, 19);
+            label2.TabIndex = 3;
+            label2.Text = "Silencio que se conserva al recortar";
+            // 
+            // numericTolerance
+            // 
+            numericTolerance.DecimalPlaces = 1;
+            numericTolerance.Increment = new decimal(new int[] { 1, 0, 0, 65536 });
+            numericTolerance.Location = new Point(240, 56);
+            numericTolerance.Maximum = new decimal(new int[] { 5, 0, 0, 0 });
+            numericTolerance.Name = "numericTolerance";
+            numericTolerance.Size = new Size(50, 25);
+            numericTolerance.TabIndex = 4;
+            numericTolerance.Value = new decimal(new int[] { 3, 0, 0, 65536 });
+            // 
+            // label3
+            // 
+            label3.AutoSize = true;
+            label3.Location = new Point(296, 59);
+            label3.Name = "label3";
+            label3.Size = new Size(71, 19);
+            label3.TabIndex = 5;
+            label3.Text = "segundos.";
+            // 
+            // label4
+            // 
+            label4.AutoSize = true;
+            label4.Location = new Point(400, 59);
+            label4.Name = "label4";
+            label4.Size = new Size(135, 19);
+            label4.TabIndex = 12;
+            label4.Text = "Archivos en paralelo:";
+            // 
+            // numericThreads
+            // 
+            numericThreads.Location = new Point(548, 56);
+            numericThreads.Maximum = new decimal(new int[] { 64, 0, 0, 0 });
+            numericThreads.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            numericThreads.Name = "numericThreads";
+            numericThreads.Size = new Size(50, 25);
+            numericThreads.TabIndex = 13;
+            numericThreads.Value = new decimal(new int[] { 8, 0, 0, 0 });
+            // 
+            // btnAdvanced
+            // 
+            btnAdvanced.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnAdvanced.AutoSize = true;
+            btnAdvanced.Location = new Point(953, 54);
+            btnAdvanced.Name = "btnAdvanced";
+            btnAdvanced.Size = new Size(135, 29);
+            btnAdvanced.TabIndex = 14;
+            btnAdvanced.Text = "Avanzado…";
+            btnAdvanced.UseVisualStyleBackColor = true;
+            btnAdvanced.Click += btnAdvanced_Click;
+            // 
+            // progressBar
+            // 
+            progressBar.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            progressBar.Location = new Point(12, 574);
+            progressBar.Name = "progressBar";
+            progressBar.Size = new Size(1076, 22);
+            progressBar.TabIndex = 15;
+            // 
+            // lblStatus
+            // 
+            lblStatus.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            lblStatus.AutoEllipsis = true;
+            lblStatus.Location = new Point(798, 104);
+            lblStatus.Name = "lblStatus";
+            lblStatus.Size = new Size(290, 19);
+            lblStatus.TabIndex = 16;
+            lblStatus.Text = "Listo.";
+            lblStatus.TextAlign = ContentAlignment.MiddleRight;
+            // 
+            // saveFileDialog
+            // 
+            saveFileDialog.DefaultExt = "csv";
+            saveFileDialog.Filter = "Archivo CSV|*.csv";
+            saveFileDialog.Title = "Exportar resultados";
+            // 
+            // Main
+            // 
+            AutoScaleDimensions = new SizeF(7F, 17F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(1100, 611);
+            Controls.Add(lblStatus);
+            Controls.Add(progressBar);
+            Controls.Add(btnAdvanced);
+            Controls.Add(numericThreads);
+            Controls.Add(label4);
+            Controls.Add(label3);
+            Controls.Add(numericTolerance);
+            Controls.Add(label2);
+            Controls.Add(btnExport);
+            Controls.Add(btnStop);
+            Controls.Add(btnCropAll);
+            Controls.Add(btnCancel);
+            Controls.Add(btnAnalyze);
+            Controls.Add(dataGrid);
+            Controls.Add(btnPath);
+            Controls.Add(txtPath);
+            Controls.Add(label1);
+            Font = new Font("Segoe UI", 10F);
+            Icon = (Icon)resources.GetObject("$this.Icon");
+            MinimumSize = new Size(940, 550);
+            Name = "Main";
+            Text = "Analizador de Audios";
+            FormClosing += Main_FormClosing;
+            ((System.ComponentModel.ISupportInitialize)dataGrid).EndInit();
+            contextMenuStrip.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)numericTolerance).EndInit();
+            ((System.ComponentModel.ISupportInitialize)numericThreads).EndInit();
+            ResumeLayout(false);
+            PerformLayout();
+        }
+
+        #endregion
+
+        private Label label1;
+        private TextBox txtPath;
+        private Button btnPath;
+        private DataGridView dataGrid;
+        private Button btnAnalyze;
+        private Button btnCancel;
+        private Button btnCropAll;
+        private Button btnStop;
+        private Button btnExport;
+        private Label label2;
+        private NumericUpDown numericTolerance;
+        private FolderBrowserDialog folderBrowserDialog;
+        private Label label3;
+        private Label label4;
+        private NumericUpDown numericThreads;
+        private Button btnAdvanced;
+        private ProgressBar progressBar;
+        private Label lblStatus;
+        private SaveFileDialog saveFileDialog;
+        private ContextMenuStrip contextMenuStrip;
+        private ToolStripMenuItem mnuOpenFolder;
+        private ToolStripMenuItem mnuOpenAudacity;
+    }
+}
