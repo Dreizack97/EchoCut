@@ -1,9 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-	<!--
-    La capa de presentación. Vive en su propia carpeta y no en la raíz: mientras estuvo allí,
-    su glob **/*.cs alcanzaba a los proyectos anidados y hacía falta excluirlos uno a uno.
-  -->
+	
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
 		<TargetFramework>net10.0-windows</TargetFramework>
@@ -12,6 +8,17 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<ApplicationIcon>Ico.ico</ApplicationIcon>
+
+		<!-- Versionado Semántico (SemVer) y Metadatos de Publicación -->
+		<Version>1.0.0</Version>
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<FileVersion>1.0.0.0</FileVersion>
+		<InformationalVersion>1.0.0</InformationalVersion>
+		<Product>EchoCut</Product>
+		<Authors>Jorge Silva</Authors>
+		<Company>EchoCut</Company>
+		<Description>Recortador inteligente y sin pérdidas de silencio final para bibliotecas de audio masivas.</Description>
+		<Copyright>Copyright © 2026 Jorge Silva. Licencia GPLv3.</Copyright>
 	</PropertyGroup>
 
 	<ItemGroup>

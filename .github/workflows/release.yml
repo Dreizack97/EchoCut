@@ -1,0 +1,80 @@
+name: Publicar Release Oficial
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Compilar y Publicar Release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Instalar .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Extraer número de versión del Tag
+        id: get_version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart("v")
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Versión a compilar: $version"
+
+      - name: Ejecutar script de empaquetado de Release
+        shell: pwsh
+        run: |
+          .\scripts\build-release.ps1 -Version "${{ steps.get_version.outputs.VERSION }}" -OutputDir "./dist" -Clean
+
+      - name: Generar cuerpo de notas de la Release
+        id: release_notes
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          $hashes = Get-Content "./dist/SHA256SUMS.txt"
+          
+          $body = @"
+          # EchoCut v$version 🎵
+
+          Versión oficial de **EchoCut**, el recortador inteligente y sin pérdidas de silencio final para bibliotecas masivas de audio con .NET 10 y FFmpeg.
+
+          ### 📦 ¿Qué archivo debo descargar?
+          * **`EchoCut-v$version-win-x64-standalone.zip` (Recomendado)**: No requiere instalar nada. Incluye el motor .NET 10 compilado con ReadyToRun. Descomprime y ejecuta `EchoCut.exe`.
+          * **`EchoCut-v$version-win-x64-portable.zip`**: Versión ultraligera para usuarios que ya tienen instalado el [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
+
+          > [!NOTE]
+          > EchoCut utiliza FFmpeg para el análisis y corte sin pérdida. Asegúrate de tener `ffmpeg.exe` en tu sistema o selecciónalo en el diálogo al iniciar el programa.
+
+          ---
+          ### 🔒 Verificación de Integridad (SHA-256)
+          ```text
+          $($hashes -join "`n")
+          ```
+
+          Para ver el historial detallado de cambios, consulta el [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md).
+          "@
+          
+          Set-Content -Path "./dist/RELEASE_BODY.md" -Value $body -Encoding utf8
+
+      - name: Publicar Release en GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "EchoCut v${{ steps.get_version.outputs.VERSION }}"
+          body_path: "./dist/RELEASE_BODY.md"
+          files: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          draft: false
+          prerelease: false
+          generate_release_notes: false

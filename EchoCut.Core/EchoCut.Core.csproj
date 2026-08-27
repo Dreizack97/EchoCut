@@ -1,15 +1,21 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<!--
-    El motor de EchoCut. Deliberadamente sin sufijo -windows: es el compilador quien impide
-    que se cuele aquí una referencia a WinForms, System.Drawing o System.Media. Todo lo que
-    dependa del escritorio vive en el proyecto de interfaz.
-  -->
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+		<!-- Versionado Semántico (SemVer) y Metadatos de Publicación -->
+		<Version>1.0.0</Version>
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<FileVersion>1.0.0.0</FileVersion>
+		<InformationalVersion>1.0.0</InformationalVersion>
+		<Product>EchoCut</Product>
+		<Authors>Jorge Silva</Authors>
+		<Company>EchoCut</Company>
+		<Description>Recortador inteligente y sin pérdidas de silencio final para bibliotecas de audio masivas.</Description>
+		<Copyright>Copyright © 2026 Jorge Silva. Licencia GPLv3.</Copyright>
 	</PropertyGroup>
 
 	<ItemGroup>
