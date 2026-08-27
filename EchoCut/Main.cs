@@ -450,6 +450,27 @@ namespace EchoCut
             }
         }
 
+        private void dataGrid_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+            {
+                return;
+            }
+
+            string columnName = dataGrid.Columns[e.ColumnIndex].Name;
+            if (columnName is PlayColumnName or TrimColumnName)
+            {
+                return;
+            }
+
+            if (dataGrid.Rows[e.RowIndex].DataBoundItem is not Song song)
+            {
+                return;
+            }
+
+            OpenSongsInAudacity([song]);
+        }
+
         // ------------------------------------------------------------------- Previsualización
 
         /// <summary>Reproduce el final resultante de una pista, o lo detiene si ya está sonando.</summary>
@@ -1026,16 +1047,59 @@ namespace EchoCut
         {
             if (e.Button == MouseButtons.Right && e.RowIndex >= 0 && e.ColumnIndex >= 0)
             {
-                dataGrid.ClearSelection();
-                dataGrid.Rows[e.RowIndex].Selected = true;
+                // Si la fila pulsada con clic derecho no forma parte de la selección actual,
+                // se restablece la selección a dicha fila; de lo contrario, se conserva la multiselección.
+                if (!dataGrid.Rows[e.RowIndex].Selected)
+                {
+                    dataGrid.ClearSelection();
+                    dataGrid.Rows[e.RowIndex].Selected = true;
+                }
+
                 dataGrid.CurrentCell = dataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex];
             }
         }
 
-        private Song? GetSelectedSong() =>
-            dataGrid.SelectedRows.Count > 0 && dataGrid.SelectedRows[0].DataBoundItem is Song song
-                ? song
-                : null;
+        private List<Song> GetSelectedSongs() =>
+            dataGrid.SelectedRows
+                .Cast<DataGridViewRow>()
+                .OrderBy(r => r.Index)
+                .Select(r => r.DataBoundItem)
+                .OfType<Song>()
+                .ToList();
+
+        private Song? GetSelectedSong() => GetSelectedSongs().FirstOrDefault();
+
+        /// <summary>
+        /// Abre una o varias pistas en Audacity para su inspección acústica.
+        /// </summary>
+        /// <param name="songs">Colección de pistas a abrir.</param>
+        private void OpenSongsInAudacity(IReadOnlyList<Song> songs)
+        {
+            if (songs.Count == 0)
+            {
+                return;
+            }
+
+            if (ExternalApps.FindAudacity() is not { } audacityPath)
+            {
+                MessageBox.Show(
+                    this,
+                    "No se encontró Audacity en las rutas por defecto. Por favor, instálelo o verifique su ubicación.",
+                    "Audacity no encontrado",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                ExternalApps.OpenInAudacity(audacityPath, songs.Select(s => s.FilePath));
+            }
+            catch (Exception exception)
+            {
+                ShowError("No se pudo abrir Audacity.", exception);
+            }
+        }
 
         private void mnuOpenFolder_Click(object? sender, EventArgs e)
         {
@@ -1056,29 +1120,10 @@ namespace EchoCut
 
         private void mnuOpenAudacity_Click(object? sender, EventArgs e)
         {
-            if (GetSelectedSong() is not { } song)
+            List<Song> songs = GetSelectedSongs();
+            if (songs.Count > 0)
             {
-                return;
-            }
-
-            if (ExternalApps.FindAudacity() is not { } audacityPath)
-            {
-                MessageBox.Show(
-                    this,
-                    "No se encontró Audacity en las rutas por defecto. Por favor, instálelo o verifique su ubicación.",
-                    "Audacity no encontrado",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                return;
-            }
-
-            try
-            {
-                ExternalApps.OpenInAudacity(audacityPath, song.FilePath);
-            }
-            catch (Exception exception)
-            {
-                ShowError("No se pudo abrir Audacity.", exception);
+                OpenSongsInAudacity(songs);
             }
         }
     }

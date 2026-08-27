@@ -106,7 +106,6 @@
             dataGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             dataGrid.ContextMenuStrip = contextMenuStrip;
             dataGrid.Location = new Point(12, 134);
-            dataGrid.MultiSelect = false;
             dataGrid.Name = "dataGrid";
             dataGrid.ReadOnly = true;
             dataGrid.RowHeadersVisible = false;
@@ -114,6 +113,7 @@
             dataGrid.Size = new Size(1076, 428);
             dataGrid.TabIndex = 11;
             dataGrid.CellContentClick += dataGrid_CellContentClick;
+            dataGrid.CellDoubleClick += dataGrid_CellDoubleClick;
             dataGrid.CellFormatting += dataGrid_CellFormatting;
             dataGrid.CellMouseDown += dataGrid_CellMouseDown;
             dataGrid.DataBindingComplete += dataGrid_DataBindingComplete;
