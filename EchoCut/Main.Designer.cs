@@ -53,6 +53,8 @@
             progressBar = new ProgressBar();
             lblStatus = new Label();
             saveFileDialog = new SaveFileDialog();
+            btnFile = new Button();
+            openFileDialog = new OpenFileDialog();
             ((System.ComponentModel.ISupportInitialize)dataGrid).BeginInit();
             contextMenuStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numericTolerance).BeginInit();
@@ -75,14 +77,14 @@
             txtPath.Location = new Point(92, 12);
             txtPath.Name = "txtPath";
             txtPath.ReadOnly = true;
-            txtPath.Size = new Size(841, 25);
+            txtPath.Size = new Size(686, 25);
             txtPath.TabIndex = 1;
             // 
             // btnPath
             // 
             btnPath.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnPath.AutoSize = true;
-            btnPath.Location = new Point(939, 10);
+            btnPath.Location = new Point(784, 9);
             btnPath.Name = "btnPath";
             btnPath.Size = new Size(149, 29);
             btnPath.TabIndex = 2;
@@ -281,12 +283,30 @@
             saveFileDialog.Filter = "Archivo CSV|*.csv";
             saveFileDialog.Title = "Exportar resultados";
             // 
+            // btnFile
+            // 
+            btnFile.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnFile.AutoSize = true;
+            btnFile.Location = new Point(939, 9);
+            btnFile.Name = "btnFile";
+            btnFile.Size = new Size(149, 29);
+            btnFile.TabIndex = 17;
+            btnFile.Text = "Seleccionar archivo(s)";
+            btnFile.UseVisualStyleBackColor = true;
+            btnFile.Click += btnFile_Click;
+            // 
+            // openFileDialog
+            // 
+            openFileDialog.Filter = resources.GetString("openFileDialog.Filter");
+            openFileDialog.Multiselect = true;
+            // 
             // Main
             // 
             AllowDrop = true;
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1100, 611);
+            Controls.Add(btnFile);
             Controls.Add(lblStatus);
             Controls.Add(progressBar);
             Controls.Add(btnAdvanced);
@@ -344,5 +364,7 @@
         private ContextMenuStrip contextMenuStrip;
         private ToolStripMenuItem mnuOpenFolder;
         private ToolStripMenuItem mnuOpenAudacity;
+        private Button btnFile;
+        private OpenFileDialog openFileDialog;
     }
 }

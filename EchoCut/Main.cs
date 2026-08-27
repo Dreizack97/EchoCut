@@ -125,6 +125,26 @@ namespace EchoCut
             }
         }
 
+        private void btnFile_Click(object sender, EventArgs e)
+        {
+            if (openFileDialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            string[] selected = openFileDialog.FileNames;
+            IReadOnlyList<string> selectedFiles = selected.Length > 0
+                ? selected
+                : string.IsNullOrWhiteSpace(openFileDialog.FileName)
+                    ? []
+                    : [openFileDialog.FileName];
+
+            if (selectedFiles.Count > 0)
+            {
+                LoadFiles(selectedFiles);
+            }
+        }
+
         private void Main_DragEnter(object sender, DragEventArgs e)
         {
             if (!IsBusy && e.Data?.GetDataPresent(DataFormats.FileDrop) == true)
@@ -148,18 +168,26 @@ namespace EchoCut
                 .Where(Directory.Exists)
                 .ToList();
 
-            foreach (string file in dropped.Where(File.Exists))
-            {
-                string? dir = Path.GetDirectoryName(file);
-                if (dir is not null && !directories.Contains(dir, StringComparer.OrdinalIgnoreCase))
-                {
-                    directories.Add(dir);
-                }
-            }
+            List<string> files = dropped
+                .Where(File.Exists)
+                .ToList();
 
             if (directories.Count > 0)
             {
+                foreach (string file in files)
+                {
+                    string? dir = Path.GetDirectoryName(file);
+                    if (dir is not null && !directories.Contains(dir, StringComparer.OrdinalIgnoreCase))
+                    {
+                        directories.Add(dir);
+                    }
+                }
+
                 LoadDirectories(directories);
+            }
+            else if (files.Count > 0)
+            {
+                LoadFiles(files);
             }
         }
 
@@ -219,6 +247,74 @@ namespace EchoCut
             lblStatus.Text = scan.SkippedCount == 0
                 ? $"{_songs.Count} archivo(s) encontrados en {folderSummary}."
                 : $"{_songs.Count} archivo(s) encontrados en {folderSummary}; {scan.SkippedCount} ilegible(s) omitido(s).";
+
+            progressBar.Value = 0;
+            UpdateButtons();
+        }
+
+        /// <summary>
+        /// Carga y lista una colección de archivos de audio seleccionados individualmente.
+        /// </summary>
+        /// <param name="filePaths">Rutas de los archivos a cargar.</param>
+        private void LoadFiles(IReadOnlyList<string> filePaths)
+        {
+            StopPreview();
+
+            List<string> validFiles = filePaths
+                .Where(File.Exists)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (validFiles.Count == 0)
+            {
+                return;
+            }
+
+            _sourceDirectories.Clear();
+            _sourceDirectories.AddRange(validFiles
+                .Select(Path.GetDirectoryName)
+                .Where(d => !string.IsNullOrWhiteSpace(d))
+                .Distinct(StringComparer.OrdinalIgnoreCase)!);
+
+            txtPath.Text = _sourceDirectories.Count switch
+            {
+                0 => string.Empty,
+                1 => _sourceDirectories[0],
+                _ => string.Join("; ", _sourceDirectories)
+            };
+            _pathToolTip.SetToolTip(txtPath, string.Join(Environment.NewLine, _sourceDirectories));
+
+            ScanResult scan = TrackScanner.ScanFiles(validFiles);
+
+            _songs.RaiseListChangedEvents = false;
+            _songs.Clear();
+            _rows.Clear();
+
+            foreach (TrackInfo track in scan.Tracks)
+            {
+                if (_rows.ContainsKey(track.FilePath))
+                {
+                    continue;
+                }
+
+                Song song = new(track);
+                _songs.Add(song);
+                _rows[track.FilePath] = song;
+            }
+
+            _songs.RaiseListChangedEvents = true;
+            _songs.ResetBindings();
+
+            // Cargar nueva lista de pistas no debe dejar la cabecera marcada con un orden obsoleto.
+            _songs.ReapplySort();
+
+            string originSummary = _sourceDirectories.Count == 1
+                ? $"de la carpeta «{Path.GetFileName(_sourceDirectories[0])}»"
+                : $"de {_sourceDirectories.Count} carpetas";
+
+            lblStatus.Text = scan.SkippedCount == 0
+                ? $"{_songs.Count} archivo(s) cargados {originSummary}."
+                : $"{_songs.Count} archivo(s) cargados {originSummary}; {scan.SkippedCount} ilegible(s) o no compatible(s) omitido(s).";
 
             progressBar.Value = 0;
             UpdateButtons();
@@ -848,6 +944,7 @@ namespace EchoCut
             bool hasSongs = _songs.Count > 0;
 
             btnPath.Enabled = !IsBusy;
+            btnFile.Enabled = !IsBusy;
             btnAnalyze.Enabled = !IsBusy && hasSongs;
             btnCancel.Enabled = analyzing;
             btnCropAll.Enabled = !IsBusy && hasSongs;
