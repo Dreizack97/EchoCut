@@ -38,6 +38,29 @@ public static class TrackScanner
         return new ScanResult(tracks, skipped);
     }
 
+    /// <summary>Escanea múltiples carpetas y devuelve la combinación de sus pistas de audio legibles.</summary>
+    /// <param name="directories">Colección de carpetas a escanear.</param>
+    /// <returns>Las pistas leídas de todas las carpetas y el total de archivos omitidos.</returns>
+    public static ScanResult Scan(IEnumerable<string> directories)
+    {
+        List<TrackInfo> tracks = [];
+        int skipped = 0;
+
+        foreach (string directory in directories)
+        {
+            if (!Directory.Exists(directory))
+            {
+                continue;
+            }
+
+            ScanResult result = Scan(directory);
+            tracks.AddRange(result.Tracks);
+            skipped += result.SkippedCount;
+        }
+
+        return new ScanResult(tracks, skipped);
+    }
+
     /// <summary>Lee los metadatos de un solo archivo.</summary>
     /// <param name="filePath">Ruta del archivo de audio.</param>
     /// <returns>Los metadatos del archivo.</returns>
