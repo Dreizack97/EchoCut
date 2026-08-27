@@ -7,6 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet&logoColor=white" alt=".NET 10" />
   <img src="https://img.shields.io/badge/C%23-14-239120?style=flat-square&logo=csharp&logoColor=white" alt="C# 14" />
+  <img src="https://img.shields.io/badge/Versi%C3%B3n-1.1.0-blue.svg?style=flat-square" alt="Versión 1.1.0" />
   <img src="https://img.shields.io/badge/UI-Windows%20Forms-0078D7?style=flat-square&logo=windows&logoColor=white" alt="Windows Forms" />
   <img src="https://img.shields.io/badge/Engine-FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white" alt="FFmpeg" />
   <img src="https://img.shields.io/badge/Licencia-GPLv3-blue.svg?style=flat-square" alt="Licencia GPLv3" />
@@ -62,10 +63,12 @@ graph TD
         Player["AudioPreviewPlayer (SoundPlayer + WAV Temp)"]
         ExtApps["ExternalApps (Audacity / Explorer)"]
         Accessible["SongPresentation (WCAG AAA Dual Palette)"]
+        Properties["SongPropertiesDialog (Metadatos y Atributos)"]
     end
 
     subgraph Core ["EchoCut.Core (net10.0 - Motor Puro)"]
         Scanner["TrackScanner (TagLibSharp)"]
+        Editor["TrackEditor (Edición Metadatos TagLibSharp)"]
         Batch["BatchRunner / BatchProcessor (Parallel.ForEachAsync)"]
         AnalysisSvc["AnalysisService"]
         TrimSvc["TrimService"]
@@ -86,6 +89,8 @@ graph TD
     Form --> TrimSvc
     Form --> Exporter
     Form --> Scanner
+    Form --> Properties
+    Properties --> Editor
     AnalysisSvc --> Analyzer
     TrimSvc --> Trimmer
     Analyzer --> Decoder
@@ -133,7 +138,7 @@ flowchart TD
 
 ## 🎛️ Parámetros del Algoritmo
 
-EchoCut incluye 21 parámetros calibrados exhaustivamente para música comercial masterizada. Puedes ajustarlos desde el diálogo **Avanzado**:
+EchoCut incluye 22 parámetros calibrados exhaustivamente para música comercial masterizada. Puedes ajustarlos desde el diálogo **Avanzado**:
 
 | Categoría | Parámetro | Por Defecto | Descripción |
 | :--- | :--- | :---: | :--- |
@@ -158,6 +163,7 @@ EchoCut incluye 21 parámetros calibrados exhaustivamente para música comercial
 | | `Guarda de fundido (s)` | `0.5 s` | Margen adicional que se suma a la tolerancia si hay fundido confirmado. |
 | **5 · Corte** | `Tolerancia (s)` | `0.3 s` | Silencio remanente conservado tras el corte (configurable en la pantalla principal). |
 | | `Búsqueda del corte (s)` | `0.2 s` | Ventana de desplazamiento hacia la frontera de trama más silenciosa (anti-clic). |
+| **6 · Previsualización** | `Tiempo de previsualización (s)` | `3.0 s` | Duración de la música previa al corte que se reproduce al pulsar el botón de previsualización para juzgar cómo quedará el final. |
 
 ---
 
@@ -207,7 +213,7 @@ Clona el repositorio y compila la solución con el CLI de .NET:
 
 ```powershell
 # 1. Clonar el repositorio
-git clone https://github.com/tu-usuario/EchoCut.git
+git clone https://github.com/Dreizack97/EchoCut.git
 cd EchoCut
 
 # 2. Restaurar dependencias y paquetes NuGet
@@ -224,18 +230,22 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
 
 ## 📖 Guía de Uso Paso a Paso
 
-1. **Seleccionar Carpeta (`Ruta...`)**: Elige el directorio que contiene tus pistas de audio. EchoCut listará los archivos y leerá sus etiquetas en segundo plano.
+1. **Seleccionar Carpeta(s) o Archivo(s) (`Ruta...` / `Archivo(s)...`)**: Elige uno o varios directorios o selecciona archivos específicos directamente. EchoCut listará las pistas y leerá sus etiquetas y metadatos en segundo plano.
 2. **Ajustar Tolerancia e Hilos**:
    - **Tolerancia**: Los segundos de silencio que deseas conservar al final (0.3 s por defecto es el estándar musical ideal).
    - **Hilos**: Grado de paralelismo (EchoCut calibra automáticamente entre 1 y 8 hilos según tu procesador).
 3. **Analizar (`Analizar`)**: EchoCut procesará las colas de las canciones en paralelo, mostrando el progreso y coloreando las filas recortables en ámbar oscuro.
-4. **Previsualizar de Oído (`▶`)**: Pulsa el botón de reproducción en cualquier fila. Sonarán de inmediato los últimos 3 segundos musicales más la tolerancia configurada, permitiéndote comprobar auditivamente que el corte no se come la canción.
+4. **Previsualizar de Oído (`▶` / `⏹`)**: Pulsa el botón de reproducción en cualquier fila. Sonará de inmediato la música previa al punto de corte (3.0 s por defecto, personalizable en **Avanzado**) más la tolerancia conservada, permitiéndote comprobar auditivamente que el corte no interrumpe la frase musical.
 5. **Recortar**:
    - Pulsa **`Recortar todo`** para procesar en lote todas las pistas válidas.
    - O pulsa la tijera **`✂`** en una fila específica para recortar únicamente esa canción.
-   - Las copias resultantes se crearán en la subcarpeta `Recortados/`.
-6. **Auditoría e Inspección**:
-   - **Clic derecho sobre una fila**: Selecciona *Abrir ubicación* para ver el archivo en el Explorador de Windows, o *Abrir en Audacity* para inspeccionar visualmente su forma de onda.
+   - Las copias resultantes se crearán en la subcarpeta `Recortados/` correspondiente a la carpeta de cada archivo.
+6. **Auditoría, Edición de Metadatos y Gestión**:
+   - **Clic derecho sobre una o varias filas**:
+     - *Abrir ubicación*: Revela los archivos en el Explorador de Windows con las canciones seleccionadas.
+     - *Abrir en Audacity*: Abre simultáneamente todas las pistas seleccionadas en una sesión de Audacity (o haz doble clic sobre cualquier fila para abrirla de inmediato).
+     - *Editar propiedades*: Abre la ventana modal nativa de propiedades para consultar o editar metadatos ID3/Vorbis (título, artistas, año, álbum, etc.) o renombrar el archivo físico en disco.
+     - *Eliminar archivo(s)*: Elimina permanentemente los archivos seleccionados del disco tras confirmar la operación (también disponible pulsando la tecla **Suprimir** en la cuadrícula).
    - **Exportar (`Exportar`)**: Genera un archivo CSV codificado en UTF-8 con BOM y separador regional, listo para abrirse en Microsoft Excel con todas las métricas acústicas de cada pista.
 
 ---

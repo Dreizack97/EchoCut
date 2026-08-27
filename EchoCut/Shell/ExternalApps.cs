@@ -31,7 +31,19 @@ public static class ExternalApps
     /// <param name="audacityPath">Ruta del ejecutable de Audacity, obtenida con <see cref="FindAudacity"/>.</param>
     /// <param name="filePath">Ruta del archivo a abrir.</param>
     public static void OpenInAudacity(string audacityPath, string filePath) =>
-        Launch(audacityPath, $"\"{filePath}\"");
+        OpenInAudacity(audacityPath, [filePath]);
+
+    /// <summary>Abre uno o varios archivos en Audacity.</summary>
+    /// <param name="audacityPath">Ruta del ejecutable de Audacity, obtenida con <see cref="FindAudacity"/>.</param>
+    /// <param name="filePaths">Colección de rutas de los archivos a abrir.</param>
+    public static void OpenInAudacity(string audacityPath, IEnumerable<string> filePaths)
+    {
+        string arguments = string.Join(" ", filePaths.Select(path => $"\"{path}\""));
+        if (!string.IsNullOrWhiteSpace(arguments))
+        {
+            Launch(audacityPath, arguments);
+        }
+    }
 
     private static void Launch(string fileName, string arguments) =>
         Process.Start(new ProcessStartInfo

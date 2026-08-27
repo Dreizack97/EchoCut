@@ -50,7 +50,7 @@ Para mantener la calidad y consistencia del proyecto, todo cambio debe alinearse
 
 ```powershell
 # Clonar tu bifurcación (fork)
-git clone https://github.com/tu-usuario/EchoCut.git
+git clone https://github.com/Dreizack97/EchoCut.git
 cd EchoCut
 
 # Restaurar paquetes NuGet
@@ -65,27 +65,88 @@ dotnet run --project EchoCut/EchoCut.csproj
 
 ---
 
-## 🌿 Flujo de Trabajo con Git
+## 🌿 Flujo de Trabajo con Git (Git Flow)
 
-1. **Haz un Fork del repositorio**: Trabaja siempre sobre tu propio fork antes de enviar un Pull Request.
-2. **Crea una rama descriptiva**:
+El flujo estándar y más confiable adoptado en EchoCut es **Git Flow** (o flujo basado en ramas funcionales). En este esquema:
+* `main`: Representa exclusivamente código estable y probado en producción. Cada despliegue se etiqueta con una versión semántica formal.
+* `develop`: Centraliza la integración continua del desarrollo diario y sirve como base común para nuevas funcionalidades.
+* `feature/*`: Ramas de trabajo aisladas para cada tarea, ajuste o nueva funcionalidad. Se originan siempre desde `develop` y se reintegran mediante *Pull Request* (PR).
+
+---
+
+### 1. Crear y Publicar la Rama `develop`
+> [!NOTE]
+> Configuración inicial por única vez.
+
+Crea la rama `develop` directamente a partir del último commit funcional de `main` y súbela al repositorio remoto:
+
+```bash
+git checkout main
+git pull origin main
+git checkout -b develop
+git push -u origin develop
+```
+
+---
+
+### 2. Crear una Rama `feature/*` para Cada Tarea
+> [!IMPORTANT]
+> Toda nueva funcionalidad debe partir **siempre desde `develop`**, manteniendo `main` intacto.
+
+Cada vez que comiences un cambio o nueva funcionalidad, actualiza `develop` y desprende tu rama de trabajo con un nombre descriptivo:
+
+```bash
+git checkout develop
+git pull origin develop
+git checkout -b feature/nombre-de-la-funcionalidad
+```
+*(Ejemplos: `feature/explorador-canciones`, `feature/filtro-dsp-rlb`, `fix/deteccion-hiss`)*
+
+---
+
+### 3. Confirmación de Cambios (Conventional Commits)
+Confirma los cambios mediante commits atómicos enfocados en una única intención, con mensajes en español y siguiendo [Conventional Commits](https://www.conventionalcommits.org/es/v1.0.0/):
+* `feat(core): incorporar modelo y editor de metadatos para pistas de audio`
+* `feat(ui): implementar ventana modal de propiedades de canción y metadatos`
+* `fix(audio): corregir cálculo de umbral adaptativo en pistas con hiss`
+* `perf(processing): optimizar reutilización de búferes con ArrayPool`
+* `docs(contributing): actualizar directrices de Git Flow y ramas funcionales`
+
+---
+
+### 4. Integrar la `feature` de Vuelta a `develop`
+Tras realizar tus commits, asegurar una compilación limpia (`dotnet build EchoCut.slnx`) y validar pruebas localmente:
+
+1. Sube la rama y abre un **Pull Request (PR)** hacia `develop`:
    ```bash
-   git checkout -b feature/nueva-mejora-dsp
-   # o
-   git checkout -b fix/correccion-frecuencia-corte
+   git push -u origin feature/nombre-de-la-funcionalidad
    ```
-3. **Convención de Mensajes de Commit**:
-   Utilizamos [Conventional Commits](https://www.conventionalcommits.org/es/v1.0.0/) en español:
-   * `feat: agregar exportación en formato JSON para diagnósticos`
-   * `fix: resolver cálculo de umbral en pistas con muestreo a 96 kHz`
-   * `perf: optimizar recorrido de tramas en LevelFramer`
-   * `docs: actualizar tabla de parámetros en README`
-   * `refactor: desacoplar lógica de desempate en SortableBindingList`
-4. **Mantén tu rama actualizada**:
+2. **Estrategia de fusión (*Merge Strategy*)**:
+   > [!IMPORTANT]
+   > Al aceptar los Pull Requests, selecciona la opción **"Create a merge commit"** en lugar de *Squash and merge* o *Rebase and merge*, ya que estas dos últimas aplanan el historial linealmente y eliminan la forma gráfica de ramas separadas, dificultando la trazabilidad del árbol de desarrollo.
+3. Una vez revisado, aprobado y fusionado el PR, elimina la rama `feature` local y remota para mantener limpio el repositorio:
    ```bash
-   git fetch upstream
-   git rebase upstream/main
+   git checkout develop
+   git pull origin develop
+   git branch -d feature/nombre-de-la-funcionalidad
+   git push origin --delete feature/nombre-de-la-funcionalidad
    ```
+
+---
+
+### 5. Pasar Código Estable de `develop` a `main` (Lanzamientos a Producción)
+> [!TIP]
+> Solo versiones listas y validadas para producción.
+
+Cuando `develop` acumule suficientes cambios probados y estables para un despliegue oficial, abre un PR de `develop` hacia `main` o realiza la integración con etiqueta de versión:
+
+```bash
+git checkout main
+git pull origin main
+git merge --no-ff develop
+git tag -a v1.0.0 -m "Versión estable 1.0.0"
+git push origin main --tags
+```
 
 ---
 

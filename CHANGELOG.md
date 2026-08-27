@@ -7,6 +7,33 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 
 ---
 
+## [1.1.0] - 2026-08-27
+
+### Añadido
+
+#### Gestión y Edición de Metadatos (`EchoCut.Core` y `EchoCut`)
+* **Modelo `TrackProperties`**: Objeto de transferencia de datos (DTO) desacoplado para representar metadatos editables de audio (título, subtítulo, artistas, álbum, año, pista, género, compositores, copyright, comentarios) y propiedades de solo lectura del archivo (tamaño en bytes, atributos y marcas temporales del sistema de archivos).
+* **Servicio `TrackEditor`**: Capa de persistencia en `EchoCut.Core` para actualización no destructiva de metadatos mediante `TagLibSharp` y renombrado de archivos (`File.Move`) con validación de nombres seguros para el sistema operativo.
+* **Ventana Modal `SongPropertiesDialog`**: Diálogo accesible que replica fielmente el aspecto y distribución de la ventana de propiedades de audio de Windows:
+  * Pestaña *General*: Icono de audio nativo del sistema, cuadro de texto editable para el nombre del archivo, tipo de archivo, aplicación asociada, ubicación en disco, tamaño en MB y bytes exactos, atributos y marcas temporales de creación, modificación y último acceso.
+  * Pestaña *Detalles*: Rejilla categorizada (`SongDetailsViewModel`) para consultar y editar metadatos organizados en Descripción, Multimedia, Audio, Origen y Contenido; visualización de características acústicas técnicas (duración, tasa de bits, canales y frecuencia de muestreo) y botón de acción para remover metadatos personales.
+  * Evento `TrackUpdated` para sincronización en tiempo real con la ventana principal y el diccionario de indexación al pulsar «Aplicar», manteniendo la coherencia de datos ante cierres por la «X» o «Cancelar».
+
+#### Interacción con Cuadrícula, Eliminación y Multiselección
+* **Eliminación Física Permanente**: Capacidad de eliminar archivos del disco (`File.Delete`) y desindexarlos en memoria desde la cuadrícula (`dataGrid`) mediante la tecla **Suprimir** o la opción de menú contextual **«Eliminar archivo(s)»**, con cuadro de confirmación modal preventivo y detención automática de previsualizaciones activas para liberar descriptores de archivo.
+* **Carga de Archivos Sueltos**: Botón **`Archivo(s)...`** y método `TrackScanner.ScanFiles` para importar pistas individuales o selecciones múltiples sin necesidad de escanear carpetas enteras.
+* **Escaneo y Destino Multidirectorio**: Soporte en `TrackScanner` y `TrimService` para escanear lotes de directorios y generar subcarpetas `Recortados/` independientes en la ubicación de cada archivo de origen.
+* **Multiselección e Integración con Audacity**: Menú contextual para abrir todas las pistas seleccionadas de forma simultánea en una única sesión de Audacity, y evento de doble clic en celda (`dataGrid_CellDoubleClick`) para apertura directa de la pista.
+
+#### Parámetros Avanzados y Previsualización
+* **Tiempo de Previsualización Configurable**: Nueva categoría `6 · Previsualización` y propiedad `PreviewSeconds` en `SilenceOptions` (configurable en `AdvancedOptions` entre 0.5 y 30.0 segundos) para definir la cantidad exacta de música previa al corte a reproducir.
+* **`AudioPreview.WindowFor`**: Admite duración contextual configurable antes del punto de corte, adaptando la decodificación en `AudioPreviewPlayer` y la duración del temporizador de reproducción.
+
+### Modificado
+* **`CONTRIBUTING.md`**: Actualizado con directrices completas del flujo de trabajo Git Flow (`main`, `develop`, `feature/*`), convención de commits atómicos y la recomendación obligatoria de usar *Create a merge commit* para preservar el árbol visual de ramas.
+
+---
+
 ## [1.0.0] - 2026-08-27
 
 ### Añadido

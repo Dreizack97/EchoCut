@@ -38,6 +38,7 @@ public static class AudioPreview
     /// <param name="cutSeconds">Instante de corte calculado, o <c>null</c> si no se ha analizado.</param>
     /// <param name="silenceSeconds">Silencio final detectado, o <c>null</c> si no se ha analizado.</param>
     /// <param name="toleranceSeconds">Silencio que el recorte conserva.</param>
+    /// <param name="contextSeconds">Duración de la música previa al corte a incluir en la previsualización.</param>
     /// <remarks>
     /// En una pista analizada la ventana <em>termina en el punto de corte</em>, de modo que lo que
     /// suena es exactamente el final que tendrá la copia recortada. Reproducir desde el principio
@@ -52,16 +53,20 @@ public static class AudioPreview
         double totalDurationSeconds,
         double? cutSeconds,
         double? silenceSeconds,
-        double toleranceSeconds)
+        double toleranceSeconds,
+        double contextSeconds = ContextSeconds)
     {
         if (totalDurationSeconds <= 0)
         {
             return new PreviewWindow(0, 0);
         }
 
+        double context = Math.Max(0.1, contextSeconds);
+
         if (cutSeconds is not { } cut || cut <= 0)
         {
-            double start = Math.Max(0.0, totalDurationSeconds - UnanalyzedSeconds);
+            double duration = Math.Max(context, UnanalyzedSeconds);
+            double start = Math.Max(0.0, totalDurationSeconds - duration);
             return new PreviewWindow(start, totalDurationSeconds - start);
         }
 
@@ -70,7 +75,7 @@ public static class AudioPreview
         // El silencio conservado va incluido en la ventana: forma parte del final resultante y es lo
         // que permite oír que el corte no llega pisando la música.
         double kept = Math.Max(0.0, Math.Min(toleranceSeconds, silenceSeconds ?? toleranceSeconds));
-        double desired = ContextSeconds + kept;
+        double desired = context + kept;
 
         double startSeconds = Math.Max(0.0, cut - desired);
         return new PreviewWindow(startSeconds, cut - startSeconds);

@@ -33,7 +33,7 @@ public sealed class TrimService
     public static string GetOutputDirectory(string sourceDirectory) =>
         AudioTrimmer.GetOutputDirectory(sourceDirectory);
 
-    /// <summary>Recorta las pistas indicadas en paralelo.</summary>
+    /// <summary>Recorta las pistas indicadas en paralelo usando una carpeta de salida común.</summary>
     /// <param name="requests">Pistas a recortar con su punto de corte.</param>
     /// <param name="outputDirectory">Carpeta donde escribir las copias; se crea si no existe.</param>
     /// <param name="maxDegreeOfParallelism">Archivos recortados a la vez.</param>
@@ -42,9 +42,31 @@ public sealed class TrimService
     /// <returns>El recuento final del lote.</returns>
     /// <exception cref="FFmpegException">Se lanza si FFmpeg no está resuelto.</exception>
     /// <exception cref="OperationCanceledException">Se lanza si se cancela el lote.</exception>
-    public async Task<BatchSummary> TrimAsync(
+    public Task<BatchSummary> TrimAsync(
         IReadOnlyList<TrimRequest> requests,
         string outputDirectory,
+        int maxDegreeOfParallelism,
+        IProgress<TrackProgress<TrimOutcome>>? progress,
+        CancellationToken cancellationToken) =>
+        TrimAsync(
+            requests,
+            _ => outputDirectory,
+            maxDegreeOfParallelism,
+            progress,
+            cancellationToken);
+
+    /// <summary>Recorta las pistas indicadas resolviendo dinámicamente la carpeta de salida para cada una.</summary>
+    /// <param name="requests">Pistas a recortar con su punto de corte.</param>
+    /// <param name="outputDirectoryResolver">Función que calcula la carpeta de salida para cada petición.</param>
+    /// <param name="maxDegreeOfParallelism">Archivos recortados a la vez.</param>
+    /// <param name="progress">Canal de avisos por pista, o <c>null</c> si no interesa el detalle.</param>
+    /// <param name="cancellationToken">Token de cancelación del lote.</param>
+    /// <returns>El recuento final del lote.</returns>
+    /// <exception cref="FFmpegException">Se lanza si FFmpeg no está resuelto.</exception>
+    /// <exception cref="OperationCanceledException">Se lanza si se cancela el lote.</exception>
+    public async Task<BatchSummary> TrimAsync(
+        IReadOnlyList<TrimRequest> requests,
+        Func<TrimRequest, string> outputDirectoryResolver,
         int maxDegreeOfParallelism,
         IProgress<TrackProgress<TrimOutcome>>? progress,
         CancellationToken cancellationToken)
@@ -55,12 +77,38 @@ public sealed class TrimService
             requests,
             maxDegreeOfParallelism,
             static request => request.Track,
-            async (request, token) => new TrimOutcome(await trimmer
-                .TrimAsync(request.Track.FilePath, request.CutSeconds, outputDirectory, token)
-                .ConfigureAwait(false)),
+            async (request, token) =>
+            {
+                string targetDirectory = outputDirectoryResolver(request);
+                return new TrimOutcome(await trimmer
+                    .TrimAsync(request.Track.FilePath, request.CutSeconds, targetDirectory, token)
+                    .ConfigureAwait(false));
+            },
             progress,
             cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Recorta las pistas indicadas guardando cada copia en la subcarpeta «Recortados» de su propio directorio de origen.
+    /// </summary>
+    /// <param name="requests">Pistas a recortar con su punto de corte.</param>
+    /// <param name="maxDegreeOfParallelism">Archivos recortados a la vez.</param>
+    /// <param name="progress">Canal de avisos por pista, o <c>null</c> si no interesa el detalle.</param>
+    /// <param name="cancellationToken">Token de cancelación del lote.</param>
+    /// <returns>El recuento final del lote.</returns>
+    /// <exception cref="FFmpegException">Se lanza si FFmpeg no está resuelto.</exception>
+    /// <exception cref="OperationCanceledException">Se lanza si se cancela el lote.</exception>
+    public Task<BatchSummary> TrimAsync(
+        IReadOnlyList<TrimRequest> requests,
+        int maxDegreeOfParallelism,
+        IProgress<TrackProgress<TrimOutcome>>? progress,
+        CancellationToken cancellationToken) =>
+        TrimAsync(
+            requests,
+            static request => GetOutputDirectory(request.Track.Directory),
+            maxDegreeOfParallelism,
+            progress,
+            cancellationToken);
 
     /// <summary>Recorta una sola pista.</summary>
     /// <remarks>

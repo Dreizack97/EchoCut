@@ -1,0 +1,138 @@
+namespace EchoCut.Library;
+
+/// <summary>Permite actualizar metadatos y renombrar archivos de pistas de audio.</summary>
+public static class TrackEditor
+{
+    /// <summary>
+    /// Carga el conjunto completo de propiedades y metadatos del archivo indicado.
+    /// </summary>
+    /// <param name="filePath">Ruta del archivo a inspeccionar.</param>
+    /// <returns>Estructura con las propiedades del archivo y de los metadatos.</returns>
+    /// <exception cref="FileNotFoundException">Si el archivo no existe.</exception>
+    public static TrackProperties LoadProperties(string filePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        if (!File.Exists(filePath))
+        {
+            throw new FileNotFoundException("El archivo de audio no existe en disco.", filePath);
+        }
+
+        FileInfo file = new(filePath);
+        using TagLib.File tagFile = TagLib.File.Create(filePath);
+
+        return new TrackProperties
+        {
+            FilePath = filePath,
+            FileName = Path.GetFileNameWithoutExtension(file.Name),
+            Extension = file.Extension,
+            Directory = file.DirectoryName ?? string.Empty,
+            SizeBytes = file.Length,
+            CreationTime = file.CreationTime,
+            LastWriteTime = file.LastWriteTime,
+            LastAccessTime = file.LastAccessTime,
+            Attributes = file.Attributes,
+
+            Title = tagFile.Tag.Title ?? string.Empty,
+            Subtitle = tagFile.Tag.Subtitle ?? string.Empty,
+            Comment = tagFile.Tag.Comment ?? string.Empty,
+
+            Performers = string.Join("; ", tagFile.Tag.Performers ?? []),
+            AlbumArtist = string.Join("; ", tagFile.Tag.AlbumArtists ?? []),
+            Album = tagFile.Tag.Album ?? string.Empty,
+            Year = tagFile.Tag.Year,
+            Track = tagFile.Tag.Track,
+            Genre = string.Join("; ", tagFile.Tag.Genres ?? []),
+            Duration = tagFile.Properties.Duration,
+
+            BitrateKbps = tagFile.Properties.AudioBitrate,
+            Channels = tagFile.Properties.AudioChannels,
+            SampleRateHz = tagFile.Properties.AudioSampleRate,
+
+            Composers = string.Join("; ", tagFile.Tag.Composers ?? []),
+            Copyright = tagFile.Tag.Copyright ?? string.Empty,
+        };
+    }
+
+    /// <summary>
+    /// Guarda los cambios de metadatos y opcionalmente renombra el archivo según las propiedades indicadas.
+    /// </summary>
+    /// <param name="properties">Propiedades modificadas.</param>
+    /// <returns>La información de pista actualizada a partir del archivo en disco.</returns>
+    /// <exception cref="ArgumentNullException">Si <paramref name="properties"/> es <c>null</c>.</exception>
+    /// <exception cref="FileNotFoundException">Si el archivo original no existe en disco.</exception>
+    /// <exception cref="ArgumentException">Si el nuevo nombre contiene caracteres no válidos o está vacío.</exception>
+    /// <exception cref="IOException">Si ya existe otro archivo con el nuevo nombre o si falla la escritura.</exception>
+    public static TrackInfo SaveProperties(TrackProperties properties)
+    {
+        ArgumentNullException.ThrowIfNull(properties);
+
+        if (!File.Exists(properties.FilePath))
+        {
+            throw new FileNotFoundException("El archivo de audio no existe en disco.", properties.FilePath);
+        }
+
+        string cleanName = properties.FileName.Trim();
+        if (string.IsNullOrWhiteSpace(cleanName))
+        {
+            throw new ArgumentException("El nombre del archivo no puede estar vacío.", nameof(properties));
+        }
+
+        if (cleanName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            throw new ArgumentException("El nombre del archivo contiene caracteres no válidos.", nameof(properties));
+        }
+
+        string currentPath = properties.FilePath;
+        string currentDir = properties.Directory;
+
+        // 1. Guardar etiquetas en el archivo
+        using (TagLib.File tagFile = TagLib.File.Create(currentPath))
+        {
+            tagFile.Tag.Title = properties.Title.Trim();
+            tagFile.Tag.Subtitle = properties.Subtitle.Trim();
+            tagFile.Tag.Comment = properties.Comment.Trim();
+
+            tagFile.Tag.Performers = SplitList(properties.Performers);
+            tagFile.Tag.AlbumArtists = SplitList(properties.AlbumArtist);
+            tagFile.Tag.Album = properties.Album.Trim();
+            tagFile.Tag.Year = properties.Year;
+            tagFile.Tag.Track = properties.Track;
+            tagFile.Tag.Genres = SplitList(properties.Genre);
+
+            tagFile.Tag.Composers = SplitList(properties.Composers);
+            tagFile.Tag.Copyright = properties.Copyright.Trim();
+
+            tagFile.Save();
+        }
+
+        // 2. Renombrar archivo si el nombre cambió
+        string newFileNameWithExt = cleanName + properties.Extension;
+        string newFilePath = Path.Combine(currentDir, newFileNameWithExt);
+
+        if (!string.Equals(currentPath, newFilePath, StringComparison.OrdinalIgnoreCase))
+        {
+            if (File.Exists(newFilePath))
+            {
+                throw new IOException($"Ya existe un archivo llamado «{newFileNameWithExt}» en la misma carpeta.");
+            }
+
+            File.Move(currentPath, newFilePath);
+            currentPath = newFilePath;
+            properties.FilePath = newFilePath;
+            properties.FileName = cleanName;
+        }
+
+        // 3. Volver a leer la pista actualizada desde el disco
+        return TrackScanner.Read(currentPath);
+    }
+
+    private static string[] SplitList(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return [];
+        }
+
+        return text.Split([';', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+}
