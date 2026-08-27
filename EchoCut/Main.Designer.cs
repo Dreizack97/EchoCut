@@ -1,4 +1,4 @@
-﻿namespace EchoCut
+namespace EchoCut
 {
     partial class Main
     {
@@ -55,6 +55,7 @@
             saveFileDialog = new SaveFileDialog();
             btnFile = new Button();
             openFileDialog = new OpenFileDialog();
+            mnuEditSong = new ToolStripMenuItem();
             ((System.ComponentModel.ISupportInitialize)dataGrid).BeginInit();
             contextMenuStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numericTolerance).BeginInit();
@@ -120,9 +121,9 @@
             // 
             // contextMenuStrip
             // 
-            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuOpenFolder, mnuOpenAudacity });
+            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuOpenFolder, mnuOpenAudacity, mnuEditSong });
             contextMenuStrip.Name = "contextMenuStrip";
-            contextMenuStrip.Size = new Size(213, 48);
+            contextMenuStrip.Size = new Size(213, 92);
             // 
             // mnuOpenFolder
             // 
@@ -300,6 +301,13 @@
             openFileDialog.Filter = resources.GetString("openFileDialog.Filter");
             openFileDialog.Multiselect = true;
             // 
+            // mnuEditSong
+            // 
+            mnuEditSong.Name = "mnuEditSong";
+            mnuEditSong.Size = new Size(212, 22);
+            mnuEditSong.Text = "Editar propiedades";
+            mnuEditSong.Click += mnuEditSong_Click;
+            // 
             // Main
             // 
             AllowDrop = true;
@@ -366,5 +374,6 @@
         private ToolStripMenuItem mnuOpenAudacity;
         private Button btnFile;
         private OpenFileDialog openFileDialog;
+        private ToolStripMenuItem mnuEditSong;
     }
 }

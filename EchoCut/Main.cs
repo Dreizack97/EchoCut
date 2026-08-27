@@ -974,6 +974,7 @@ namespace EchoCut
             btnAdvanced.Enabled = !IsBusy;
             numericThreads.Enabled = !IsBusy;
             numericTolerance.Enabled = !IsBusy;
+            mnuEditSong.Enabled = !IsBusy && hasSongs;
         }
 
         private void SetStatus(string message)
@@ -1056,6 +1057,7 @@ namespace EchoCut
                 }
 
                 dataGrid.CurrentCell = dataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                mnuEditSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count == 1;
             }
         }
 
@@ -1125,6 +1127,44 @@ namespace EchoCut
             {
                 OpenSongsInAudacity(songs);
             }
+        }
+
+        private void mnuEditSong_Click(object? sender, EventArgs e)
+        {
+            if (IsBusy)
+            {
+                return;
+            }
+
+            if (GetSelectedSong() is not { } song)
+            {
+                return;
+            }
+
+            if (ReferenceEquals(song, _playingSong))
+            {
+                StopPreview();
+            }
+
+            using SongPropertiesDialog dialog = new(song.Track);
+            dialog.TrackUpdated += (_, updatedTrack) =>
+            {
+                string oldPath = song.FilePath;
+                string newPath = updatedTrack.FilePath;
+
+                if (!string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    _rows.Remove(oldPath);
+                    _rows[newPath] = song;
+                }
+
+                song.UpdateTrack(updatedTrack);
+                _songs.ReapplySort();
+
+                SetStatus($"Propiedades actualizadas: {song.Name}.");
+            };
+
+            dialog.ShowDialog(this);
         }
     }
 }
