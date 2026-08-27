@@ -19,6 +19,7 @@ public sealed class SilenceOptions
     private const string DecisionCategory = "3 · Decisión";
     private const string FadeCategory = "4 · Fundido";
     private const string CutCategory = "5 · Corte";
+    private const string PreviewCategory = "6 · Previsualización";
 
     // ------------------------------------------------------------------------------- Umbral
 
@@ -244,6 +245,17 @@ public sealed class SilenceOptions
     [Description("Margen dentro del cual el corte se retrasa hasta el punto más silencioso, para que el truncado se note menos. Cero lo desactiva.")]
     public double CutSearchSeconds { get; set; } = 0.2;
 
+    // ------------------------------------------------------------------------- Previsualización
+
+    /// <summary>
+    /// Tiempo en segundos de la música previa al punto de corte que se reproduce para previsualizar el final recortado.
+    /// </summary>
+    /// <value>Duración del tramo en segundos. Por defecto, 3.0.</value>
+    [Category(PreviewCategory)]
+    [DisplayName("Tiempo de previsualización (s)")]
+    [Description("Duración de la música previa al corte que se reproduce al pulsar el botón de previsualización para juzgar cómo quedará el final.")]
+    public double PreviewSeconds { get; set; } = AudioPreview.ContextSeconds;
+
     /// <summary>Nivel asignado a una trama con energía cero.</summary>
     public const double SilenceFloorDbfs = -120.0;
 
@@ -290,6 +302,7 @@ public sealed class SilenceOptions
 
         ToleranceSeconds = Math.Clamp(ToleranceSeconds, 0.0, 5.0);
         CutSearchSeconds = Math.Clamp(CutSearchSeconds, 0.0, 5.0);
+        PreviewSeconds = Math.Clamp(PreviewSeconds, 0.5, 30.0);
     }
 
     /// <summary>
