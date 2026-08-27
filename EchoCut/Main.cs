@@ -39,8 +39,9 @@ namespace EchoCut
         private System.Windows.Forms.Timer? _previewTimer;
         private Song? _playingSong;
 
-        /// <summary>Carpeta escaneada, origen de las copias recortadas.</summary>
-        private string _sourceDirectory = string.Empty;
+        /// <summary>Carpetas escaneadas, origen de las pistas cargadas.</summary>
+        private readonly List<string> _sourceDirectories = [];
+        private readonly ToolTip _pathToolTip = new();
 
         /// <summary>
         /// Lote en curso. Cerrar la ventana debe esperarlo: cancelar sin esperar deja procesos de
@@ -57,6 +58,7 @@ namespace EchoCut
             _trimmer = new TrimService(_locator);
 
             numericTolerance.Value = Clamp(numericTolerance, _settings.Silence.ToleranceSeconds);
+
             numericThreads.Value = Clamp(
                 numericThreads,
                 _settings.ThreadCount > 0 ? _settings.ThreadCount : AppSettings.DefaultThreadCount);
@@ -101,7 +103,7 @@ namespace EchoCut
         /// </summary>
         private bool IsAlive => !IsDisposed && !Disposing;
 
-        // ---------------------------------------------------------------- Selección de carpeta
+        // ---------------------------------------------------------------- Selección de carpetas
 
         private void btnPath_Click(object sender, EventArgs e)
         {
@@ -110,10 +112,83 @@ namespace EchoCut
                 return;
             }
 
-            _sourceDirectory = folderBrowserDialog.SelectedPath;
-            txtPath.Text = _sourceDirectory;
+            string[] selected = folderBrowserDialog.SelectedPaths;
+            IReadOnlyList<string> selectedPaths = selected.Length > 0
+                ? selected
+                : string.IsNullOrWhiteSpace(folderBrowserDialog.SelectedPath)
+                    ? []
+                    : [folderBrowserDialog.SelectedPath];
 
-            ScanResult scan = TrackScanner.Scan(_sourceDirectory);
+            if (selectedPaths.Count > 0)
+            {
+                LoadDirectories(selectedPaths);
+            }
+        }
+
+        private void Main_DragEnter(object sender, DragEventArgs e)
+        {
+            if (!IsBusy && e.Data?.GetDataPresent(DataFormats.FileDrop) == true)
+            {
+                e.Effect = DragDropEffects.Copy;
+            }
+            else
+            {
+                e.Effect = DragDropEffects.None;
+            }
+        }
+
+        private void Main_DragDrop(object sender, DragEventArgs e)
+        {
+            if (IsBusy || e.Data?.GetData(DataFormats.FileDrop) is not string[] dropped || dropped.Length == 0)
+            {
+                return;
+            }
+
+            List<string> directories = dropped
+                .Where(Directory.Exists)
+                .ToList();
+
+            foreach (string file in dropped.Where(File.Exists))
+            {
+                string? dir = Path.GetDirectoryName(file);
+                if (dir is not null && !directories.Contains(dir, StringComparer.OrdinalIgnoreCase))
+                {
+                    directories.Add(dir);
+                }
+            }
+
+            if (directories.Count > 0)
+            {
+                LoadDirectories(directories);
+            }
+        }
+
+        /// <summary>
+        /// Escanea y lista las pistas de audio de las carpetas indicadas, evitando duplicados.
+        /// </summary>
+        /// <param name="directories">Carpetas a escanear.</param>
+        private void LoadDirectories(IReadOnlyList<string> directories)
+        {
+            StopPreview();
+
+            _sourceDirectories.Clear();
+            _sourceDirectories.AddRange(directories
+                .Where(Directory.Exists)
+                .Distinct(StringComparer.OrdinalIgnoreCase));
+
+            if (_sourceDirectories.Count == 0)
+            {
+                return;
+            }
+
+            txtPath.Text = _sourceDirectories.Count switch
+            {
+                1 => _sourceDirectories[0],
+                _ => string.Join("; ", _sourceDirectories)
+            };
+            _pathToolTip.SetToolTip(txtPath, string.Join(Environment.NewLine, _sourceDirectories));
+
+            ScanResult scan = TrackScanner.Scan(_sourceDirectories);
 
             _songs.RaiseListChangedEvents = false;
             _songs.Clear();
@@ -121,6 +196,11 @@ namespace EchoCut
 
             foreach (TrackInfo track in scan.Tracks)
             {
+                if (_rows.ContainsKey(track.FilePath))
+                {
+                    continue;
+                }
+
                 Song song = new(track);
                 _songs.Add(song);
                 _rows[track.FilePath] = song;
@@ -129,13 +209,16 @@ namespace EchoCut
             _songs.RaiseListChangedEvents = true;
             _songs.ResetBindings();
 
-            // Cargar otra carpeta no debe dejar la cabecera marcada con una flecha de orden que ya
-            // no se corresponde con lo que se ve.
+            // Cargar otra selección de carpetas no debe dejar la cabecera marcada con un orden obsoleto.
             _songs.ReapplySort();
 
+            string folderSummary = _sourceDirectories.Count == 1
+                ? "1 carpeta"
+                : $"{_sourceDirectories.Count} carpetas";
+
             lblStatus.Text = scan.SkippedCount == 0
-                ? $"{_songs.Count} archivo(s) encontrados."
-                : $"{_songs.Count} archivo(s) encontrados; {scan.SkippedCount} ilegible(s) omitido(s).";
+                ? $"{_songs.Count} archivo(s) encontrados en {folderSummary}."
+                : $"{_songs.Count} archivo(s) encontrados en {folderSummary}; {scan.SkippedCount} ilegible(s) omitido(s).";
 
             progressBar.Value = 0;
             UpdateButtons();
@@ -398,12 +481,25 @@ namespace EchoCut
                 return;
             }
 
-            string outputDirectory = TrimService.GetOutputDirectory(_sourceDirectory);
+            HashSet<string> targetFolders = targets
+                .Select(x => TrimService.GetOutputDirectory(x.Track.Directory))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            string folderDetails = targetFolders.Count switch
+            {
+                1 => $"en la subcarpeta:\n{targetFolders.First()}",
+                <= 5 => $"en las subcarpetas «{TrimService.OutputFolderName}» de cada carpeta:\n"
+                        + string.Join(Environment.NewLine, targetFolders.Select(f => $" • {f}")),
+                _ => $"en las subcarpetas «{TrimService.OutputFolderName}» de {targetFolders.Count} carpetas de origen:\n"
+                     + string.Join(Environment.NewLine, targetFolders.Take(5).Select(f => $" • {f}"))
+                     + $"{Environment.NewLine} • ... y {targetFolders.Count - 5} carpetas más."
+            };
+
             if (MessageBox.Show(
                     this,
-                    $"Se escribirán {targets.Count} archivo(s) recortado(s) en:\n{outputDirectory}\n\n"
+                    $"Se escribirán {targets.Count} archivo(s) recortado(s) {folderDetails}\n\n"
                     + "Los archivos originales no se modificarán.",
-                    "Confirmar recorte",
+                    "Confirmar recorte dinámico",
                     MessageBoxButtons.OKCancel,
                     MessageBoxIcon.Question) != DialogResult.OK)
             {
@@ -420,7 +516,6 @@ namespace EchoCut
             {
                 Task<BatchSummary> batch = _trimmer.TrimAsync(
                     targets,
-                    outputDirectory,
                     (int)numericThreads.Value,
                     CreateProgress<TrimOutcome>(ApplyTrim),
                     cts.Token);
@@ -429,7 +524,7 @@ namespace EchoCut
                 BatchSummary summary = await batch.ConfigureAwait(true);
 
                 SetStatus(summary.Failed == 0
-                    ? $"Recorte completado: {summary.Total} archivo(s) en «{TrimService.OutputFolderName}»."
+                    ? $"Recorte completado: {summary.Total} archivo(s) en «{TrimService.OutputFolderName}» de {targetFolders.Count} carpeta(s)."
                     : $"Recorte completado con {summary.Failed} error(es) de {summary.Total}.");
             }
             catch (OperationCanceledException)
@@ -503,8 +598,10 @@ namespace EchoCut
                 StopPreview();
             }
 
-            string outputDirectory = TrimService.GetOutputDirectory(
-                song.Track.Directory is { Length: > 0 } directory ? directory : _sourceDirectory);
+            string originDir = song.Track.Directory is { Length: > 0 } directory
+                ? directory
+                : (_sourceDirectories.FirstOrDefault() ?? string.Empty);
+            string outputDirectory = TrimService.GetOutputDirectory(originDir);
 
             using CancellationTokenSource cts = new();
             _trimCts = cts;
@@ -524,7 +621,7 @@ namespace EchoCut
                 await trim.ConfigureAwait(true);
 
                 song.Estatus = Song.StatusTrimmed;
-                SetStatus($"Recortado en «{TrimService.OutputFolderName}»: {song.Name}.");
+                SetStatus($"Recortado en «{outputDirectory}»: {song.Name}.");
             }
             catch (OperationCanceledException)
             {
@@ -598,6 +695,63 @@ namespace EchoCut
             SilenceOptions options = _settings.Silence.Clone();
             options.ToleranceSeconds = (double)numericTolerance.Value;
             return options;
+        }
+
+        private void numericTolerance_ValueChanged(object sender, EventArgs e)
+        {
+            if (IsBusy)
+            {
+                return;
+            }
+
+            double tolerance = (double)numericTolerance.Value;
+            _settings.Silence.ToleranceSeconds = tolerance;
+            ApplyToleranceDynamically(tolerance);
+        }
+
+        /// <summary>
+        /// Recalcula dinámicamente el recorte y la decisión de corte para todas las pistas ya analizadas
+        /// en memoria, sin necesidad de redecodificar el audio con FFmpeg.
+        /// </summary>
+        private void ApplyToleranceDynamically(double tolerance)
+        {
+            if (_songs.Count == 0)
+            {
+                return;
+            }
+
+            bool anyUpdated = false;
+            foreach (Song song in _songs)
+            {
+                if (song.Analysis is not { } analysis)
+                {
+                    continue;
+                }
+
+                double keptSeconds = tolerance + (analysis.FadeDetected ? _settings.Silence.FadeGuardSeconds : 0.0);
+                double savedSeconds = Math.Max(0.0, analysis.SilenceSeconds - keptSeconds);
+                double cutSeconds = Math.Clamp(analysis.DurationSeconds - savedSeconds, 0.0, analysis.DurationSeconds);
+                bool shouldTrim = analysis.SilenceSeconds >= _settings.Silence.MinSilenceSeconds
+                                  && savedSeconds >= _settings.Silence.MinSavingsSeconds
+                                  && analysis.ReachesSilenceFloor;
+
+                TrackAnalysis updated = analysis with
+                {
+                    CropSeconds = Math.Round(savedSeconds, 2),
+                    CutSeconds = cutSeconds,
+                    ShouldTrim = shouldTrim
+                };
+
+                song.Analysis = updated;
+                song.Estatus = shouldTrim ? Song.StatusAnalyzed : Song.StatusNoSilence;
+                anyUpdated = true;
+            }
+
+            if (anyUpdated)
+            {
+                int trimmable = _songs.Count(x => x.ShouldTrim);
+                SetStatus($"Tolerancia actualizada a {tolerance:0.0} s. {trimmable} de {_songs.Count} con cola recortable.");
+            }
         }
 
         /// <summary>Localiza la fila de una pista notificada por un lote.</summary>
@@ -733,6 +887,7 @@ namespace EchoCut
             StopPreview();
             _preview?.Dispose();
             _preview = null;
+            _pathToolTip.Dispose();
 
             _settings.Silence.ToleranceSeconds = (double)numericTolerance.Value;
             _settings.ThreadCount = (int)numericThreads.Value;

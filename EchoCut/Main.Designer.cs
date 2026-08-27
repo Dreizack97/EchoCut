@@ -64,29 +64,29 @@
             label1.AutoSize = true;
             label1.Location = new Point(12, 15);
             label1.Name = "label1";
-            label1.Size = new Size(60, 19);
+            label1.Size = new Size(74, 19);
             label1.TabIndex = 0;
-            label1.Text = "Carpeta:";
+            label1.Text = "Carpeta(s):";
             // 
             // txtPath
             // 
             txtPath.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             txtPath.BackColor = SystemColors.Window;
-            txtPath.Location = new Point(78, 12);
+            txtPath.Location = new Point(92, 12);
             txtPath.Name = "txtPath";
             txtPath.ReadOnly = true;
-            txtPath.Size = new Size(869, 25);
+            txtPath.Size = new Size(841, 25);
             txtPath.TabIndex = 1;
             // 
             // btnPath
             // 
             btnPath.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnPath.AutoSize = true;
-            btnPath.Location = new Point(953, 10);
+            btnPath.Location = new Point(939, 10);
             btnPath.Name = "btnPath";
-            btnPath.Size = new Size(135, 29);
+            btnPath.Size = new Size(149, 29);
             btnPath.TabIndex = 2;
-            btnPath.Text = "Seleccionar carpeta";
+            btnPath.Text = "Seleccionar carpeta(s)";
             btnPath.UseVisualStyleBackColor = true;
             btnPath.Click += btnPath_Click;
             // 
@@ -210,6 +210,11 @@
             numericTolerance.Size = new Size(50, 25);
             numericTolerance.TabIndex = 4;
             numericTolerance.Value = new decimal(new int[] { 3, 0, 0, 65536 });
+            numericTolerance.ValueChanged += numericTolerance_ValueChanged;
+            // 
+            // folderBrowserDialog
+            // 
+            folderBrowserDialog.Multiselect = true;
             // 
             // label3
             // 
@@ -278,6 +283,7 @@
             // 
             // Main
             // 
+            AllowDrop = true;
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1100, 611);
@@ -304,6 +310,8 @@
             Name = "Main";
             Text = "Analizador de Audios";
             FormClosing += Main_FormClosing;
+            DragDrop += Main_DragDrop;
+            DragEnter += Main_DragEnter;
             ((System.ComponentModel.ISupportInitialize)dataGrid).EndInit();
             contextMenuStrip.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)numericTolerance).EndInit();
