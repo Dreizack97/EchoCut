@@ -975,6 +975,7 @@ namespace EchoCut
             numericThreads.Enabled = !IsBusy;
             numericTolerance.Enabled = !IsBusy;
             mnuEditSong.Enabled = !IsBusy && hasSongs;
+            mnuDeleteSong.Enabled = !IsBusy && hasSongs;
         }
 
         private void SetStatus(string message)
@@ -1058,6 +1059,7 @@ namespace EchoCut
 
                 dataGrid.CurrentCell = dataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex];
                 mnuEditSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count == 1;
+                mnuDeleteSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count > 0;
             }
         }
 
@@ -1165,6 +1167,106 @@ namespace EchoCut
             };
 
             dialog.ShowDialog(this);
+        }
+
+        private void dataGrid_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Delete)
+            {
+                e.Handled = true;
+                DeleteSelectedSongs();
+            }
+        }
+
+        private void mnuDeleteSong_Click(object? sender, EventArgs e)
+        {
+            DeleteSelectedSongs();
+        }
+
+        /// <summary>
+        /// Elimina permanentemente del disco y retira de la lista las canciones actualmente seleccionadas.
+        /// </summary>
+        private void DeleteSelectedSongs()
+        {
+            if (IsBusy)
+            {
+                return;
+            }
+
+            List<Song> selectedSongs = GetSelectedSongs();
+            if (selectedSongs.Count == 0)
+            {
+                return;
+            }
+
+            string confirmationMessage = selectedSongs.Count == 1
+                ? $"¿Está seguro de que desea eliminar permanentemente «{selectedSongs[0].Name}» del disco?"
+                : $"¿Está seguro de que desea eliminar permanentemente estas {selectedSongs.Count} canciones del disco?";
+
+            DialogResult result = MessageBox.Show(
+                this,
+                confirmationMessage,
+                "Confirmar eliminación",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+
+            if (result != DialogResult.Yes)
+            {
+                return;
+            }
+
+            if (_playingSong is not null && selectedSongs.Any(s => ReferenceEquals(s, _playingSong)))
+            {
+                StopPreview();
+            }
+
+            List<Song> successfullyDeleted = [];
+            List<string> errors = [];
+
+            foreach (Song song in selectedSongs)
+            {
+                try
+                {
+                    if (File.Exists(song.FilePath))
+                    {
+                        File.Delete(song.FilePath);
+                    }
+
+                    successfullyDeleted.Add(song);
+                }
+                catch (Exception exception)
+                {
+                    errors.Add($"{song.Name}: {exception.Message}");
+                }
+            }
+
+            foreach (Song song in successfullyDeleted)
+            {
+                _rows.Remove(song.FilePath);
+                _songs.Remove(song);
+            }
+
+            UpdateButtons();
+
+            if (successfullyDeleted.Count == 1)
+            {
+                SetStatus($"Canción eliminada del disco: {successfullyDeleted[0].Name}.");
+            }
+            else if (successfullyDeleted.Count > 1)
+            {
+                SetStatus($"Se eliminaron {successfullyDeleted.Count} canciones del disco.");
+            }
+
+            if (errors.Count > 0)
+            {
+                MessageBox.Show(
+                    this,
+                    $"No se pudieron eliminar algunos archivos:\n\n{string.Join(Environment.NewLine, errors)}",
+                    "Error al eliminar archivos",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
         }
     }
 }

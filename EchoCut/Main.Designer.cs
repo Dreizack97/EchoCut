@@ -38,6 +38,7 @@ namespace EchoCut
             contextMenuStrip = new ContextMenuStrip(components);
             mnuOpenFolder = new ToolStripMenuItem();
             mnuOpenAudacity = new ToolStripMenuItem();
+            mnuEditSong = new ToolStripMenuItem();
             btnAnalyze = new Button();
             btnCancel = new Button();
             btnCropAll = new Button();
@@ -55,7 +56,7 @@ namespace EchoCut
             saveFileDialog = new SaveFileDialog();
             btnFile = new Button();
             openFileDialog = new OpenFileDialog();
-            mnuEditSong = new ToolStripMenuItem();
+            mnuDeleteSong = new ToolStripMenuItem();
             ((System.ComponentModel.ISupportInitialize)dataGrid).BeginInit();
             contextMenuStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numericTolerance).BeginInit();
@@ -118,12 +119,13 @@ namespace EchoCut
             dataGrid.CellFormatting += dataGrid_CellFormatting;
             dataGrid.CellMouseDown += dataGrid_CellMouseDown;
             dataGrid.DataBindingComplete += dataGrid_DataBindingComplete;
+            dataGrid.KeyDown += dataGrid_KeyDown;
             // 
             // contextMenuStrip
             // 
-            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuOpenFolder, mnuOpenAudacity, mnuEditSong });
+            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuOpenFolder, mnuOpenAudacity, mnuEditSong, mnuDeleteSong });
             contextMenuStrip.Name = "contextMenuStrip";
-            contextMenuStrip.Size = new Size(213, 92);
+            contextMenuStrip.Size = new Size(213, 114);
             // 
             // mnuOpenFolder
             // 
@@ -138,6 +140,13 @@ namespace EchoCut
             mnuOpenAudacity.Size = new Size(212, 22);
             mnuOpenAudacity.Text = "Abrir en Audacity";
             mnuOpenAudacity.Click += mnuOpenAudacity_Click;
+            // 
+            // mnuEditSong
+            // 
+            mnuEditSong.Name = "mnuEditSong";
+            mnuEditSong.Size = new Size(212, 22);
+            mnuEditSong.Text = "Editar propiedades";
+            mnuEditSong.Click += mnuEditSong_Click;
             // 
             // btnAnalyze
             // 
@@ -301,12 +310,12 @@ namespace EchoCut
             openFileDialog.Filter = resources.GetString("openFileDialog.Filter");
             openFileDialog.Multiselect = true;
             // 
-            // mnuEditSong
+            // mnuDeleteSong
             // 
-            mnuEditSong.Name = "mnuEditSong";
-            mnuEditSong.Size = new Size(212, 22);
-            mnuEditSong.Text = "Editar propiedades";
-            mnuEditSong.Click += mnuEditSong_Click;
+            mnuDeleteSong.Name = "mnuDeleteSong";
+            mnuDeleteSong.Size = new Size(212, 22);
+            mnuDeleteSong.Text = "Eliminar archivo(s)";
+            mnuDeleteSong.Click += mnuDeleteSong_Click;
             // 
             // Main
             // 
@@ -375,5 +384,6 @@ namespace EchoCut
         private Button btnFile;
         private OpenFileDialog openFileDialog;
         private ToolStripMenuItem mnuEditSong;
+        private ToolStripMenuItem mnuDeleteSong;
     }
 }
