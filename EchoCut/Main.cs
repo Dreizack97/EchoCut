@@ -493,7 +493,8 @@ namespace EchoCut
                 song.DurationSeconds,
                 song.CutSeconds,
                 song.Silence,
-                (double)numericTolerance.Value);
+                (double)numericTolerance.Value,
+                _settings.Silence.PreviewSeconds);
 
             using CancellationTokenSource cts = new();
             _previewCts = cts;
