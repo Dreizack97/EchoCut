@@ -109,9 +109,9 @@ public static class TrackEditor
         string newFileNameWithExt = cleanName + properties.Extension;
         string newFilePath = Path.Combine(currentDir, newFileNameWithExt);
 
-        if (!string.Equals(currentPath, newFilePath, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(currentPath, newFilePath, StringComparison.Ordinal))
         {
-            if (File.Exists(newFilePath))
+            if (!string.Equals(currentPath, newFilePath, StringComparison.OrdinalIgnoreCase) && File.Exists(newFilePath))
             {
                 throw new IOException($"Ya existe un archivo llamado «{newFileNameWithExt}» en la misma carpeta.");
             }
@@ -134,5 +134,61 @@ public static class TrackEditor
         }
 
         return text.Split([';', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    /// <summary>
+    /// Elimina todos los metadatos y etiquetas del archivo de audio indicado en disco.
+    /// </summary>
+    /// <param name="filePath">Ruta absoluta del archivo de audio.</param>
+    /// <returns>La información de pista actualizada a partir del archivo en disco sin metadatos.</returns>
+    /// <exception cref="ArgumentException">Si <paramref name="filePath"/> es nulo o está en blanco.</exception>
+    /// <exception cref="FileNotFoundException">Si el archivo no existe en disco.</exception>
+    public static TrackInfo StripMetadata(string filePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        if (!File.Exists(filePath))
+        {
+            throw new FileNotFoundException("El archivo de audio no existe en disco.", filePath);
+        }
+
+        using (TagLib.File tagFile = TagLib.File.Create(filePath))
+        {
+            tagFile.RemoveTags(TagLib.TagTypes.AllTags);
+            tagFile.Save();
+        }
+
+        return TrackScanner.Read(filePath);
+    }
+
+    /// <summary>
+    /// Normaliza los metadatos y el nombre de archivo de una pista de audio (eliminando acentos diacríticos,
+    /// preservando la «ñ» / «Ñ» y aplicando TitleCase), y actualiza el archivo en disco.
+    /// </summary>
+    /// <param name="filePath">Ruta absoluta del archivo a normalizar.</param>
+    /// <returns>La información de pista actualizada tras la normalización y posible renombrado.</returns>
+    /// <exception cref="ArgumentException">Si <paramref name="filePath"/> es nulo o está en blanco.</exception>
+    /// <exception cref="FileNotFoundException">Si el archivo no existe en disco.</exception>
+    public static TrackInfo NormalizeTrack(string filePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        if (!File.Exists(filePath))
+        {
+            throw new FileNotFoundException("El archivo de audio no existe en disco.", filePath);
+        }
+
+        TrackProperties properties = LoadProperties(filePath);
+
+        properties.FileName = TextNormalizer.NormalizeTitleCase(properties.FileName);
+        properties.Title = TextNormalizer.NormalizeTitleCase(properties.Title);
+        properties.Subtitle = TextNormalizer.NormalizeTitleCase(properties.Subtitle);
+        properties.Comment = TextNormalizer.NormalizeTitleCase(properties.Comment);
+        properties.Performers = TextNormalizer.NormalizeTitleCase(properties.Performers);
+        properties.AlbumArtist = TextNormalizer.NormalizeTitleCase(properties.AlbumArtist);
+        properties.Album = TextNormalizer.NormalizeTitleCase(properties.Album);
+        properties.Genre = TextNormalizer.NormalizeTitleCase(properties.Genre);
+        properties.Composers = TextNormalizer.NormalizeTitleCase(properties.Composers);
+        properties.Copyright = TextNormalizer.NormalizeTitleCase(properties.Copyright);
+
+        return SaveProperties(properties);
     }
 }
