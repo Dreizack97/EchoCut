@@ -33,6 +33,7 @@ namespace EchoCut
         private CancellationTokenSource? _analysisCts;
         private CancellationTokenSource? _trimCts;
         private CancellationTokenSource? _cleanCts;
+        private CancellationTokenSource? _normalizeCts;
 
         /// <summary>Reproducción de previsualización, creada al primer uso porque necesita FFmpeg.</summary>
         private AudioPreviewPlayer? _preview;
@@ -95,7 +96,7 @@ namespace EchoCut
             dataGrid.InvalidateRow(e.NewIndex);
         }
 
-        private bool IsBusy => _analysisCts is not null || _trimCts is not null || _cleanCts is not null;
+        private bool IsBusy => _analysisCts is not null || _trimCts is not null || _cleanCts is not null || _normalizeCts is not null;
 
         /// <summary>
         /// Si la ventana sigue viva. Un lote que ya había terminado hace que la espera del cierre
@@ -409,6 +410,7 @@ namespace EchoCut
         {
             _analysisCts?.Cancel();
             _cleanCts?.Cancel();
+            _normalizeCts?.Cancel();
         }
 
         // ------------------------------------------------------------------ Acciones de fila
@@ -969,16 +971,18 @@ namespace EchoCut
             bool analyzing = _analysisCts is not null;
             bool trimming = _trimCts is not null;
             bool cleaning = _cleanCts is not null;
+            bool normalizing = _normalizeCts is not null;
             bool hasSongs = _songs.Count > 0;
 
             btnPath.Enabled = !IsBusy;
             btnFile.Enabled = !IsBusy;
             btnAnalyze.Enabled = !IsBusy && hasSongs;
-            btnCancel.Enabled = analyzing || cleaning;
+            btnCancel.Enabled = analyzing || cleaning || normalizing;
             btnCropAll.Enabled = !IsBusy && hasSongs;
             btnStop.Enabled = trimming;
             btnExport.Enabled = !IsBusy && hasSongs;
             btnClean.Enabled = !IsBusy && hasSongs;
+            btnNormalize.Enabled = !IsBusy && hasSongs;
             btnAdvanced.Enabled = !IsBusy;
             numericThreads.Enabled = !IsBusy;
             numericTolerance.Enabled = !IsBusy;
@@ -1033,6 +1037,7 @@ namespace EchoCut
             _analysisCts?.Cancel();
             _trimCts?.Cancel();
             _cleanCts?.Cancel();
+            _normalizeCts?.Cancel();
             SetStatus("Cerrando: esperando a que terminen las tareas en curso…");
 
             try
@@ -1427,6 +1432,169 @@ namespace EchoCut
                     this,
                     $"No se pudieron limpiar los metadatos de algunos archivos:\n\n{string.Join(Environment.NewLine, errors)}",
                     "Aviso de limpieza",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+        }
+
+        private async void btnNormalize_Click(object sender, EventArgs e)
+        {
+            if (IsBusy || _songs.Count == 0)
+            {
+                return;
+            }
+
+            int count = _songs.Count;
+            string confirmationMessage = count == 1
+                ? $"¿Está seguro de que desea normalizar «{_songs[0].Name}»?\n\nEsta operación removerá los acentos (conservando la letra «ñ») y convertirá las palabras a TitleCase tanto en los metadatos como en el nombre del archivo en disco."
+                : $"¿Está seguro de que desea normalizar las {count} canciones cargadas en la lista?\n\nEsta operación removerá los acentos (conservando la letra «ñ») y convertirá las palabras a TitleCase tanto en los metadatos como en el nombre del archivo en disco.";
+
+            DialogResult confirmation = MessageBox.Show(
+                this,
+                confirmationMessage,
+                "Confirmar normalización de canciones",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button2);
+
+            if (confirmation != DialogResult.Yes)
+            {
+                return;
+            }
+
+            StopPreview();
+
+            List<Song> songsToNormalize = [.. _songs];
+            using CancellationTokenSource cts = new();
+            _normalizeCts = cts;
+            UpdateButtons();
+
+            StartProgress(songsToNormalize.Count, "Normalizando información de canciones…");
+
+            int completed = 0;
+            int successCount = 0;
+            List<string> errors = [];
+            int degreeOfParallelism = Math.Clamp((int)numericThreads.Value, 1, 8);
+
+            try
+            {
+                _running = Task.Run(async () =>
+                {
+                    ParallelOptions parallelOptions = new()
+                    {
+                        MaxDegreeOfParallelism = degreeOfParallelism,
+                        CancellationToken = cts.Token,
+                    };
+
+                    await Parallel.ForEachAsync(songsToNormalize, parallelOptions, (song, token) =>
+                    {
+                        token.ThrowIfCancellationRequested();
+
+                        try
+                        {
+                            string oldPath = song.FilePath;
+                            TrackInfo updated = TrackEditor.NormalizeTrack(oldPath);
+
+                            if (IsAlive)
+                            {
+                                try
+                                {
+                                    BeginInvoke(() =>
+                                    {
+                                        if (IsAlive)
+                                        {
+                                            string newPath = updated.FilePath;
+                                            if (!string.Equals(oldPath, newPath, StringComparison.Ordinal))
+                                            {
+                                                _rows.Remove(oldPath);
+                                                _rows[newPath] = song;
+                                            }
+
+                                            song.UpdateTrack(updated);
+                                        }
+                                    });
+                                }
+                                catch (InvalidOperationException)
+                                {
+                                }
+                            }
+
+                            Interlocked.Increment(ref successCount);
+                        }
+                        catch (Exception exception)
+                        {
+                            lock (errors)
+                            {
+                                errors.Add($"{song.Name}: {exception.Message}");
+                            }
+                        }
+                        finally
+                        {
+                            int current = Interlocked.Increment(ref completed);
+                            if (IsAlive)
+                            {
+                                try
+                                {
+                                    BeginInvoke(() =>
+                                    {
+                                        if (IsAlive)
+                                        {
+                                            AdvanceProgress(current);
+                                        }
+                                    });
+                                }
+                                catch (InvalidOperationException)
+                                {
+                                }
+                            }
+                        }
+
+                        return ValueTask.CompletedTask;
+                    }).ConfigureAwait(false);
+                }, cts.Token);
+
+                await _running.ConfigureAwait(true);
+
+                if (IsAlive)
+                {
+                    _songs.ReapplySort();
+
+                    if (successCount == 1)
+                    {
+                        SetStatus("Normalización completada para 1 canción.");
+                    }
+                    else
+                    {
+                        SetStatus($"Normalización completada en {successCount} de {songsToNormalize.Count} canciones.");
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                SetStatus("Normalización de canciones cancelada.");
+            }
+            catch (Exception exception)
+            {
+                ShowError("No se pudo completar la normalización de canciones.", exception);
+            }
+            finally
+            {
+                _normalizeCts = null;
+                _running = null;
+
+                if (IsAlive)
+                {
+                    EndProgress();
+                    UpdateButtons();
+                }
+            }
+
+            if (errors.Count > 0 && IsAlive)
+            {
+                MessageBox.Show(
+                    this,
+                    $"No se pudieron normalizar algunos archivos:\n\n{string.Join(Environment.NewLine, errors)}",
+                    "Aviso de normalización",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
             }
