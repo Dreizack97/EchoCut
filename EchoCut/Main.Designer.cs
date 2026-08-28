@@ -39,6 +39,7 @@ namespace EchoCut
             mnuOpenFolder = new ToolStripMenuItem();
             mnuOpenAudacity = new ToolStripMenuItem();
             mnuEditSong = new ToolStripMenuItem();
+            mnuDeleteSong = new ToolStripMenuItem();
             btnAnalyze = new Button();
             btnCancel = new Button();
             btnCropAll = new Button();
@@ -56,7 +57,7 @@ namespace EchoCut
             saveFileDialog = new SaveFileDialog();
             btnFile = new Button();
             openFileDialog = new OpenFileDialog();
-            mnuDeleteSong = new ToolStripMenuItem();
+            btnClean = new Button();
             ((System.ComponentModel.ISupportInitialize)dataGrid).BeginInit();
             contextMenuStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numericTolerance).BeginInit();
@@ -125,7 +126,7 @@ namespace EchoCut
             // 
             contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuOpenFolder, mnuOpenAudacity, mnuEditSong, mnuDeleteSong });
             contextMenuStrip.Name = "contextMenuStrip";
-            contextMenuStrip.Size = new Size(213, 114);
+            contextMenuStrip.Size = new Size(213, 92);
             // 
             // mnuOpenFolder
             // 
@@ -148,6 +149,13 @@ namespace EchoCut
             mnuEditSong.Text = "Editar propiedades";
             mnuEditSong.Click += mnuEditSong_Click;
             // 
+            // mnuDeleteSong
+            // 
+            mnuDeleteSong.Name = "mnuDeleteSong";
+            mnuDeleteSong.Size = new Size(212, 22);
+            mnuDeleteSong.Text = "Eliminar archivo(s)";
+            mnuDeleteSong.Click += mnuDeleteSong_Click;
+            // 
             // btnAnalyze
             // 
             btnAnalyze.AutoSize = true;
@@ -162,7 +170,7 @@ namespace EchoCut
             // btnCancel
             // 
             btnCancel.AutoSize = true;
-            btnCancel.Location = new Point(172, 99);
+            btnCancel.Location = new Point(171, 99);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(140, 29);
             btnCancel.TabIndex = 7;
@@ -173,7 +181,7 @@ namespace EchoCut
             // btnCropAll
             // 
             btnCropAll.AutoSize = true;
-            btnCropAll.Location = new Point(332, 99);
+            btnCropAll.Location = new Point(330, 99);
             btnCropAll.Name = "btnCropAll";
             btnCropAll.Size = new Size(140, 29);
             btnCropAll.TabIndex = 8;
@@ -184,7 +192,7 @@ namespace EchoCut
             // btnStop
             // 
             btnStop.AutoSize = true;
-            btnStop.Location = new Point(492, 99);
+            btnStop.Location = new Point(489, 99);
             btnStop.Name = "btnStop";
             btnStop.Size = new Size(140, 29);
             btnStop.TabIndex = 9;
@@ -195,7 +203,7 @@ namespace EchoCut
             // btnExport
             // 
             btnExport.AutoSize = true;
-            btnExport.Location = new Point(652, 99);
+            btnExport.Location = new Point(648, 99);
             btnExport.Name = "btnExport";
             btnExport.Size = new Size(140, 29);
             btnExport.TabIndex = 10;
@@ -280,9 +288,9 @@ namespace EchoCut
             // 
             lblStatus.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             lblStatus.AutoEllipsis = true;
-            lblStatus.Location = new Point(798, 104);
+            lblStatus.Location = new Point(953, 104);
             lblStatus.Name = "lblStatus";
-            lblStatus.Size = new Size(290, 19);
+            lblStatus.Size = new Size(135, 19);
             lblStatus.TabIndex = 16;
             lblStatus.Text = "Listo.";
             lblStatus.TextAlign = ContentAlignment.MiddleRight;
@@ -310,12 +318,16 @@ namespace EchoCut
             openFileDialog.Filter = resources.GetString("openFileDialog.Filter");
             openFileDialog.Multiselect = true;
             // 
-            // mnuDeleteSong
+            // btnClean
             // 
-            mnuDeleteSong.Name = "mnuDeleteSong";
-            mnuDeleteSong.Size = new Size(212, 22);
-            mnuDeleteSong.Text = "Eliminar archivo(s)";
-            mnuDeleteSong.Click += mnuDeleteSong_Click;
+            btnClean.AutoSize = true;
+            btnClean.Location = new Point(807, 99);
+            btnClean.Name = "btnClean";
+            btnClean.Size = new Size(140, 29);
+            btnClean.TabIndex = 18;
+            btnClean.Text = "Limpiar metadatos";
+            btnClean.UseVisualStyleBackColor = true;
+            btnClean.Click += btnClean_Click;
             // 
             // Main
             // 
@@ -323,6 +335,7 @@ namespace EchoCut
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1100, 611);
+            Controls.Add(btnClean);
             Controls.Add(btnFile);
             Controls.Add(lblStatus);
             Controls.Add(progressBar);
@@ -385,5 +398,6 @@ namespace EchoCut
         private OpenFileDialog openFileDialog;
         private ToolStripMenuItem mnuEditSong;
         private ToolStripMenuItem mnuDeleteSong;
+        private Button btnClean;
     }
 }
