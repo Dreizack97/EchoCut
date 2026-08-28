@@ -135,4 +135,28 @@ public static class TrackEditor
 
         return text.Split([';', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
+
+    /// <summary>
+    /// Elimina todos los metadatos y etiquetas del archivo de audio indicado en disco.
+    /// </summary>
+    /// <param name="filePath">Ruta absoluta del archivo de audio.</param>
+    /// <returns>La información de pista actualizada a partir del archivo en disco sin metadatos.</returns>
+    /// <exception cref="ArgumentException">Si <paramref name="filePath"/> es nulo o está en blanco.</exception>
+    /// <exception cref="FileNotFoundException">Si el archivo no existe en disco.</exception>
+    public static TrackInfo StripMetadata(string filePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        if (!File.Exists(filePath))
+        {
+            throw new FileNotFoundException("El archivo de audio no existe en disco.", filePath);
+        }
+
+        using (TagLib.File tagFile = TagLib.File.Create(filePath))
+        {
+            tagFile.RemoveTags(TagLib.TagTypes.AllTags);
+            tagFile.Save();
+        }
+
+        return TrackScanner.Read(filePath);
+    }
 }
