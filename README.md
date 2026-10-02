@@ -62,7 +62,7 @@ graph TD
         Form["Main (Formulario WinForms)"]
         Grid["Main.Grid (Presentación Rejilla)"]
         Advanced["AdvancedOptions (PropertyGrid Dinámico)"]
-        Player["AudioPreviewPlayer (SoundPlayer + WAV Temp)"]
+        Player["AudioPreviewPlayer (NAudio, PCM en Memoria)"]
         ExtApps["ExternalApps (Audacity / Explorer)"]
         Accessible["SongPresentation (WCAG AAA Dual Palette)"]
         Properties["SongPropertiesDialog (Metadatos y Atributos)"]
@@ -255,7 +255,7 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
    - Las copias resultantes se crearán en la subcarpeta `Recortados/` correspondiente a la carpeta de cada archivo.
 6. **Auditoría, Edición de Metadatos y Gestión**:
    - **Clic derecho sobre una o varias filas**:
-     - *Ver forma de onda y ajustar recorte*: Muestra la forma de onda de la pista completa y, en detalle, su principio y su final con el recorte superpuesto; lo que se eliminaría aparece con fondo gris y onda atenuada, como una selección de Audacity. La casilla *Escala en dB* agranda las colas de fundido y el hiss que en escala lineal parecen una línea plana. Arrastra las marcas con el ratón, muévelas con ← y → (10 ms; 100 ms con Mayús; 1 s con Ctrl) o escribe el instante exacto, y escucha cada borde tal como quedará. El ajuste manual prevalece sobre el análisis durante la sesión, aunque cambies la tolerancia o vuelvas a analizar, y la fila pasa a estado *Ajustado*. También funciona con pistas sin analizar.
+     - *Ver forma de onda y ajustar recorte*: Muestra la forma de onda de la pista completa y, en detalle, su principio y su final con el recorte superpuesto; lo que se eliminaría aparece con fondo gris y onda atenuada, como una selección de Audacity. La casilla *Escala en dB* agranda las colas de fundido y el hiss que en escala lineal parecen una línea plana. Arrastra las marcas con el ratón, muévelas con ← y → (10 ms; 100 ms con Mayús; 1 s con Ctrl) o escribe el instante exacto, y escucha cada borde tal como quedará mientras un cursor rojo recorre la forma de onda (el mismo botón lo detiene). El ajuste manual prevalece sobre el análisis durante la sesión, aunque cambies la tolerancia o vuelvas a analizar, y la fila pasa a estado *Ajustado*. También funciona con pistas sin analizar.
      - *Abrir ubicación*: Revela los archivos en el Explorador de Windows con las canciones seleccionadas.
      - *Abrir en Audacity*: Abre simultáneamente todas las pistas seleccionadas en una sesión de Audacity (o haz doble clic sobre cualquier fila para abrirla de inmediato).
      - *Editar propiedades*: Abre la ventana modal nativa de propiedades para consultar o editar metadatos ID3/Vorbis (título, artistas, año, álbum, etc.) o renombrar el archivo físico en disco.
