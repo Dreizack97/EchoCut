@@ -74,6 +74,7 @@ graph TD
         Batch["BatchRunner / BatchProcessor (Parallel.ForEachAsync)"]
         AnalysisSvc["AnalysisService"]
         TrimSvc["TrimService"]
+        WaveformSvc["WaveformService (Pista completa y final)"]
         Exporter["CsvExporter (UTF-8 BOM para Excel)"]
         
         subgraph AudioDSP ["Motor DSP y Audio"]
@@ -84,6 +85,11 @@ graph TD
             Decoder["AudioDecoder (FFmpeg f32le Mono)"]
             Trimmer["AudioTrimmer (FFmpeg -c copy)"]
             Locator["FFmpegLocator"]
+        end
+
+        subgraph Waveforms ["Forma de Onda"]
+            WaveBuilder["WaveformBuilder (Resumen por Bloques en Streaming)"]
+            WaveRenderer["WaveformRenderer (Píxeles ARGB en Memoria)"]
         end
     end
 
@@ -99,12 +105,15 @@ graph TD
     Analyzer --> Framer
     Analyzer --> Detector
     Framer --> BiquadFilter
+    WaveformSvc --> Decoder
+    WaveformSvc --> WaveBuilder
 ```
 
 ### Pureza de Dominio en `EchoCut.Core`
 * **Compilación Limpia**: `EchoCut.Core` compila para `net10.0` estándar (sin `-windows`). No contiene referencias a WinForms, GDI+ ni APIs de interfaz gráfica.
 * **Memoria Cero en el LOH**: El decodificador no carga el audio completo en RAM. El flujo de muestras PCM se procesa en bloques mediante `ISampleSink` y `LevelFramer`, reutilizando búferes con `ArrayPool<byte>` y `ArrayPool<double>`.
 * **Sondeo Progresivo**: En lugar de decodificar canciones de 10 minutos completas, analiza inicialmente los últimos 30 segundos (`InitialWindowSeconds`). Solo si toda la ventana es silencio, cuadruplica el tamaño progresivamente.
+* **Forma de Onda sin Interfaz**: `WaveformBuilder` implementa `ISampleSink` y resume la señal mono mientras FFmpeg decodifica, guardando mínimo, máximo y energía por bloque de 256 muestras como los resúmenes de Audacity (3.7 MB para 30 minutos). `WaveformRenderer` pinta picos y banda RMS, en escala lineal o en dB, en un búfer ARGB en memoria que la interfaz solo envuelve en un `Bitmap`. El final de la pista se decodifica aparte y se sitúa con la misma referencia que el corte final.
 
 ---
 
@@ -246,6 +255,7 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
    - Las copias resultantes se crearán en la subcarpeta `Recortados/` correspondiente a la carpeta de cada archivo.
 6. **Auditoría, Edición de Metadatos y Gestión**:
    - **Clic derecho sobre una o varias filas**:
+     - *Ver forma de onda y ajustar recorte*: Muestra la forma de onda de la pista completa y, en detalle, su principio y su final con el recorte superpuesto; lo que se eliminaría aparece con fondo gris y onda atenuada, como una selección de Audacity. La casilla *Escala en dB* agranda las colas de fundido y el hiss que en escala lineal parecen una línea plana. Arrastra las marcas con el ratón, muévelas con ← y → (10 ms; 100 ms con Mayús; 1 s con Ctrl) o escribe el instante exacto, y escucha cada borde tal como quedará. El ajuste manual prevalece sobre el análisis durante la sesión, aunque cambies la tolerancia o vuelvas a analizar, y la fila pasa a estado *Ajustado*. También funciona con pistas sin analizar.
      - *Abrir ubicación*: Revela los archivos en el Explorador de Windows con las canciones seleccionadas.
      - *Abrir en Audacity*: Abre simultáneamente todas las pistas seleccionadas en una sesión de Audacity (o haz doble clic sobre cualquier fila para abrirla de inmediato).
      - *Editar propiedades*: Abre la ventana modal nativa de propiedades para consultar o editar metadatos ID3/Vorbis (título, artistas, año, álbum, etc.) o renombrar el archivo físico en disco.
