@@ -29,4 +29,8 @@
 		<ProjectReference Include="..\EchoCut.Core\EchoCut.Core.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <PackageReference Include="NAudio.WinMM" Version="3.1.0" />
+	</ItemGroup>
+
 </Project>

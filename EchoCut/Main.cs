@@ -39,7 +39,6 @@ namespace EchoCut
         /// <summary>Reproducción de previsualización, creada al primer uso porque necesita FFmpeg.</summary>
         private AudioPreviewPlayer? _preview;
         private CancellationTokenSource? _previewCts;
-        private System.Windows.Forms.Timer? _previewTimer;
         private Song? _playingSong;
 
         /// <summary>Carpetas escaneadas, origen de las pistas cargadas.</summary>
@@ -510,10 +509,10 @@ namespace EchoCut
 
             try
             {
-                _preview ??= new AudioPreviewPlayer(_locator.Require().FFmpeg);
+                _preview ??= CreatePreviewPlayer();
                 SetStatus($"Preparando el final de {song.Name}…");
 
-                TimeSpan duration = await _preview
+                await _preview
                     .PlayAsync(song.FilePath, window, cts.Token)
                     .ConfigureAwait(true);
 
@@ -524,16 +523,6 @@ namespace EchoCut
 
                 _playingSong = song;
                 SetStatus($"Reproduciendo el final de {song.Name}…");
-
-                // SoundPlayer no avisa de que terminó, así que el glifo se devuelve a su sitio con
-                // un temporizador de la duración ya conocida.
-                _previewTimer = new System.Windows.Forms.Timer
-                {
-                    Interval = (int)Math.Max(1, duration.TotalMilliseconds) + 100,
-                };
-                _previewTimer.Tick += (_, _) => StopPreview();
-                _previewTimer.Start();
-
                 RefreshPlayColumn();
             }
             catch (OperationCanceledException)
@@ -550,17 +539,20 @@ namespace EchoCut
             }
         }
 
+        /// <summary>
+        /// Crea el reproductor en el hilo de la interfaz, que es donde avisará de que el tramo
+        /// terminó: así el glifo vuelve a su sitio justo cuando deja de sonar.
+        /// </summary>
+        private AudioPreviewPlayer CreatePreviewPlayer()
+        {
+            AudioPreviewPlayer player = new(_locator.Require().FFmpeg);
+            player.PlaybackCompleted += (_, _) => StopPreview();
+            return player;
+        }
+
         private void StopPreview()
         {
             _previewCts?.Cancel();
-
-            if (_previewTimer is { } timer)
-            {
-                timer.Stop();
-                timer.Dispose();
-                _previewTimer = null;
-            }
-
             _preview?.Stop();
 
             if (_playingSong is null)
