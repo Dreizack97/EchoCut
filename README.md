@@ -1,13 +1,13 @@
 # EchoCut
 
 <p align="center">
-  <strong>El recortador inteligente y sin pérdidas de silencio final para bibliotecas de audio masivas.</strong>
+  <strong>El recortador inteligente y sin pérdidas de silencio inicial y final para bibliotecas de audio masivas.</strong>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet&logoColor=white" alt=".NET 10" />
   <img src="https://img.shields.io/badge/C%23-14-239120?style=flat-square&logo=csharp&logoColor=white" alt="C# 14" />
-  <img src="https://img.shields.io/badge/Versi%C3%B3n-1.1.0-blue.svg?style=flat-square" alt="Versión 1.1.0" />
+  <img src="https://img.shields.io/badge/Versi%C3%B3n-1.2.0-blue.svg?style=flat-square" alt="Versión 1.2.0" />
   <img src="https://img.shields.io/badge/UI-Windows%20Forms-0078D7?style=flat-square&logo=windows&logoColor=white" alt="Windows Forms" />
   <img src="https://img.shields.io/badge/Engine-FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white" alt="FFmpeg" />
   <img src="https://img.shields.io/badge/Licencia-GPLv3-blue.svg?style=flat-square" alt="Licencia GPLv3" />
@@ -19,7 +19,7 @@
 
 ## 🎯 ¿Qué es EchoCut?
 
-**EchoCut** es una aplicación de escritorio para Windows y un motor de procesamiento digital de señales (DSP) de alto rendimiento construido sobre **.NET 10** y **C# 14**. Su propósito es analizar carpetas enteras de música y audiolibros, detectar con precisión quirúrgica el silencio innecesario, colas muertas o ruido residual al final de cada archivo, y recortarlos por lote **sin recodificar el audio y sin tocar los archivos originales**.
+**EchoCut** es una aplicación de escritorio para Windows y un motor de procesamiento digital de señales (DSP) de alto rendimiento construido sobre **.NET 10** y **C# 14**. Su propósito es analizar carpetas enteras de música y audiolibros, detectar con precisión quirúrgica el silencio innecesario, entradas y colas muertas o ruido residual al inicio y al final de cada archivo, y recortarlos por lote **sin recodificar el audio y sin tocar los archivos originales**.
 
 Si eres DJ, coleccionista musical, archivista, podcaster o simplemente te desespera el "tiempo muerto" entre canciones en tu auto o reproductor portátil, EchoCut automatiza la limpieza de miles de pistas en minutos, conservando una fidelidad sonora absoluta.
 
@@ -33,8 +33,8 @@ EchoCut fue diseñado bajo principios estrictos de ingeniería acústica:
 
 1. **Cero Pérdida Generacional (`-c copy`)**:
    El recorte se realiza mediante copia de flujo directo con FFmpeg. **No hay recodificación**. Un archivo MP3 de 320 Kbps sigue siendo exactamente el mismo flujo comprimido; los metadatos ID3v2, portadas y etiquetas se conservan intactos y cada archivo se procesa en una fracción de segundo.
-2. **Procesamiento 100% No Destructivo**:
-   Los archivos originales **nunca se sobrescriben**. Las copias recortadas se guardan de forma aislada en la subcarpeta `Recortados/`.
+2. **Recorte 100% No Destructivo**:
+   El recorte **nunca sobrescribe** los archivos originales: las copias recortadas se guardan de forma aislada en la subcarpeta `Recortados/`. Las únicas operaciones que modifican los originales —editar propiedades, limpiar o normalizar metadatos y eliminar archivos— son explícitas y piden confirmación.
 3. **Filtro Paso Alto RLB (EBU R128)**:
    Antes de medir energía, la señal pasa por un filtro digital Biquad paso alto de 2.° orden calibrado a ~38.14 Hz (portado del código matemático de Audacity). Esto elimina el *offset* de corriente directa (DC) y el retumbe subsónico de digitalizaciones de vinilo que engañan a las compuertas convencionales.
 4. **Disparador Schmitt e Histéresis Dinámica**:
@@ -47,6 +47,8 @@ EchoCut fue diseñado bajo principios estrictos de ingeniería acústica:
    El umbral no es estático; se adapta al piso de ruido de la grabación. Una pista grabada de cinta con *hiss* a -44 dBFS no se queda sin recortar ni se corta a la mitad: el algoritmo identifica el piso real y sitúa el umbral por encima con margen seguro.
 8. **Protección de Másters Silenciosos**:
    El umbral nunca se acerca al nivel de programa (el pasaje más sonoro medido en RMS) a menos de una distancia configurable, protegiendo obras de música clásica o grabaciones acústicas con amplio rango dinámico.
+9. **Silencio Inicial por Análisis en Espejo**:
+   El principio de la pista se analiza invirtiendo en el tiempo su curva de nivel y tratándola como una cola, de modo que el umbral adaptativo, la histéresis, la guarda de fundido (aquí, de entrada) y la afinación del corte se aplican idénticos en ambos bordes. Su mínimo es más corto que el del final para respetar las décimas de silencio deliberadas con que arrancan los másters comerciales.
 
 ---
 
@@ -60,10 +62,12 @@ graph TD
         Form["Main (Formulario WinForms)"]
         Grid["Main.Grid (Presentación Rejilla)"]
         Advanced["AdvancedOptions (PropertyGrid Dinámico)"]
-        Player["AudioPreviewPlayer (SoundPlayer + WAV Temp)"]
+        Player["AudioPreviewPlayer (NAudio, PCM en Memoria)"]
         ExtApps["ExternalApps (Audacity / Explorer)"]
         Accessible["SongPresentation (WCAG AAA Dual Palette)"]
         Properties["SongPropertiesDialog (Metadatos y Atributos)"]
+        WaveEditor["WaveformEditor (Forma de Onda y Ajuste Manual)"]
+        WaveView["WaveformView (Marcas y Cursor de Reproducción)"]
     end
 
     subgraph Core ["EchoCut.Core (net10.0 - Motor Puro)"]
@@ -72,6 +76,7 @@ graph TD
         Batch["BatchRunner / BatchProcessor (Parallel.ForEachAsync)"]
         AnalysisSvc["AnalysisService"]
         TrimSvc["TrimService"]
+        WaveformSvc["WaveformService (Pista completa y final)"]
         Exporter["CsvExporter (UTF-8 BOM para Excel)"]
         
         subgraph AudioDSP ["Motor DSP y Audio"]
@@ -83,6 +88,11 @@ graph TD
             Trimmer["AudioTrimmer (FFmpeg -c copy)"]
             Locator["FFmpegLocator"]
         end
+
+        subgraph Waveforms ["Forma de Onda"]
+            WaveBuilder["WaveformBuilder (Resumen por Bloques en Streaming)"]
+            WaveRenderer["WaveformRenderer (Píxeles ARGB en Memoria)"]
+        end
     end
 
     Form --> AnalysisSvc
@@ -91,18 +101,26 @@ graph TD
     Form --> Scanner
     Form --> Properties
     Properties --> Editor
+    Form --> WaveEditor
+    WaveEditor --> WaveView
+    WaveEditor --> WaveformSvc
+    WaveEditor --> Player
+    WaveView --> WaveRenderer
     AnalysisSvc --> Analyzer
     TrimSvc --> Trimmer
     Analyzer --> Decoder
     Analyzer --> Framer
     Analyzer --> Detector
     Framer --> BiquadFilter
+    WaveformSvc --> Decoder
+    WaveformSvc --> WaveBuilder
 ```
 
 ### Pureza de Dominio en `EchoCut.Core`
 * **Compilación Limpia**: `EchoCut.Core` compila para `net10.0` estándar (sin `-windows`). No contiene referencias a WinForms, GDI+ ni APIs de interfaz gráfica.
 * **Memoria Cero en el LOH**: El decodificador no carga el audio completo en RAM. El flujo de muestras PCM se procesa en bloques mediante `ISampleSink` y `LevelFramer`, reutilizando búferes con `ArrayPool<byte>` y `ArrayPool<double>`.
 * **Sondeo Progresivo**: En lugar de decodificar canciones de 10 minutos completas, analiza inicialmente los últimos 30 segundos (`InitialWindowSeconds`). Solo si toda la ventana es silencio, cuadruplica el tamaño progresivamente.
+* **Forma de Onda sin Interfaz**: `WaveformBuilder` implementa `ISampleSink` y resume la señal mono mientras FFmpeg decodifica, guardando mínimo, máximo y energía por bloque de 256 muestras como los resúmenes de Audacity (3.7 MB para 30 minutos). `WaveformRenderer` pinta picos y banda RMS, en escala lineal o en dB, en un búfer ARGB en memoria que la interfaz solo envuelve en un `Bitmap`. El final de la pista se decodifica aparte y se sitúa con la misma referencia que el corte final.
 
 ---
 
@@ -138,7 +156,7 @@ flowchart TD
 
 ## 🎛️ Parámetros del Algoritmo
 
-EchoCut incluye 22 parámetros calibrados exhaustivamente para música comercial masterizada. Puedes ajustarlos desde el diálogo **Avanzado**:
+EchoCut incluye 24 parámetros calibrados exhaustivamente para música comercial masterizada. Puedes ajustarlos desde el diálogo **Avanzado**:
 
 | Categoría | Parámetro | Por Defecto | Descripción |
 | :--- | :--- | :---: | :--- |
@@ -164,6 +182,8 @@ EchoCut incluye 22 parámetros calibrados exhaustivamente para música comercial
 | **5 · Corte** | `Tolerancia (s)` | `0.3 s` | Silencio remanente conservado tras el corte (configurable en la pantalla principal). |
 | | `Búsqueda del corte (s)` | `0.2 s` | Ventana de desplazamiento hacia la frontera de trama más silenciosa (anti-clic). |
 | **6 · Previsualización** | `Tiempo de previsualización (s)` | `3.0 s` | Duración de la música previa al corte que se reproduce al pulsar el botón de previsualización para juzgar cómo quedará el final. |
+| **7 · Inicio** | `Recortar silencio inicial` | `Sí` | Analiza también el principio de la pista y recorta su silencio conservando la tolerancia antes de la música. Desactivarlo ahorra la decodificación del inicio. |
+| | `Silencio inicial mínimo (s)` | `1.0 s` | Silencio inicial mínimo para considerar recortable el principio. El resto de criterios se comparten con el final. |
 
 ---
 
@@ -234,7 +254,7 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
 2. **Ajustar Tolerancia e Hilos**:
    - **Tolerancia**: Los segundos de silencio que deseas conservar al final (0.3 s por defecto es el estándar musical ideal).
    - **Hilos**: Grado de paralelismo (EchoCut calibra automáticamente entre 1 y 8 hilos según tu procesador).
-3. **Analizar (`Analizar`)**: EchoCut procesará las colas de las canciones en paralelo, mostrando el progreso y coloreando las filas recortables en ámbar oscuro.
+3. **Analizar (`Analizar`)**: EchoCut procesará el principio y el final de las canciones en paralelo, mostrando el progreso y coloreando las filas recortables en ámbar oscuro.
 4. **Previsualizar de Oído (`▶` / `⏹`)**: Pulsa el botón de reproducción en cualquier fila. Sonará de inmediato la música previa al punto de corte (3.0 s por defecto, personalizable en **Avanzado**) más la tolerancia conservada, permitiéndote comprobar auditivamente que el corte no interrumpe la frase musical.
 5. **Recortar**:
    - Pulsa **`Recortar todo`** para procesar en lote todas las pistas válidas.
@@ -242,10 +262,13 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
    - Las copias resultantes se crearán en la subcarpeta `Recortados/` correspondiente a la carpeta de cada archivo.
 6. **Auditoría, Edición de Metadatos y Gestión**:
    - **Clic derecho sobre una o varias filas**:
+     - *Ver forma de onda y ajustar recorte*: Muestra la forma de onda de la pista completa y, en detalle, su principio y su final con el recorte superpuesto; lo que se eliminaría aparece con fondo gris y onda atenuada, como una selección de Audacity. La casilla *Escala en dB* agranda las colas de fundido y el hiss que en escala lineal parecen una línea plana. Arrastra las marcas con el ratón, muévelas con ← y → (10 ms; 100 ms con Mayús; 1 s con Ctrl) o escribe el instante exacto, y escucha cada borde tal como quedará mientras un cursor rojo recorre la forma de onda (el mismo botón lo detiene). El ajuste manual prevalece sobre el análisis durante la sesión, aunque cambies la tolerancia o vuelvas a analizar, y la fila pasa a estado *Ajustado*. También funciona con pistas sin analizar.
      - *Abrir ubicación*: Revela los archivos en el Explorador de Windows con las canciones seleccionadas.
      - *Abrir en Audacity*: Abre simultáneamente todas las pistas seleccionadas en una sesión de Audacity (o haz doble clic sobre cualquier fila para abrirla de inmediato).
      - *Editar propiedades*: Abre la ventana modal nativa de propiedades para consultar o editar metadatos ID3/Vorbis (título, artistas, año, álbum, etc.) o renombrar el archivo físico en disco.
      - *Eliminar archivo(s)*: Elimina permanentemente los archivos seleccionados del disco tras confirmar la operación (también disponible pulsando la tecla **Suprimir** en la cuadrícula).
+   - **Limpiar metadatos (`Limpiar metadatos`)**: Elimina todas las etiquetas (título, artistas, portada, etc.) de las pistas cargadas, tras confirmar la operación. Modifica los archivos originales.
+   - **Normalizar (`Normalizar`)**: Quita los acentos (conservando la «ñ») y pone en mayúscula la inicial de cada palabra tanto en el nombre del archivo como en los metadatos de texto de las pistas cargadas, tras confirmar la operación. Modifica y renombra los archivos originales.
    - **Exportar (`Exportar`)**: Genera un archivo CSV codificado en UTF-8 con BOM y separador regional, listo para abrirse en Microsoft Excel con todas las métricas acústicas de cada pista.
 
 ---

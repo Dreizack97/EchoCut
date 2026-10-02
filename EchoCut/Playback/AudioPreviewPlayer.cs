@@ -1,58 +1,100 @@
 using EchoCut.Audio;
+using NAudio.Wave;
 using System.Globalization;
-using System.Media;
 
 namespace EchoCut.Playback;
 
 /// <summary>
-/// Reproduce un tramo corto de una pista para poder juzgar de oído el punto de corte.
+/// Reproduce un tramo corto de una pista para poder juzgar de oído el punto de corte, sabiendo en
+/// todo momento qué instante está sonando.
 /// </summary>
 /// <remarks>
 /// <para>
-/// FFmpeg decodifica el tramo a WAV y <see cref="SoundPlayer"/> —que viene en el propio .NET— lo
-/// reproduce, así que la previsualización no añade ninguna dependencia al proyecto. A cambio no hay
-/// control de volumen ni de posición: solo sonar y parar, que es todo lo que una previsualización de
-/// unos segundos necesita.
+/// FFmpeg decodifica el tramo a PCM estéreo de 16 bits directamente en memoria y NAudio lo envía
+/// a la tarjeta con <see cref="WaveOut"/>. A diferencia de reproducir un WAV temporal, el
+/// dispositivo informa de cuántos bytes ha sonado ya, que es lo que permite dibujar un cursor
+/// sincronizado con lo que se oye, y avisa cuando termina en vez de obligar a adivinarlo con un
+/// temporizador.
 /// </para>
 /// <para>
-/// El WAV va a un archivo temporal y no a una tubería a propósito. Al escribir <c>-f wav</c> sobre
-/// la salida estándar, FFmpeg no puede volver atrás a rellenar los tamaños de las cabeceras RIFF y
-/// los deja marcados como indefinidos; <see cref="SoundPlayer"/> rechaza precisamente eso.
+/// El tramo cabe holgadamente en memoria: la previsualización dura como mucho 30 s, unos 5 MB.
+/// </para>
+/// <para>
+/// <see cref="WaveOut"/> notifica el final desde un hilo propio; el reproductor lo devuelve al
+/// contexto de sincronización en el que se creó, de modo que creado en la interfaz,
+/// <see cref="PlaybackCompleted"/> llega listo para tocar controles.
 /// </para>
 /// </remarks>
 public sealed class AudioPreviewPlayer : IDisposable
 {
-    /// <summary>Frecuencia de reproducción. No es la de análisis: aquí sí se escucha.</summary>
-    private const int PlaybackSampleRate = 44100;
+    /// <summary>Formato de reproducción. No es el de análisis: aquí sí se escucha, y en estéreo.</summary>
+    private static readonly WaveFormat PlaybackFormat = new(44100, 16, 2);
+
+    /// <summary>Duración de cada búfer del dispositivo: la recomendada por NAudio.</summary>
+    private const int BufferMilliseconds = 100;
 
     private readonly string _ffmpegPath;
-    private readonly SoundPlayer _player = new();
-    private readonly string _temporaryFile =
-        Path.Combine(Path.GetTempPath(), $"echocut-preview-{Guid.NewGuid():N}.wav");
+    private readonly SynchronizationContext? _context;
 
+    private WaveOut? _output;
+    private PreviewWindow _window;
+    private int _generation;
     private bool _disposed;
 
     /// <summary>Crea el reproductor contra el ejecutable de FFmpeg indicado.</summary>
     /// <param name="ffmpegPath">Ruta absoluta a <c>ffmpeg.exe</c>, ya resuelta.</param>
-    public AudioPreviewPlayer(string ffmpegPath) => _ffmpegPath = ffmpegPath;
+    /// <remarks>Debe crearse en el hilo en el que se quiera recibir <see cref="PlaybackCompleted"/>.</remarks>
+    public AudioPreviewPlayer(string ffmpegPath)
+    {
+        _ffmpegPath = ffmpegPath;
+        _context = SynchronizationContext.Current;
+    }
 
-    /// <summary>Decodifica el tramo indicado y empieza a reproducirlo.</summary>
+    /// <summary>
+    /// Se produce cuando el tramo termina de sonar por sí solo. No se produce al detenerlo con
+    /// <see cref="Stop"/> ni al sustituirlo por otro: en esos casos quien lo pidió ya lo sabe.
+    /// </summary>
+    public event EventHandler? PlaybackCompleted;
+
+    /// <value><c>true</c> mientras suena un tramo.</value>
+    public bool IsPlaying => _output?.PlaybackState == PlaybackState.Playing;
+
+    /// <value>
+    /// Instante del archivo que está sonando, en segundos, o <c>null</c> si no suena nada. Lo da el
+    /// propio dispositivo, así que incluye la latencia de salida: es lo que de verdad se oye.
+    /// </value>
+    public double? PositionSeconds
+    {
+        get
+        {
+            if (_output is not { } output)
+            {
+                return null;
+            }
+
+            double played = output.GetPosition() / (double)PlaybackFormat.AverageBytesPerSecond;
+            return _window.StartSeconds + Math.Min(played, _window.DurationSeconds);
+        }
+    }
+
+    /// <summary>Decodifica el tramo indicado y empieza a reproducirlo, sustituyendo al que sonara.</summary>
     /// <param name="filePath">Ruta del archivo de audio a previsualizar.</param>
     /// <param name="window">Tramo del archivo a reproducir.</param>
     /// <param name="cancellationToken">
     /// Token de cancelación para la decodificación con FFmpeg. Una vez iniciada la reproducción, no
     /// afecta al sonido ya en curso: para eso está <see cref="Stop"/>.
     /// </param>
-    /// <returns>La duración real preparada, para saber cuándo dejará de sonar.</returns>
+    /// <returns>Una tarea que termina cuando el tramo empieza a sonar.</returns>
+    /// <remarks>
+    /// Si se pide otro tramo mientras este se decodifica, gana el último: el anterior se descarta sin
+    /// llegar a sonar, para que dos clics seguidos nunca dejen dos reproducciones superpuestas.
+    /// </remarks>
     /// <exception cref="ObjectDisposedException">Se lanza si el reproductor ya se liberó con <see cref="Dispose"/>.</exception>
     /// <exception cref="FFmpegException">
     /// Se lanza si <paramref name="window"/> tiene duración no positiva, o si FFmpeg falla al
     /// decodificar el tramo.
     /// </exception>
-    public async Task<TimeSpan> PlayAsync(
-        string filePath,
-        PreviewWindow window,
-        CancellationToken cancellationToken)
+    public async Task PlayAsync(string filePath, PreviewWindow window, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -62,46 +104,56 @@ public sealed class AudioPreviewPlayer : IDisposable
         }
 
         Stop();
+        int generation = ++_generation;
 
         string[] arguments =
         [
             "-v", "error",
-            "-y",
-            "-ss", window.StartSeconds.ToString("0.###", CultureInfo.InvariantCulture),
+            "-ss", Seconds(window.StartSeconds),
             "-i", filePath,
-            "-t", window.DurationSeconds.ToString("0.###", CultureInfo.InvariantCulture),
+            "-t", Seconds(window.DurationSeconds),
             "-vn",
-            "-ac", "2",
-            "-ar", PlaybackSampleRate.ToString(CultureInfo.InvariantCulture),
-            "-f", "wav",
-            _temporaryFile,
+            "-ac", PlaybackFormat.Channels.ToString(CultureInfo.InvariantCulture),
+            "-ar", PlaybackFormat.SampleRate.ToString(CultureInfo.InvariantCulture),
+            "-f", "s16le",
+            "-",
         ];
 
-        await FFmpegRunner.RunCheckedAsync(_ffmpegPath, arguments, cancellationToken).ConfigureAwait(false);
+        byte[] pcm = await FFmpegRunner.ReadOutputAsync(_ffmpegPath, arguments, cancellationToken).ConfigureAwait(true);
 
         cancellationToken.ThrowIfCancellationRequested();
+        if (_disposed || generation != _generation)
+        {
+            return;
+        }
 
-        _player.SoundLocation = _temporaryFile;
-        _player.Load();
-        _player.Play();
+        WaveOut output = new() { BufferMilliseconds = BufferMilliseconds };
+        output.PlaybackStopped += (_, _) => OnStopped(output);
+        output.Init(new RawSourceWaveStream(pcm, 0, pcm.Length, PlaybackFormat));
 
-        return TimeSpan.FromSeconds(window.DurationSeconds);
+        _output = output;
+        _window = window;
+        output.Play();
     }
 
-    /// <summary>Detiene la reproducción en curso, si la hay.</summary>
+    /// <summary>Detiene la reproducción en curso, si la hay, sin producir <see cref="PlaybackCompleted"/>.</summary>
     public void Stop()
     {
-        try
+        _generation++;
+
+        // Se suelta antes de parar: así el aviso de parada que llega después ya no la reconoce
+        // como la reproducción en curso y no se confunde con un final natural.
+        WaveOut? output = _output;
+        _output = null;
+
+        if (output is not null)
         {
-            _player.Stop();
-        }
-        catch (Exception)
-        {
-            // Detener algo que no llegó a sonar no es un fallo del que haya que informar.
+            output.Stop();
+            output.Dispose();
         }
     }
 
-    /// <summary>Detiene la reproducción, libera el reproductor y borra el archivo temporal.</summary>
+    /// <summary>Detiene la reproducción y libera el dispositivo.</summary>
     public void Dispose()
     {
         if (_disposed)
@@ -111,19 +163,32 @@ public sealed class AudioPreviewPlayer : IDisposable
 
         _disposed = true;
         Stop();
-        _player.Dispose();
+    }
 
-        try
+    private static string Seconds(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+
+    /// <summary>Atiende el aviso de parada, que llega desde el hilo del dispositivo.</summary>
+    private void OnStopped(WaveOut output)
+    {
+        void Complete()
         {
-            if (File.Exists(_temporaryFile))
+            if (!ReferenceEquals(_output, output))
             {
-                File.Delete(_temporaryFile);
+                return;
             }
+
+            _output = null;
+            output.Dispose();
+            PlaybackCompleted?.Invoke(this, EventArgs.Empty);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+
+        if (_context is null)
         {
-            // El archivo temporal puede seguir bloqueado un instante tras detener la reproducción;
-            // dejarlo atrás es preferible a impedir que la aplicación se cierre.
+            Complete();
+        }
+        else
+        {
+            _context.Post(_ => Complete(), null);
         }
     }
 }

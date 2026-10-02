@@ -7,6 +7,45 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 
 ---
 
+## [1.2.0] - 2026-10-02
+
+### Añadido
+* **`TrimRange`**: Valor inmutable con el tramo (inicio y final, en tiempo absoluto del original) que conserva la copia recortada. Base para el recorte del silencio inicial y el ajuste manual desde la forma de onda.
+* **Detección y recorte del silencio inicial**: `SilenceDetector.AnalyzeLeadingFrames` analiza el principio invirtiendo en el tiempo su curva de nivel, reutilizando íntegro el algoritmo del final (umbral adaptativo, histéresis, guarda de fundido de entrada y afinación del corte).
+* **Sondeo del principio en `SilenceAnalyzer`**: Ventana inicial de 10 s que se cuadruplica si resulta toda silencio; si la ventana del final ya cubrió el archivo, el principio se analiza sobre las mismas tramas sin decodificar de nuevo.
+* **`AudioDecoder.DecodeRangeIntoAsync`**: Decodificación de un tramo arbitrario, compartiendo con la de la cola el lanzamiento de FFmpeg y la lectura del PCM.
+* **Categoría `7 · Inicio`** en el diálogo Avanzado: `Recortar silencio inicial` (activado por defecto) y `Silencio inicial mínimo (s)` (1.0 s).
+* **`EdgeTrim`**: Medida y decisión por borde; `TrackAnalysis` deriva de ambos bordes el tramo conservado, el ahorro total y si procede recortar.
+* **Rejilla y CSV**: Columna «Silencio inicial (s)» y, en el CSV, el inicio de la copia y las métricas de fundido y fondo de cada borde.
+
+#### Forma de Onda y Ajuste Manual del Recorte
+* **`WaveformBuilder` y `Waveform`** (`EchoCut.Core/Waveforms`): Resumen de la señal por bloques de 256 muestras (mínimo, máximo y energía) calculado en streaming sobre `ISampleSink`, con memoria de `ArrayPool`; sirve cualquier nivel de zoom sin volver a decodificar.
+* **`WaveformRenderer`, `AmplitudeScale` y `WaveformPalette`**: Pintado de picos y banda RMS en píxeles ARGB en memoria, en escala lineal o en dB (rango de 60 dB), con los azules de Audacity y una paleta gris para la zona que se eliminaría.
+* **`WaveformService`**: Carga de la pista completa a 44.1 kHz para la vista general y el detalle del principio, y del final con `-sseof` situado con la misma referencia que el corte final.
+* **`WaveformEditor`**: Ventana con la pista completa y el detalle de su principio y su final, marcas y campos numéricos sincronizados, casilla de escala en dB, escucha de cada borde y restablecimiento a la decisión del análisis. Se abre con «Ver forma de onda y ajustar recorte…» en el menú contextual de la rejilla.
+* **`WaveformView`**: Control con la zona a eliminar resaltada, regla de tiempo y referencias de amplitud; marcas arrastrables o movibles con el teclado y valor expuesto a lectores de pantalla.
+* **Ajuste manual en `Song`**: `ManualRange` prevalece sobre el análisis en el recorte, la previsualización y la columna de recorte, sobrevive a un nuevo análisis y a los cambios de tolerancia durante la sesión, y marca la fila con el nuevo estado «Ajustado».
+* **`AudioDecoder`**: Frecuencia de salida configurable por instancia y `DecodeAllIntoAsync` para decodificar el archivo completo sin acotarlo por la duración de los metadatos.
+* **Cursor de reproducción**: Al escuchar un borde en `WaveformEditor`, un cursor rojo recorre las vistas con el instante que informa el dispositivo y los botones de escucha pasan a reproducir o detener.
+* **`FFmpegRunner.ReadOutputAsync`**: Lectura a memoria de salidas binarias acotadas de FFmpeg, con la misma gestión de cancelación y errores que el resto del ejecutor.
+
+#### Gestión de Metadatos en Lote
+* **Limpiar metadatos**: Botón **«Limpiar metadatos»** y método `TrackEditor.StripMetadata` que eliminan todas las etiquetas de las pistas cargadas mediante `TagLibSharp`, en paralelo, previa confirmación y con un resumen de los archivos que no se pudieron procesar.
+* **Normalizar**: Botón **«Normalizar»**, método `TrackEditor.NormalizeTrack` y utilidad `TextNormalizer`, que eliminan los acentos diacríticos (conservando la «ñ») y aplican mayúscula inicial a cada palabra en el nombre del archivo y en los metadatos de texto (título, subtítulo, artistas, álbum, género, compositores, copyright y comentarios), previa confirmación.
+
+### Corregido
+* **Columna «Silencio inicial (s)»**: Se repinta al asignar el análisis; antes podía quedarse vacía hasta el siguiente repintado completo de la fila.
+* **Icono de las ventanas**: Las ventanas de propiedades y de forma de onda muestran el icono de la aplicación, como la principal y la de parámetros avanzados.
+
+### Modificado
+* **Previsualización con NAudio**: `AudioPreviewPlayer` reproduce PCM estéreo decodificado en memoria con `WaveOut` de NAudio.WinMM en lugar de `SoundPlayer` y un WAV temporal; expone la posición real de reproducción y avisa al terminar, de modo que la rejilla ya no estima el final con un temporizador. NAudio solo se referencia desde el proyecto de interfaz.
+* **`AudioTrimmer` y `TrimRequest`**: El recorte recibe un `TrimRange` en lugar de un único instante de corte. Si el inicio es mayor que cero se añade `-ss` como opción de entrada (antes de `-i`), manteniendo la copia de flujo sin recodificar; si es cero, la línea de órdenes es idéntica a la anterior.
+* **`SilenceResult`**: Pasa a ser un `record` independiente del borde; `TrailingSilenceSeconds` se renombra a `SilenceSeconds`.
+* **Recálculo por tolerancia**: La regla que rehace la decisión al mover la tolerancia pasa de `Main` a `TrackAnalysis.WithOptions`, y también se aplica al aceptar el diálogo Avanzado.
+* **CSV**: «Silencio (s)», «Fundido» y «Toca fondo» pasan a «Silencio final (s)», «Fundido final» y «Final toca fondo».
+
+---
+
 ## [1.1.0] - 2026-08-27
 
 ### Añadido

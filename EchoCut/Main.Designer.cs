@@ -38,7 +38,9 @@ namespace EchoCut
             contextMenuStrip = new ContextMenuStrip(components);
             mnuOpenFolder = new ToolStripMenuItem();
             mnuOpenAudacity = new ToolStripMenuItem();
+            mnuWaveform = new ToolStripMenuItem();
             mnuEditSong = new ToolStripMenuItem();
+            mnuDeleteSong = new ToolStripMenuItem();
             btnAnalyze = new Button();
             btnCancel = new Button();
             btnCropAll = new Button();
@@ -56,7 +58,8 @@ namespace EchoCut
             saveFileDialog = new SaveFileDialog();
             btnFile = new Button();
             openFileDialog = new OpenFileDialog();
-            mnuDeleteSong = new ToolStripMenuItem();
+            btnClean = new Button();
+            btnNormalize = new Button();
             ((System.ComponentModel.ISupportInitialize)dataGrid).BeginInit();
             contextMenuStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numericTolerance).BeginInit();
@@ -113,7 +116,7 @@ namespace EchoCut
             dataGrid.RowHeadersVisible = false;
             dataGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dataGrid.Size = new Size(1076, 428);
-            dataGrid.TabIndex = 11;
+            dataGrid.TabIndex = 18;
             dataGrid.CellContentClick += dataGrid_CellContentClick;
             dataGrid.CellDoubleClick += dataGrid_CellDoubleClick;
             dataGrid.CellFormatting += dataGrid_CellFormatting;
@@ -123,9 +126,17 @@ namespace EchoCut
             // 
             // contextMenuStrip
             // 
-            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuOpenFolder, mnuOpenAudacity, mnuEditSong, mnuDeleteSong });
+            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuWaveform, mnuOpenFolder, mnuOpenAudacity, mnuEditSong, mnuDeleteSong });
             contextMenuStrip.Name = "contextMenuStrip";
-            contextMenuStrip.Size = new Size(213, 114);
+            contextMenuStrip.Size = new Size(296, 114);
+            // 
+            // mnuWaveform
+            // 
+            mnuWaveform.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            mnuWaveform.Name = "mnuWaveform";
+            mnuWaveform.Size = new Size(295, 22);
+            mnuWaveform.Text = "Ver forma de onda y ajustar recorte…";
+            mnuWaveform.Click += mnuWaveform_Click;
             // 
             // mnuOpenFolder
             // 
@@ -148,13 +159,20 @@ namespace EchoCut
             mnuEditSong.Text = "Editar propiedades";
             mnuEditSong.Click += mnuEditSong_Click;
             // 
+            // mnuDeleteSong
+            // 
+            mnuDeleteSong.Name = "mnuDeleteSong";
+            mnuDeleteSong.Size = new Size(212, 22);
+            mnuDeleteSong.Text = "Eliminar archivo(s)";
+            mnuDeleteSong.Click += mnuDeleteSong_Click;
+            // 
             // btnAnalyze
             // 
             btnAnalyze.AutoSize = true;
             btnAnalyze.Location = new Point(12, 99);
             btnAnalyze.Name = "btnAnalyze";
             btnAnalyze.Size = new Size(140, 29);
-            btnAnalyze.TabIndex = 6;
+            btnAnalyze.TabIndex = 11;
             btnAnalyze.Text = "Analizar";
             btnAnalyze.UseVisualStyleBackColor = true;
             btnAnalyze.Click += btnAnalyze_Click;
@@ -162,10 +180,10 @@ namespace EchoCut
             // btnCancel
             // 
             btnCancel.AutoSize = true;
-            btnCancel.Location = new Point(172, 99);
+            btnCancel.Location = new Point(168, 99);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(140, 29);
-            btnCancel.TabIndex = 7;
+            btnCancel.TabIndex = 12;
             btnCancel.Text = "Cancelar";
             btnCancel.UseVisualStyleBackColor = true;
             btnCancel.Click += btnCancel_Click;
@@ -173,10 +191,10 @@ namespace EchoCut
             // btnCropAll
             // 
             btnCropAll.AutoSize = true;
-            btnCropAll.Location = new Point(332, 99);
+            btnCropAll.Location = new Point(324, 99);
             btnCropAll.Name = "btnCropAll";
             btnCropAll.Size = new Size(140, 29);
-            btnCropAll.TabIndex = 8;
+            btnCropAll.TabIndex = 13;
             btnCropAll.Text = "Recortar todos";
             btnCropAll.UseVisualStyleBackColor = true;
             btnCropAll.Click += btnCropAll_Click;
@@ -184,10 +202,10 @@ namespace EchoCut
             // btnStop
             // 
             btnStop.AutoSize = true;
-            btnStop.Location = new Point(492, 99);
+            btnStop.Location = new Point(480, 99);
             btnStop.Name = "btnStop";
             btnStop.Size = new Size(140, 29);
-            btnStop.TabIndex = 9;
+            btnStop.TabIndex = 14;
             btnStop.Text = "⏹ Detener";
             btnStop.UseVisualStyleBackColor = true;
             btnStop.Click += btnStop_Click;
@@ -195,10 +213,10 @@ namespace EchoCut
             // btnExport
             // 
             btnExport.AutoSize = true;
-            btnExport.Location = new Point(652, 99);
+            btnExport.Location = new Point(636, 99);
             btnExport.Name = "btnExport";
             btnExport.Size = new Size(140, 29);
-            btnExport.TabIndex = 10;
+            btnExport.TabIndex = 15;
             btnExport.Text = "Exportar resultados";
             btnExport.UseVisualStyleBackColor = true;
             btnExport.Click += btnExport_Click;
@@ -209,7 +227,7 @@ namespace EchoCut
             label2.Location = new Point(12, 59);
             label2.Name = "label2";
             label2.Size = new Size(222, 19);
-            label2.TabIndex = 3;
+            label2.TabIndex = 4;
             label2.Text = "Silencio que se conserva al recortar";
             // 
             // numericTolerance
@@ -220,7 +238,7 @@ namespace EchoCut
             numericTolerance.Maximum = new decimal(new int[] { 5, 0, 0, 0 });
             numericTolerance.Name = "numericTolerance";
             numericTolerance.Size = new Size(50, 25);
-            numericTolerance.TabIndex = 4;
+            numericTolerance.TabIndex = 5;
             numericTolerance.Value = new decimal(new int[] { 3, 0, 0, 65536 });
             numericTolerance.ValueChanged += numericTolerance_ValueChanged;
             // 
@@ -234,7 +252,7 @@ namespace EchoCut
             label3.Location = new Point(296, 59);
             label3.Name = "label3";
             label3.Size = new Size(71, 19);
-            label3.TabIndex = 5;
+            label3.TabIndex = 6;
             label3.Text = "segundos.";
             // 
             // label4
@@ -243,7 +261,7 @@ namespace EchoCut
             label4.Location = new Point(400, 59);
             label4.Name = "label4";
             label4.Size = new Size(135, 19);
-            label4.TabIndex = 12;
+            label4.TabIndex = 7;
             label4.Text = "Archivos en paralelo:";
             // 
             // numericThreads
@@ -253,7 +271,7 @@ namespace EchoCut
             numericThreads.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             numericThreads.Name = "numericThreads";
             numericThreads.Size = new Size(50, 25);
-            numericThreads.TabIndex = 13;
+            numericThreads.TabIndex = 8;
             numericThreads.Value = new decimal(new int[] { 8, 0, 0, 0 });
             // 
             // btnAdvanced
@@ -263,7 +281,7 @@ namespace EchoCut
             btnAdvanced.Location = new Point(953, 54);
             btnAdvanced.Name = "btnAdvanced";
             btnAdvanced.Size = new Size(135, 29);
-            btnAdvanced.TabIndex = 14;
+            btnAdvanced.TabIndex = 10;
             btnAdvanced.Text = "Avanzado…";
             btnAdvanced.UseVisualStyleBackColor = true;
             btnAdvanced.Click += btnAdvanced_Click;
@@ -274,16 +292,16 @@ namespace EchoCut
             progressBar.Location = new Point(12, 574);
             progressBar.Name = "progressBar";
             progressBar.Size = new Size(1076, 22);
-            progressBar.TabIndex = 15;
+            progressBar.TabIndex = 19;
             // 
             // lblStatus
             // 
             lblStatus.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             lblStatus.AutoEllipsis = true;
-            lblStatus.Location = new Point(798, 104);
+            lblStatus.Location = new Point(604, 59);
             lblStatus.Name = "lblStatus";
-            lblStatus.Size = new Size(290, 19);
-            lblStatus.TabIndex = 16;
+            lblStatus.Size = new Size(343, 19);
+            lblStatus.TabIndex = 9;
             lblStatus.Text = "Listo.";
             lblStatus.TextAlign = ContentAlignment.MiddleRight;
             // 
@@ -300,7 +318,7 @@ namespace EchoCut
             btnFile.Location = new Point(939, 9);
             btnFile.Name = "btnFile";
             btnFile.Size = new Size(149, 29);
-            btnFile.TabIndex = 17;
+            btnFile.TabIndex = 3;
             btnFile.Text = "Seleccionar archivo(s)";
             btnFile.UseVisualStyleBackColor = true;
             btnFile.Click += btnFile_Click;
@@ -310,12 +328,27 @@ namespace EchoCut
             openFileDialog.Filter = resources.GetString("openFileDialog.Filter");
             openFileDialog.Multiselect = true;
             // 
-            // mnuDeleteSong
+            // btnClean
             // 
-            mnuDeleteSong.Name = "mnuDeleteSong";
-            mnuDeleteSong.Size = new Size(212, 22);
-            mnuDeleteSong.Text = "Eliminar archivo(s)";
-            mnuDeleteSong.Click += mnuDeleteSong_Click;
+            btnClean.AutoSize = true;
+            btnClean.Location = new Point(792, 99);
+            btnClean.Name = "btnClean";
+            btnClean.Size = new Size(140, 29);
+            btnClean.TabIndex = 16;
+            btnClean.Text = "Limpiar metadatos";
+            btnClean.UseVisualStyleBackColor = true;
+            btnClean.Click += btnClean_Click;
+            // 
+            // btnNormalize
+            // 
+            btnNormalize.AutoSize = true;
+            btnNormalize.Location = new Point(948, 99);
+            btnNormalize.Name = "btnNormalize";
+            btnNormalize.Size = new Size(140, 29);
+            btnNormalize.TabIndex = 17;
+            btnNormalize.Text = "Normalizar";
+            btnNormalize.UseVisualStyleBackColor = true;
+            btnNormalize.Click += btnNormalize_Click;
             // 
             // Main
             // 
@@ -323,6 +356,8 @@ namespace EchoCut
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1100, 611);
+            Controls.Add(btnNormalize);
+            Controls.Add(btnClean);
             Controls.Add(btnFile);
             Controls.Add(lblStatus);
             Controls.Add(progressBar);
@@ -381,9 +416,12 @@ namespace EchoCut
         private ContextMenuStrip contextMenuStrip;
         private ToolStripMenuItem mnuOpenFolder;
         private ToolStripMenuItem mnuOpenAudacity;
+        private ToolStripMenuItem mnuWaveform;
         private Button btnFile;
         private OpenFileDialog openFileDialog;
         private ToolStripMenuItem mnuEditSong;
         private ToolStripMenuItem mnuDeleteSong;
+        private Button btnClean;
+        private Button btnNormalize;
     }
 }

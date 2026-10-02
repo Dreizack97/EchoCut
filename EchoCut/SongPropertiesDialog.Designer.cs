@@ -28,6 +28,7 @@ namespace EchoCut
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(SongPropertiesDialog));
             tabControl = new TabControl();
             tabGeneral = new TabPage();
             lblAccessedValue = new Label();
@@ -103,92 +104,85 @@ namespace EchoCut
             tabGeneral.TabIndex = 0;
             tabGeneral.Text = "General";
             // 
-            // picIcon
+            // lblAccessedValue
             // 
-            picIcon.Location = new Point(18, 18);
-            picIcon.Name = "picIcon";
-            picIcon.Size = new Size(36, 36);
-            picIcon.SizeMode = PictureBoxSizeMode.CenterImage;
-            picIcon.TabIndex = 0;
-            picIcon.TabStop = false;
+            lblAccessedValue.AutoSize = true;
+            lblAccessedValue.Location = new Point(115, 316);
+            lblAccessedValue.Name = "lblAccessedValue";
+            lblAccessedValue.Size = new Size(12, 15);
+            lblAccessedValue.TabIndex = 19;
+            lblAccessedValue.Text = "-";
             // 
-            // txtName
+            // lblAccessedHeader
             // 
-            txtName.Location = new Point(68, 24);
-            txtName.Name = "txtName";
-            txtName.Size = new Size(268, 23);
-            txtName.TabIndex = 1;
+            lblAccessedHeader.AutoSize = true;
+            lblAccessedHeader.Location = new Point(15, 316);
+            lblAccessedHeader.Name = "lblAccessedHeader";
+            lblAccessedHeader.Size = new Size(85, 15);
+            lblAccessedHeader.TabIndex = 18;
+            lblAccessedHeader.Text = "Último acceso:";
             // 
-            // lblExtension
+            // lblModifiedValue
             // 
-            lblExtension.AutoSize = true;
-            lblExtension.ForeColor = SystemColors.GrayText;
-            lblExtension.Location = new Point(342, 27);
-            lblExtension.Name = "lblExtension";
-            lblExtension.Size = new Size(35, 15);
-            lblExtension.TabIndex = 2;
-            lblExtension.Text = ".mp3";
+            lblModifiedValue.AutoSize = true;
+            lblModifiedValue.Location = new Point(115, 286);
+            lblModifiedValue.Name = "lblModifiedValue";
+            lblModifiedValue.Size = new Size(12, 15);
+            lblModifiedValue.TabIndex = 17;
+            lblModifiedValue.Text = "-";
             // 
-            // sep1
+            // lblModifiedHeader
             // 
-            sep1.BorderStyle = BorderStyle.Fixed3D;
-            sep1.Location = new Point(15, 72);
-            sep1.Name = "sep1";
-            sep1.Size = new Size(358, 2);
-            sep1.TabIndex = 3;
+            lblModifiedHeader.AutoSize = true;
+            lblModifiedHeader.Location = new Point(15, 286);
+            lblModifiedHeader.Name = "lblModifiedHeader";
+            lblModifiedHeader.Size = new Size(71, 15);
+            lblModifiedHeader.TabIndex = 16;
+            lblModifiedHeader.Text = "Modificado:";
             // 
-            // lblTypeHeader
+            // lblCreatedValue
             // 
-            lblTypeHeader.AutoSize = true;
-            lblTypeHeader.Location = new Point(15, 92);
-            lblTypeHeader.Name = "lblTypeHeader";
-            lblTypeHeader.Size = new Size(89, 15);
-            lblTypeHeader.TabIndex = 4;
-            lblTypeHeader.Text = "Tipo de archivo:";
+            lblCreatedValue.AutoSize = true;
+            lblCreatedValue.Location = new Point(115, 256);
+            lblCreatedValue.Name = "lblCreatedValue";
+            lblCreatedValue.Size = new Size(12, 15);
+            lblCreatedValue.TabIndex = 15;
+            lblCreatedValue.Text = "-";
             // 
-            // lblTypeValue
+            // lblCreatedHeader
             // 
-            lblTypeValue.AutoSize = true;
-            lblTypeValue.Location = new Point(115, 92);
-            lblTypeValue.Name = "lblTypeValue";
-            lblTypeValue.Size = new Size(135, 15);
-            lblTypeValue.TabIndex = 5;
-            lblTypeValue.Text = "Archivo de audio (.mp3)";
+            lblCreatedHeader.AutoSize = true;
+            lblCreatedHeader.Location = new Point(15, 256);
+            lblCreatedHeader.Name = "lblCreatedHeader";
+            lblCreatedHeader.Size = new Size(48, 15);
+            lblCreatedHeader.TabIndex = 14;
+            lblCreatedHeader.Text = "Creado:";
             // 
-            // lblOpensWithHeader
+            // sep3
             // 
-            lblOpensWithHeader.AutoSize = true;
-            lblOpensWithHeader.Location = new Point(15, 122);
-            lblOpensWithHeader.Name = "lblOpensWithHeader";
-            lblOpensWithHeader.Size = new Size(71, 15);
-            lblOpensWithHeader.TabIndex = 6;
-            lblOpensWithHeader.Text = "Se abre con:";
+            sep3.BorderStyle = BorderStyle.Fixed3D;
+            sep3.Location = new Point(15, 236);
+            sep3.Name = "sep3";
+            sep3.Size = new Size(358, 2);
+            sep3.TabIndex = 13;
             // 
-            // lblOpensWithValue
+            // lblSizeValue
             // 
-            lblOpensWithValue.AutoSize = true;
-            lblOpensWithValue.Location = new Point(115, 122);
-            lblOpensWithValue.Name = "lblOpensWithValue";
-            lblOpensWithValue.Size = new Size(130, 15);
-            lblOpensWithValue.TabIndex = 7;
-            lblOpensWithValue.Text = "Reproductor de música";
+            lblSizeValue.AutoSize = true;
+            lblSizeValue.Location = new Point(115, 204);
+            lblSizeValue.Name = "lblSizeValue";
+            lblSizeValue.Size = new Size(12, 15);
+            lblSizeValue.TabIndex = 12;
+            lblSizeValue.Text = "-";
             // 
-            // sep2
+            // lblSizeHeader
             // 
-            sep2.BorderStyle = BorderStyle.Fixed3D;
-            sep2.Location = new Point(15, 154);
-            sep2.Name = "sep2";
-            sep2.Size = new Size(358, 2);
-            sep2.TabIndex = 8;
-            // 
-            // lblLocationHeader
-            // 
-            lblLocationHeader.AutoSize = true;
-            lblLocationHeader.Location = new Point(15, 174);
-            lblLocationHeader.Name = "lblLocationHeader";
-            lblLocationHeader.Size = new Size(63, 15);
-            lblLocationHeader.TabIndex = 9;
-            lblLocationHeader.Text = "Ubicación:";
+            lblSizeHeader.AutoSize = true;
+            lblSizeHeader.Location = new Point(15, 204);
+            lblSizeHeader.Name = "lblSizeHeader";
+            lblSizeHeader.Size = new Size(53, 15);
+            lblSizeHeader.TabIndex = 11;
+            lblSizeHeader.Text = "Tamaño:";
             // 
             // txtLocation
             // 
@@ -200,85 +194,92 @@ namespace EchoCut
             txtLocation.Size = new Size(255, 16);
             txtLocation.TabIndex = 10;
             // 
-            // lblSizeHeader
+            // lblLocationHeader
             // 
-            lblSizeHeader.AutoSize = true;
-            lblSizeHeader.Location = new Point(15, 204);
-            lblSizeHeader.Name = "lblSizeHeader";
-            lblSizeHeader.Size = new Size(53, 15);
-            lblSizeHeader.TabIndex = 11;
-            lblSizeHeader.Text = "Tamaño:";
+            lblLocationHeader.AutoSize = true;
+            lblLocationHeader.Location = new Point(15, 174);
+            lblLocationHeader.Name = "lblLocationHeader";
+            lblLocationHeader.Size = new Size(63, 15);
+            lblLocationHeader.TabIndex = 9;
+            lblLocationHeader.Text = "Ubicación:";
             // 
-            // lblSizeValue
+            // sep2
             // 
-            lblSizeValue.AutoSize = true;
-            lblSizeValue.Location = new Point(115, 204);
-            lblSizeValue.Name = "lblSizeValue";
-            lblSizeValue.Size = new Size(12, 15);
-            lblSizeValue.TabIndex = 12;
-            lblSizeValue.Text = "-";
+            sep2.BorderStyle = BorderStyle.Fixed3D;
+            sep2.Location = new Point(15, 154);
+            sep2.Name = "sep2";
+            sep2.Size = new Size(358, 2);
+            sep2.TabIndex = 8;
             // 
-            // sep3
+            // lblOpensWithValue
             // 
-            sep3.BorderStyle = BorderStyle.Fixed3D;
-            sep3.Location = new Point(15, 236);
-            sep3.Name = "sep3";
-            sep3.Size = new Size(358, 2);
-            sep3.TabIndex = 13;
+            lblOpensWithValue.AutoSize = true;
+            lblOpensWithValue.Location = new Point(115, 122);
+            lblOpensWithValue.Name = "lblOpensWithValue";
+            lblOpensWithValue.Size = new Size(130, 15);
+            lblOpensWithValue.TabIndex = 7;
+            lblOpensWithValue.Text = "Reproductor de música";
             // 
-            // lblCreatedHeader
+            // lblOpensWithHeader
             // 
-            lblCreatedHeader.AutoSize = true;
-            lblCreatedHeader.Location = new Point(15, 256);
-            lblCreatedHeader.Name = "lblCreatedHeader";
-            lblCreatedHeader.Size = new Size(48, 15);
-            lblCreatedHeader.TabIndex = 14;
-            lblCreatedHeader.Text = "Creado:";
+            lblOpensWithHeader.AutoSize = true;
+            lblOpensWithHeader.Location = new Point(15, 122);
+            lblOpensWithHeader.Name = "lblOpensWithHeader";
+            lblOpensWithHeader.Size = new Size(71, 15);
+            lblOpensWithHeader.TabIndex = 6;
+            lblOpensWithHeader.Text = "Se abre con:";
             // 
-            // lblCreatedValue
+            // lblTypeValue
             // 
-            lblCreatedValue.AutoSize = true;
-            lblCreatedValue.Location = new Point(115, 256);
-            lblCreatedValue.Name = "lblCreatedValue";
-            lblCreatedValue.Size = new Size(12, 15);
-            lblCreatedValue.TabIndex = 15;
-            lblCreatedValue.Text = "-";
+            lblTypeValue.AutoSize = true;
+            lblTypeValue.Location = new Point(115, 92);
+            lblTypeValue.Name = "lblTypeValue";
+            lblTypeValue.Size = new Size(135, 15);
+            lblTypeValue.TabIndex = 5;
+            lblTypeValue.Text = "Archivo de audio (.mp3)";
             // 
-            // lblModifiedHeader
+            // lblTypeHeader
             // 
-            lblModifiedHeader.AutoSize = true;
-            lblModifiedHeader.Location = new Point(15, 286);
-            lblModifiedHeader.Name = "lblModifiedHeader";
-            lblModifiedHeader.Size = new Size(71, 15);
-            lblModifiedHeader.TabIndex = 16;
-            lblModifiedHeader.Text = "Modificado:";
+            lblTypeHeader.AutoSize = true;
+            lblTypeHeader.Location = new Point(15, 92);
+            lblTypeHeader.Name = "lblTypeHeader";
+            lblTypeHeader.Size = new Size(92, 15);
+            lblTypeHeader.TabIndex = 4;
+            lblTypeHeader.Text = "Tipo de archivo:";
             // 
-            // lblModifiedValue
+            // sep1
             // 
-            lblModifiedValue.AutoSize = true;
-            lblModifiedValue.Location = new Point(115, 286);
-            lblModifiedValue.Name = "lblModifiedValue";
-            lblModifiedValue.Size = new Size(12, 15);
-            lblModifiedValue.TabIndex = 17;
-            lblModifiedValue.Text = "-";
+            sep1.BorderStyle = BorderStyle.Fixed3D;
+            sep1.Location = new Point(15, 72);
+            sep1.Name = "sep1";
+            sep1.Size = new Size(358, 2);
+            sep1.TabIndex = 3;
             // 
-            // lblAccessedHeader
+            // lblExtension
             // 
-            lblAccessedHeader.AutoSize = true;
-            lblAccessedHeader.Location = new Point(15, 316);
-            lblAccessedHeader.Name = "lblAccessedHeader";
-            lblAccessedHeader.Size = new Size(85, 15);
-            lblAccessedHeader.TabIndex = 18;
-            lblAccessedHeader.Text = "Último acceso:";
+            lblExtension.AutoSize = true;
+            lblExtension.ForeColor = SystemColors.GrayText;
+            lblExtension.Location = new Point(342, 27);
+            lblExtension.Name = "lblExtension";
+            lblExtension.Size = new Size(34, 15);
+            lblExtension.TabIndex = 2;
+            lblExtension.Text = ".mp3";
             // 
-            // lblAccessedValue
+            // txtName
             // 
-            lblAccessedValue.AutoSize = true;
-            lblAccessedValue.Location = new Point(115, 316);
-            lblAccessedValue.Name = "lblAccessedValue";
-            lblAccessedValue.Size = new Size(12, 15);
-            lblAccessedValue.TabIndex = 19;
-            lblAccessedValue.Text = "-";
+            txtName.Location = new Point(68, 24);
+            txtName.Name = "txtName";
+            txtName.Size = new Size(268, 23);
+            txtName.TabIndex = 1;
+            // 
+            // picIcon
+            // 
+            picIcon.Location = new Point(18, 18);
+            picIcon.Name = "picIcon";
+            picIcon.Size = new Size(36, 36);
+            picIcon.SizeMode = PictureBoxSizeMode.CenterImage;
+            picIcon.TabIndex = 0;
+            picIcon.TabStop = false;
             // 
             // tabDetails
             // 
@@ -302,18 +303,6 @@ namespace EchoCut
             propertyGrid.Size = new Size(382, 371);
             propertyGrid.TabIndex = 0;
             propertyGrid.ToolbarVisible = false;
-            // 
-            // lnkRemovePersonal
-            // 
-            lnkRemovePersonal.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-            lnkRemovePersonal.AutoSize = true;
-            lnkRemovePersonal.Location = new Point(12, 426);
-            lnkRemovePersonal.Name = "lnkRemovePersonal";
-            lnkRemovePersonal.Size = new Size(243, 15);
-            lnkRemovePersonal.TabIndex = 4;
-            lnkRemovePersonal.TabStop = true;
-            lnkRemovePersonal.Text = "Quitar propiedades e información personal";
-            lnkRemovePersonal.LinkClicked += lnkRemovePersonal_LinkClicked;
             // 
             // btnAccept
             // 
@@ -349,6 +338,18 @@ namespace EchoCut
             btnApply.UseVisualStyleBackColor = true;
             btnApply.Click += btnApply_Click;
             // 
+            // lnkRemovePersonal
+            // 
+            lnkRemovePersonal.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+            lnkRemovePersonal.AutoSize = true;
+            lnkRemovePersonal.Location = new Point(12, 426);
+            lnkRemovePersonal.Name = "lnkRemovePersonal";
+            lnkRemovePersonal.Size = new Size(233, 15);
+            lnkRemovePersonal.TabIndex = 4;
+            lnkRemovePersonal.TabStop = true;
+            lnkRemovePersonal.Text = "Quitar propiedades e información personal";
+            lnkRemovePersonal.LinkClicked += lnkRemovePersonal_LinkClicked;
+            // 
             // SongPropertiesDialog
             // 
             AcceptButton = btnAccept;
@@ -361,8 +362,9 @@ namespace EchoCut
             Controls.Add(btnCancel);
             Controls.Add(btnAccept);
             Controls.Add(tabControl);
-            Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+            Font = new Font("Segoe UI", 9F);
             FormBorderStyle = FormBorderStyle.FixedDialog;
+            Icon = (Icon)resources.GetObject("$this.Icon");
             MaximizeBox = false;
             MinimizeBox = false;
             Name = "SongPropertiesDialog";
