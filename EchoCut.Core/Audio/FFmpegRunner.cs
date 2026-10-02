@@ -77,6 +77,55 @@ public static class FFmpegRunner
         }
     }
 
+    /// <summary>
+    /// Ejecuta el proceso, recoge en memoria su salida estándar binaria y lanza
+    /// <see cref="FFmpegException"/> si termina con error.
+    /// </summary>
+    /// <param name="executable">Ruta al ejecutable a lanzar.</param>
+    /// <param name="arguments">Argumentos de la línea de comandos; deben dirigir la salida a <c>-</c>.</param>
+    /// <param name="cancellationToken">
+    /// Token de cancelación. Si se activa mientras el proceso sigue vivo, se mata el árbol completo
+    /// antes de propagar la cancelación.
+    /// </param>
+    /// <returns>Los bytes escritos por el proceso en su salida estándar.</returns>
+    /// <remarks>
+    /// Pensado para salidas acotadas, como unos segundos de PCM para escucharlos: lo que FFmpeg
+    /// escribe se retiene entero. Para decodificar pistas completas está el streaming de
+    /// <see cref="AudioDecoder"/>, que nunca materializa el audio.
+    /// </remarks>
+    /// <exception cref="FFmpegException">Se lanza si el proceso termina con un código de salida distinto de cero.</exception>
+    public static async Task<byte[]> ReadOutputAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        CancellationToken cancellationToken)
+    {
+        using Process process = Start(executable, arguments, redirectStandardOutput: true);
+        Task<string> stderr = DrainStandardErrorAsync(process);
+        using MemoryStream output = new();
+
+        try
+        {
+            await process.StandardOutput.BaseStream.CopyToAsync(output, cancellationToken).ConfigureAwait(false);
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            KillQuietly(process);
+            throw;
+        }
+
+        if (process.ExitCode != 0)
+        {
+            string error = await stderr.ConfigureAwait(false);
+            throw new FFmpegException(
+                $"FFmpeg terminó con código {process.ExitCode}: {FirstLine(error)}",
+                process.ExitCode,
+                error);
+        }
+
+        return output.ToArray();
+    }
+
     /// <summary>Ejecuta el proceso y lanza <see cref="FFmpegException"/> si termina con error.</summary>
     /// <param name="executable">Ruta al ejecutable a lanzar.</param>
     /// <param name="arguments">Argumentos de la línea de comandos.</param>
