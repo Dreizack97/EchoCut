@@ -90,25 +90,78 @@ public sealed class AudioDecoder
     /// <exception cref="FFmpegException">
     /// Se lanza si el proceso de FFmpeg termina con un código de salida distinto de cero.
     /// </exception>
-    public async Task DecodeTailIntoAsync(
+    public Task DecodeTailIntoAsync(
         string filePath,
         double windowSeconds,
         double totalDurationSeconds,
         ISampleSink sink,
         CancellationToken cancellationToken)
     {
-        bool wholeFile = windowSeconds >= totalDurationSeconds;
+        List<string> seek = windowSeconds >= totalDurationSeconds
+            ? []
+            : ["-sseof", Seconds(-windowSeconds)];
 
-        List<string> arguments = ["-v", "error"];
-        if (!wholeFile)
-        {
-            arguments.Add("-sseof");
-            arguments.Add((-windowSeconds).ToString("0.###", CultureInfo.InvariantCulture));
-        }
+        return DecodeIntoAsync(filePath, seek, [], sink, cancellationToken);
+    }
 
+    /// <summary>
+    /// Decodifica <paramref name="durationSeconds"/> segundos a partir de
+    /// <paramref name="startSeconds"/> como PCM mono y se los entrega a <paramref name="sink"/> según
+    /// van llegando, sin retener el audio completo.
+    /// </summary>
+    /// <param name="filePath">Ruta del archivo de audio a decodificar.</param>
+    /// <param name="startSeconds">Instante inicial del tramo, en segundos desde el principio del archivo.</param>
+    /// <param name="durationSeconds">Duración del tramo, en segundos. Si excede el archivo, se decodifica hasta el final.</param>
+    /// <param name="sink">Destino que recibe las muestras decodificadas, trozo a trozo.</param>
+    /// <param name="cancellationToken">
+    /// Token de cancelación. Si se activa mientras el proceso de FFmpeg sigue vivo, se mata antes de
+    /// propagar la cancelación.
+    /// </param>
+    /// <remarks>
+    /// A diferencia del recorte por copia de flujo, aquí <c>-ss</c> es exacto a la muestra: al
+    /// decodificar, FFmpeg salta al paquete anterior y descarta lo que sobra. Desde el principio se
+    /// omite el salto para que la primera trama del análisis coincida con la primera muestra del
+    /// archivo, que es la referencia de tiempo del recorte del inicio.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Se lanza si <paramref name="startSeconds"/> es negativo o <paramref name="durationSeconds"/> no es positiva.
+    /// </exception>
+    /// <exception cref="FFmpegException">
+    /// Se lanza si el proceso de FFmpeg termina con un código de salida distinto de cero.
+    /// </exception>
+    public Task DecodeRangeIntoAsync(
+        string filePath,
+        double startSeconds,
+        double durationSeconds,
+        ISampleSink sink,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(startSeconds);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(durationSeconds);
+
+        List<string> seek = startSeconds > 0 ? ["-ss", Seconds(startSeconds)] : [];
+        return DecodeIntoAsync(filePath, seek, ["-t", Seconds(durationSeconds)], sink, cancellationToken);
+    }
+
+    /// <summary>Lanza FFmpeg con las opciones de posición indicadas y vuelca su salida PCM en el destino.</summary>
+    /// <param name="filePath">Ruta del archivo de audio a decodificar.</param>
+    /// <param name="inputSeek">Opciones de entrada que sitúan el inicio, colocadas antes de <c>-i</c>.</param>
+    /// <param name="outputLimit">Opciones de salida que acotan la duración, colocadas después de <c>-i</c>.</param>
+    /// <param name="sink">Destino que recibe las muestras decodificadas, trozo a trozo.</param>
+    /// <param name="cancellationToken">Token de cancelación.</param>
+    /// <exception cref="FFmpegException">
+    /// Se lanza si el proceso de FFmpeg termina con un código de salida distinto de cero.
+    /// </exception>
+    private async Task DecodeIntoAsync(
+        string filePath,
+        List<string> inputSeek,
+        List<string> outputLimit,
+        ISampleSink sink,
+        CancellationToken cancellationToken)
+    {
+        List<string> arguments = ["-v", "error", .. inputSeek, "-i", filePath, .. outputLimit];
         arguments.AddRange(
         [
-            "-i", filePath,
             "-map", "0:a:0",
             "-vn",
             "-ac", "1",
@@ -142,6 +195,8 @@ public sealed class AudioDecoder
             throw;
         }
     }
+
+    private static string Seconds(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
 
     /// <summary>Lee la salida de FFmpeg como floats de 32 bits y los reenvía al sumidero en trozos.</summary>
     /// <param name="stream">Salida estándar del proceso de FFmpeg, en formato <c>f32le</c> crudo.</param>
