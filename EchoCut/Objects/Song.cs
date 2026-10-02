@@ -177,6 +177,7 @@ public sealed class Song : INotifyPropertyChanged
             // Silencio y Recorte se calculan a partir del análisis, así que el enlace no se entera
             // de que han cambiado si no se le avisa columna por columna.
             OnPropertyChanged(nameof(Analysis));
+            OnPropertyChanged(nameof(LeadingSilence));
             OnPropertyChanged(nameof(Silence));
             OnPropertyChanged(nameof(Crop));
         }
