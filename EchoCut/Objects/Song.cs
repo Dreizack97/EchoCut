@@ -1,3 +1,4 @@
+using EchoCut.Audio;
 using EchoCut.Export;
 using EchoCut.Library;
 using EchoCut.Processing;
@@ -187,6 +188,15 @@ public sealed class Song : INotifyPropertyChanged
     /// <value>Segundo del archivo en el que se produciría el corte, o <c>null</c> si no se ha analizado.</value>
     [Browsable(false)]
     public double? CutSeconds => _analysis?.CutSeconds;
+
+    /// <summary>Tramo que conservaría la copia recortada.</summary>
+    /// <value>
+    /// Del principio del archivo al corte calculado, o <c>null</c> si no se ha analizado. Es el único
+    /// punto del que el recorte toma sus extremos, para que el inicio detectado o ajustado a mano
+    /// llegue al recorte sin tocar a quienes lo piden.
+    /// </value>
+    [Browsable(false)]
+    public TrimRange? TrimRange => CutSeconds is { } cut ? Audio.TrimRange.EndingAt(cut) : null;
 
     /// <summary>Si el análisis considera que la pista tiene cola recortable.</summary>
     /// <value><c>true</c> si procede recortar; <c>false</c> en caso contrario.</value>

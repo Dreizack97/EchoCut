@@ -591,8 +591,8 @@ namespace EchoCut
             StopPreview();
 
             List<TrimRequest> targets = _songs
-                .Where(x => x.ShouldTrim && x.CutSeconds is not null)
-                .Select(x => new TrimRequest(x.Track, x.CutSeconds!.Value))
+                .Where(x => x.ShouldTrim && x.TrimRange is not null)
+                .Select(x => new TrimRequest(x.Track, x.TrimRange!.Value))
                 .ToList();
 
             if (targets.Count == 0)
@@ -712,7 +712,7 @@ namespace EchoCut
         /// </remarks>
         private async Task TrimSingleAsync(Song song)
         {
-            if (IsBusy || !EnsureFFmpeg() || song.CutSeconds is not { } cut)
+            if (IsBusy || !EnsureFFmpeg() || song.TrimRange is not { } range)
             {
                 return;
             }
@@ -738,7 +738,7 @@ namespace EchoCut
             try
             {
                 Task<TrimOutcome> trim = _trimmer.TrimOneAsync(
-                    new TrimRequest(song.Track, cut),
+                    new TrimRequest(song.Track, range),
                     outputDirectory,
                     cts.Token);
 
