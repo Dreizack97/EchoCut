@@ -142,7 +142,7 @@ public sealed class SilenceAnalyzer
     /// la ventana y se repite.
     /// </param>
     /// <returns>El resultado de la última ventana y los segundos decodificados en todas las pasadas.</returns>
-    private static async Task<(TResult Result, double DecodedSeconds)> ProbeAsync<TResult>(
+    private async Task<(TResult Result, double DecodedSeconds)> ProbeAsync<TResult>(
         double durationSeconds,
         double initialWindowSeconds,
         SilenceOptions options,
@@ -159,7 +159,7 @@ public sealed class SilenceAnalyzer
                 (int)(window * 1000.0 / Math.Max(1.0, options.FrameMilliseconds)) + 1;
 
             using LevelFramer framer = new(
-                AudioDecoder.AnalysisSampleRate,
+                _decoder.SampleRate,
                 options.FrameMilliseconds,
                 expectedFrames,
                 options.HighPassHz);
