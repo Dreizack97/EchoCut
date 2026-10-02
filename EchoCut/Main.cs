@@ -29,6 +29,7 @@ namespace EchoCut
 
         private readonly AnalysisService _analysis;
         private readonly TrimService _trimmer;
+        private readonly WaveformService _waveforms;
 
         private CancellationTokenSource? _analysisCts;
         private CancellationTokenSource? _trimCts;
@@ -58,6 +59,7 @@ namespace EchoCut
 
             _analysis = new AnalysisService(_locator);
             _trimmer = new TrimService(_locator);
+            _waveforms = new WaveformService(_locator);
 
             numericTolerance.Value = Clamp(numericTolerance, _settings.Silence.ToleranceSeconds);
 
@@ -1135,6 +1137,45 @@ namespace EchoCut
             {
                 OpenSongsInAudacity(songs);
             }
+        }
+
+        /// <summary>
+        /// Abre la forma de onda de la pista seleccionada para ver sus silencios y corregir el
+        /// recorte a mano.
+        /// </summary>
+        /// <remarks>
+        /// Funciona también con pistas sin analizar: el tramo parte de la pista completa y el ajuste
+        /// manual basta para recortarla.
+        /// </remarks>
+        private void mnuWaveform_Click(object? sender, EventArgs e)
+        {
+            if (IsBusy || GetSelectedSong() is not { } song || !EnsureFFmpeg())
+            {
+                return;
+            }
+
+            StopPreview();
+
+            double duration = song.DurationSeconds;
+            using WaveformEditor dialog = new(
+                song.Track,
+                duration,
+                song.TrimRange ?? new TrimRange(0.0, duration),
+                song.Analysis?.Range,
+                song.ManualRange is not null,
+                _waveforms,
+                _locator.Require().FFmpeg,
+                _settings.Silence.PreviewSeconds);
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            song.AdjustManually(dialog.ManualRange);
+            SetStatus(dialog.ManualRange is null
+                ? $"{song.Name}: se usa el recorte del análisis."
+                : $"{song.Name}: recorte ajustado a mano, {song.Crop:0.00} s a eliminar.");
         }
 
         private void mnuEditSong_Click(object? sender, EventArgs e)
