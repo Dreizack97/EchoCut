@@ -7,6 +7,16 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 
 ---
 
+## [Sin publicar]
+
+### Añadido
+* **`TrimRange`**: Valor inmutable con el tramo (inicio y final, en tiempo absoluto del original) que conserva la copia recortada. Base para el recorte del silencio inicial y el ajuste manual desde el espectrograma.
+
+### Modificado
+* **`AudioTrimmer` y `TrimRequest`**: El recorte recibe un `TrimRange` en lugar de un único instante de corte. Si el inicio es mayor que cero se añade `-ss` como opción de entrada (antes de `-i`), manteniendo la copia de flujo sin recodificar; si es cero, la línea de órdenes es idéntica a la anterior.
+
+---
+
 ## [1.1.0] - 2026-08-27
 
 ### Añadido
