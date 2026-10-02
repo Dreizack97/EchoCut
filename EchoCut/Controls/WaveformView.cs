@@ -44,6 +44,9 @@ public sealed class WaveformView : Control
     /// <summary>Separación mínima entre marcas: un tramo vacío no es una copia que se pueda escribir.</summary>
     public const double MinimumGapSeconds = 0.1;
 
+    /// <summary>Rojo del cursor de reproducción: contrasta 5.7:1 con el fondo blanco.</summary>
+    private static readonly Color PlayheadColor = Color.FromArgb(0xC4, 0x2B, 0x1C);
+
     private const double FineStepSeconds = 0.01;
     private const double CoarseStepSeconds = 0.1;
     private const double LargeStepSeconds = 1.0;
@@ -66,6 +69,7 @@ public sealed class WaveformView : Control
     private bool _showEndMarker = true;
     private bool _showTimeRuler = true;
     private string _statusText = string.Empty;
+    private double? _playheadSeconds;
     private TrimMarker _activeMarker;
     private TrimMarker _dragging;
 
@@ -182,6 +186,23 @@ public sealed class WaveformView : Control
         }
     }
 
+    /// <summary>Instante que está sonando, para dibujar el cursor de reproducción.</summary>
+    /// <value>Segundos del archivo, o <c>null</c> si no suena nada.</value>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public double? PlayheadSeconds
+    {
+        get => _playheadSeconds;
+        set
+        {
+            if (_playheadSeconds != value)
+            {
+                _playheadSeconds = value;
+                Invalidate();
+            }
+        }
+    }
+
     /// <summary>Marca que mueve el teclado.</summary>
     /// <value>La marca activa, o <see cref="TrimMarker.None"/> si aún no se eligió.</value>
     [Browsable(false)]
@@ -285,6 +306,11 @@ public sealed class WaveformView : Control
         if (_showEndMarker)
         {
             DrawMarker(g, image, TrimMarker.End, _endMarkerSeconds);
+        }
+
+        if (_playheadSeconds is { } playhead)
+        {
+            DrawPlayhead(g, image, playhead);
         }
 
         // Las referencias de amplitud van encima de las marcas para que una marca pegada al borde
@@ -564,6 +590,35 @@ public sealed class WaveformView : Control
         g.FillRectangle(active ? Brushes.Yellow : Brushes.White, box);
         g.DrawRectangle(Pens.Black, box);
         TextRenderer.DrawText(g, label, Font, box, Color.Black, TextFormatFlags.NoPadding);
+    }
+
+    /// <summary>
+    /// Dibuja el cursor de reproducción: una línea roja con borde blanco rematada por un triángulo.
+    /// La forma, y no solo el color, lo distingue de las marcas de recorte, que son negras y sin
+    /// triángulo.
+    /// </summary>
+    private void DrawPlayhead(Graphics g, Rectangle image, double seconds)
+    {
+        float x = XFor(seconds);
+        if (x < 0 || x > image.Width)
+        {
+            return;
+        }
+
+        float width = LogicalToDeviceUnits(2);
+        using (Pen outline = new(Color.White, width + LogicalToDeviceUnits(2)))
+        {
+            g.DrawLine(outline, x, 0, x, image.Bottom);
+        }
+
+        using Pen line = new(PlayheadColor, width);
+        g.DrawLine(line, x, 0, x, image.Bottom);
+
+        float half = LogicalToDeviceUnits(6);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        using SolidBrush head = new(PlayheadColor);
+        g.FillPolygon(head, [new PointF(x - half, 0), new PointF(x + half, 0), new PointF(x, half * 1.5f)]);
+        g.SmoothingMode = SmoothingMode.None;
     }
 
     /// <summary>
