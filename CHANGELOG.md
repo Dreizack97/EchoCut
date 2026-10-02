@@ -11,9 +11,18 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 
 ### Añadido
 * **`TrimRange`**: Valor inmutable con el tramo (inicio y final, en tiempo absoluto del original) que conserva la copia recortada. Base para el recorte del silencio inicial y el ajuste manual desde el espectrograma.
+* **Detección y recorte del silencio inicial**: `SilenceDetector.AnalyzeLeadingFrames` analiza el principio invirtiendo en el tiempo su curva de nivel, reutilizando íntegro el algoritmo del final (umbral adaptativo, histéresis, guarda de fundido de entrada y afinación del corte).
+* **Sondeo del principio en `SilenceAnalyzer`**: Ventana inicial de 10 s que se cuadruplica si resulta toda silencio; si la ventana del final ya cubrió el archivo, el principio se analiza sobre las mismas tramas sin decodificar de nuevo.
+* **`AudioDecoder.DecodeRangeIntoAsync`**: Decodificación de un tramo arbitrario, compartiendo con la de la cola el lanzamiento de FFmpeg y la lectura del PCM.
+* **Categoría `7 · Inicio`** en el diálogo Avanzado: `Recortar silencio inicial` (activado por defecto) y `Silencio inicial mínimo (s)` (1.0 s).
+* **`EdgeTrim`**: Medida y decisión por borde; `TrackAnalysis` deriva de ambos bordes el tramo conservado, el ahorro total y si procede recortar.
+* **Rejilla y CSV**: Columna «Silencio inicial (s)» y, en el CSV, el inicio de la copia y las métricas de fundido y fondo de cada borde.
 
 ### Modificado
 * **`AudioTrimmer` y `TrimRequest`**: El recorte recibe un `TrimRange` en lugar de un único instante de corte. Si el inicio es mayor que cero se añade `-ss` como opción de entrada (antes de `-i`), manteniendo la copia de flujo sin recodificar; si es cero, la línea de órdenes es idéntica a la anterior.
+* **`SilenceResult`**: Pasa a ser un `record` independiente del borde; `TrailingSilenceSeconds` se renombra a `SilenceSeconds`.
+* **Recálculo por tolerancia**: La regla que rehace la decisión al mover la tolerancia pasa de `Main` a `TrackAnalysis.WithOptions`, y también se aplica al aceptar el diálogo Avanzado.
+* **CSV**: «Silencio (s)», «Fundido» y «Toca fondo» pasan a «Silencio final (s)», «Fundido final» y «Final toca fondo».
 
 ---
 
