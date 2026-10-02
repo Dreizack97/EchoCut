@@ -860,10 +860,7 @@ namespace EchoCut
                     continue;
                 }
 
-                TrackAnalysis updated = analysis.WithOptions(options);
-
-                song.Analysis = updated;
-                song.Estatus = updated.ShouldTrim ? Song.StatusAnalyzed : Song.StatusNoSilence;
+                song.Complete(analysis.WithOptions(options));
                 anyUpdated = true;
             }
 

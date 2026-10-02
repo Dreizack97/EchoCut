@@ -85,7 +85,7 @@ public static class SongPresentation
     /// <returns>Color semántico del estado oscuro, o <see cref="Neutral"/>.</returns>
     public static Color ForeColorFor(string? status) => status switch
     {
-        Song.StatusAnalyzed => Trimmable,
+        Song.StatusAnalyzed or Song.StatusAdjusted => Trimmable,
         Song.StatusTrimmed => Trimmed,
         Song.StatusError => Failed,
 
@@ -102,7 +102,7 @@ public static class SongPresentation
     /// <returns>Color semántico del estado claro, o <see cref="NeutralSelection"/>.</returns>
     public static Color SelectionForeColorFor(string? status) => status switch
     {
-        Song.StatusAnalyzed => TrimmableSelection,
+        Song.StatusAnalyzed or Song.StatusAdjusted => TrimmableSelection,
         Song.StatusTrimmed => TrimmedSelection,
         Song.StatusError => FailedSelection,
         Song.StatusPending or Song.StatusAnalyzing or Song.StatusTrimming or Song.StatusCancelled => InconclusiveSelection,

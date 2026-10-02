@@ -36,6 +36,9 @@ public sealed class Song : INotifyPropertyChanged
     /// <summary>El análisis terminó y no hay silencio final que recortar.</summary>
     public const string StatusNoSilence = "Sin silencio";
 
+    /// <summary>El tramo a conservar se ajustó a mano y recorta algo.</summary>
+    public const string StatusAdjusted = "Ajustado";
+
     /// <summary>El recorte está en curso.</summary>
     public const string StatusTrimming = "Recortando…";
 
@@ -52,7 +55,15 @@ public sealed class Song : INotifyPropertyChanged
         new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty,
             TimeSpan.Zero, string.Empty, 0, 0);
 
+    /// <summary>
+    /// Diferencia por debajo de la cual un extremo del ajuste manual se considera el borde del
+    /// archivo: un milisegundo está muy por debajo del paquete más corto que puede cortar la copia
+    /// de flujo.
+    /// </summary>
+    private const double EdgeEpsilonSeconds = 0.001;
+
     private TrackAnalysis? _analysis;
+    private TrimRange? _manualRange;
     private string _estatus = StatusPending;
     private string _errorMessage = string.Empty;
 
@@ -119,9 +130,14 @@ public sealed class Song : INotifyPropertyChanged
     public double? Silence => _analysis?.Trailing.SilenceSeconds;
 
     /// <summary>Segundos que se eliminarían al recortar.</summary>
-    /// <value>Segundos que se ahorrarían al recortar, o <c>null</c> si aún no se ha analizado.</value>
+    /// <value>
+    /// Segundos que se ahorrarían al recortar según el ajuste manual o, si no lo hay, según el
+    /// análisis; <c>null</c> si no hay ninguno de los dos.
+    /// </value>
     [DisplayName("Recorte (s)")]
-    public double? Crop => _analysis?.CropSeconds;
+    public double? Crop => _manualRange is { } manual
+        ? Math.Round(DurationSeconds - manual.DurationSeconds, 2)
+        : _analysis?.CropSeconds;
 
     /// <summary>Estado actual de la fila, tal como se muestra en la columna «Estado».</summary>
     /// <value>Uno de los valores <c>Status*</c> definidos en esta clase.</value>
@@ -199,21 +215,34 @@ public sealed class Song : INotifyPropertyChanged
     /// no se recorta—, o <c>null</c> si no se ha analizado.
     /// </value>
     [Browsable(false)]
-    public double? CutSeconds => _analysis?.EndSeconds;
+    public double? CutSeconds => TrimRange?.EndSeconds;
 
     /// <summary>Tramo que conservaría la copia recortada.</summary>
     /// <value>
-    /// Del comienzo al final calculados por el análisis, o <c>null</c> si no se ha analizado. Es el
-    /// único punto del que el recorte toma sus extremos, para que un ajuste manual llegue al recorte
-    /// sin tocar a quienes lo piden.
+    /// El ajuste manual si lo hay; si no, el calculado por el análisis; <c>null</c> si no hay
+    /// ninguno. Es el único punto del que el recorte y la previsualización toman sus extremos.
     /// </value>
     [Browsable(false)]
-    public TrimRange? TrimRange => _analysis?.Range;
+    public TrimRange? TrimRange => _manualRange ?? _analysis?.Range;
 
-    /// <summary>Si el análisis considera que la pista tiene cola recortable.</summary>
-    /// <value><c>true</c> si procede recortar; <c>false</c> en caso contrario.</value>
+    /// <summary>Tramo ajustado a mano desde el espectrograma.</summary>
+    /// <value>
+    /// El tramo elegido por el usuario, o <c>null</c> si manda el análisis. Dura lo que la sesión:
+    /// sobrevive a un nuevo análisis y a los cambios de tolerancia, porque es una decisión tomada a
+    /// la vista de la señal que ningún parámetro debe deshacer.
+    /// </value>
     [Browsable(false)]
-    public bool ShouldTrim => _analysis?.ShouldTrim ?? false;
+    public TrimRange? ManualRange => _manualRange;
+
+    /// <summary>Si procede escribir una copia recortada.</summary>
+    /// <value>
+    /// Con ajuste manual, si este descarta algo del principio o del final; si no, la decisión del
+    /// análisis.
+    /// </value>
+    [Browsable(false)]
+    public bool ShouldTrim => _manualRange is { } manual
+        ? manual.StartSeconds > EdgeEpsilonSeconds || manual.EndSeconds < DurationSeconds - EdgeEpsilonSeconds
+        : _analysis?.ShouldTrim ?? false;
 
     /// <summary>Detalle del último error, para el CSV y el tooltip de la fila.</summary>
     /// <value>Mensaje de error, o cadena vacía si no hay ninguno.</value>
@@ -242,12 +271,34 @@ public sealed class Song : INotifyPropertyChanged
 
     /// <summary>Anota el resultado del análisis y actualiza el estado en consecuencia.</summary>
     /// <param name="analysis">Resultado del análisis de esta pista.</param>
+    /// <remarks>Si hay un ajuste manual, se conserva y sigue mandando sobre el análisis nuevo.</remarks>
     public void Complete(TrackAnalysis analysis)
     {
         Analysis = analysis;
         ErrorMessage = string.Empty;
-        Estatus = analysis.ShouldTrim ? StatusAnalyzed : StatusNoSilence;
+        Estatus = DecisionStatus();
     }
+
+    /// <summary>Fija o retira el ajuste manual del tramo a conservar.</summary>
+    /// <param name="range">Tramo elegido, o <c>null</c> para volver a la decisión del análisis.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Se lanza si el tramo no es válido.</exception>
+    public void AdjustManually(TrimRange? range)
+    {
+        range?.ThrowIfInvalid();
+
+        _manualRange = range;
+        OnPropertyChanged(nameof(ManualRange));
+        OnPropertyChanged(nameof(Crop));
+        Estatus = DecisionStatus();
+    }
+
+    private string DecisionStatus() => (_manualRange, _analysis) switch
+    {
+        (null, null) => StatusPending,
+        _ when !ShouldTrim => StatusNoSilence,
+        (null, _) => StatusAnalyzed,
+        _ => StatusAdjusted,
+    };
 
     /// <summary>Asigna un campo de respaldo y notifica el cambio solo si el valor es distinto.</summary>
     /// <typeparam name="T">Tipo del campo y de la propiedad asociada.</typeparam>
