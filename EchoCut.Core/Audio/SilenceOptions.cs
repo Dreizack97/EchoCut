@@ -20,6 +20,7 @@ public sealed class SilenceOptions
     private const string FadeCategory = "4 · Fundido";
     private const string CutCategory = "5 · Corte";
     private const string PreviewCategory = "6 · Previsualización";
+    private const string LeadingCategory = "7 · Inicio";
 
     // ------------------------------------------------------------------------------- Umbral
 
@@ -256,6 +257,31 @@ public sealed class SilenceOptions
     [Description("Duración de la música previa al corte que se reproduce al pulsar el botón de previsualización para juzgar cómo quedará el final.")]
     public double PreviewSeconds { get; set; } = AudioPreview.ContextSeconds;
 
+    // --------------------------------------------------------------------------------- Inicio
+
+    /// <summary>Si el análisis también busca y recorta el silencio al principio de la pista.</summary>
+    /// <value><c>true</c> para analizar y recortar el inicio. Por defecto, <c>true</c>.</value>
+    /// <remarks>
+    /// Desactivarlo ahorra la decodificación del inicio de cada pista, útil en bibliotecas cuyos
+    /// silencios iniciales son intencionados, como los álbumes en directo o sin pausas.
+    /// </remarks>
+    [Category(LeadingCategory)]
+    [DisplayName("Recortar silencio inicial")]
+    [Description("Busca también el silencio al principio de la pista y lo recorta conservando la tolerancia antes de que empiece la música.")]
+    public bool TrimLeadingSilence { get; set; } = true;
+
+    /// <summary>Silencio inicial mínimo para considerar que el inicio es recortable.</summary>
+    /// <value>Duración mínima en segundos. Por defecto, 1.0.</value>
+    /// <remarks>
+    /// Es menor que <see cref="MinSilenceSeconds"/> porque una entrada muerta es más corta que una
+    /// cola: los másters comerciales suelen arrancar con unas décimas de silencio deliberadas, que
+    /// este mínimo respeta, mientras que un ripeo o una grabación arrastran segundos enteros.
+    /// </remarks>
+    [Category(LeadingCategory)]
+    [DisplayName("Silencio inicial mínimo (s)")]
+    [Description("Silencio que debe haber al principio para que el inicio se considere recortable. El resto de criterios (umbral, profundidad, fundido, ahorro mínimo) son los mismos que para el final.")]
+    public double MinLeadingSilenceSeconds { get; set; } = 1.0;
+
     /// <summary>Nivel asignado a una trama con energía cero.</summary>
     public const double SilenceFloorDbfs = -120.0;
 
@@ -303,6 +329,8 @@ public sealed class SilenceOptions
         ToleranceSeconds = Math.Clamp(ToleranceSeconds, 0.0, 5.0);
         CutSearchSeconds = Math.Clamp(CutSearchSeconds, 0.0, 5.0);
         PreviewSeconds = Math.Clamp(PreviewSeconds, 0.5, 30.0);
+
+        MinLeadingSilenceSeconds = Math.Clamp(MinLeadingSilenceSeconds, 0.1, 120.0);
     }
 
     /// <summary>
