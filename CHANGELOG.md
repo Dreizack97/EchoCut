@@ -7,7 +7,7 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 
 ---
 
-## [Sin publicar]
+## [1.2.0] - 2026-10-02
 
 ### Añadido
 * **`TrimRange`**: Valor inmutable con el tramo (inicio y final, en tiempo absoluto del original) que conserva la copia recortada. Base para el recorte del silencio inicial y el ajuste manual desde la forma de onda.

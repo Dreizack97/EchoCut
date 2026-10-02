@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet&logoColor=white" alt=".NET 10" />
   <img src="https://img.shields.io/badge/C%23-14-239120?style=flat-square&logo=csharp&logoColor=white" alt="C# 14" />
-  <img src="https://img.shields.io/badge/Versi%C3%B3n-1.1.0-blue.svg?style=flat-square" alt="Versión 1.1.0" />
+  <img src="https://img.shields.io/badge/Versi%C3%B3n-1.2.0-blue.svg?style=flat-square" alt="Versión 1.2.0" />
   <img src="https://img.shields.io/badge/UI-Windows%20Forms-0078D7?style=flat-square&logo=windows&logoColor=white" alt="Windows Forms" />
   <img src="https://img.shields.io/badge/Engine-FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white" alt="FFmpeg" />
   <img src="https://img.shields.io/badge/Licencia-GPLv3-blue.svg?style=flat-square" alt="Licencia GPLv3" />
