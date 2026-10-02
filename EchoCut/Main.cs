@@ -599,7 +599,7 @@ namespace EchoCut
             {
                 MessageBox.Show(
                     this,
-                    "No hay pistas con cola recortable. Ejecuta primero el análisis.",
+                    "No hay pistas con silencio recortable. Ejecuta primero el análisis.",
                     "Nada que recortar",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
@@ -811,6 +811,13 @@ namespace EchoCut
                 _settings.Silence = dialog.Result;
                 _settings.Save();
                 lblStatus.Text = "Parámetros avanzados actualizados.";
+
+                // Activar o desactivar el principio, o cambiar sus mínimos, debe reflejarse ya en
+                // las pistas analizadas en lugar de esperar a un nuevo análisis.
+                if (!IsBusy)
+                {
+                    ApplyOptionsDynamically();
+                }
             }
         }
 
@@ -829,16 +836,15 @@ namespace EchoCut
                 return;
             }
 
-            double tolerance = (double)numericTolerance.Value;
-            _settings.Silence.ToleranceSeconds = tolerance;
-            ApplyToleranceDynamically(tolerance);
+            _settings.Silence.ToleranceSeconds = (double)numericTolerance.Value;
+            ApplyOptionsDynamically();
         }
 
         /// <summary>
         /// Recalcula dinámicamente el recorte y la decisión de corte para todas las pistas ya analizadas
         /// en memoria, sin necesidad de redecodificar el audio con FFmpeg.
         /// </summary>
-        private void ApplyToleranceDynamically(double tolerance)
+        private void ApplyOptionsDynamically()
         {
             if (_songs.Count == 0)
             {
@@ -864,7 +870,7 @@ namespace EchoCut
             if (anyUpdated)
             {
                 int trimmable = _songs.Count(x => x.ShouldTrim);
-                SetStatus($"Tolerancia actualizada a {tolerance:0.0} s. {trimmable} de {_songs.Count} con silencio recortable.");
+                SetStatus($"Tolerancia de {options.ToleranceSeconds:0.0} s. {trimmable} de {_songs.Count} con silencio recortable.");
             }
         }
 

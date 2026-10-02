@@ -105,9 +105,17 @@ public sealed class Song : INotifyPropertyChanged
     [DisplayName("Tamaño")]
     public string Size => TrackFormat.Size(Track.SizeBytes);
 
+    /// <summary>Silencio detectado al principio de la pista, en segundos.</summary>
+    /// <value>
+    /// Silencio inicial en segundos, o <c>null</c> si aún no se ha analizado. Vale cero si el
+    /// análisis del principio estaba desactivado.
+    /// </value>
+    [DisplayName("Silencio inicial (s)")]
+    public double? LeadingSilence => _analysis?.Leading.SilenceSeconds;
+
     /// <summary>Silencio detectado al final de la pista, en segundos.</summary>
     /// <value>Silencio final en segundos, o <c>null</c> si aún no se ha analizado.</value>
-    [DisplayName("Silencio (s)")]
+    [DisplayName("Silencio final (s)")]
     public double? Silence => _analysis?.Trailing.SilenceSeconds;
 
     /// <summary>Segundos que se eliminarían al recortar.</summary>
