@@ -1,7 +1,7 @@
 # EchoCut
 
 <p align="center">
-  <strong>El recortador inteligente y sin pérdidas de silencio final para bibliotecas de audio masivas.</strong>
+  <strong>El recortador inteligente y sin pérdidas de silencio inicial y final para bibliotecas de audio masivas.</strong>
 </p>
 
 <p align="center">
@@ -33,8 +33,8 @@ EchoCut fue diseñado bajo principios estrictos de ingeniería acústica:
 
 1. **Cero Pérdida Generacional (`-c copy`)**:
    El recorte se realiza mediante copia de flujo directo con FFmpeg. **No hay recodificación**. Un archivo MP3 de 320 Kbps sigue siendo exactamente el mismo flujo comprimido; los metadatos ID3v2, portadas y etiquetas se conservan intactos y cada archivo se procesa en una fracción de segundo.
-2. **Procesamiento 100% No Destructivo**:
-   Los archivos originales **nunca se sobrescriben**. Las copias recortadas se guardan de forma aislada en la subcarpeta `Recortados/`.
+2. **Recorte 100% No Destructivo**:
+   El recorte **nunca sobrescribe** los archivos originales: las copias recortadas se guardan de forma aislada en la subcarpeta `Recortados/`. Las únicas operaciones que modifican los originales —editar propiedades, limpiar o normalizar metadatos y eliminar archivos— son explícitas y piden confirmación.
 3. **Filtro Paso Alto RLB (EBU R128)**:
    Antes de medir energía, la señal pasa por un filtro digital Biquad paso alto de 2.° orden calibrado a ~38.14 Hz (portado del código matemático de Audacity). Esto elimina el *offset* de corriente directa (DC) y el retumbe subsónico de digitalizaciones de vinilo que engañan a las compuertas convencionales.
 4. **Disparador Schmitt e Histéresis Dinámica**:
@@ -66,6 +66,8 @@ graph TD
         ExtApps["ExternalApps (Audacity / Explorer)"]
         Accessible["SongPresentation (WCAG AAA Dual Palette)"]
         Properties["SongPropertiesDialog (Metadatos y Atributos)"]
+        WaveEditor["WaveformEditor (Forma de Onda y Ajuste Manual)"]
+        WaveView["WaveformView (Marcas y Cursor de Reproducción)"]
     end
 
     subgraph Core ["EchoCut.Core (net10.0 - Motor Puro)"]
@@ -99,6 +101,11 @@ graph TD
     Form --> Scanner
     Form --> Properties
     Properties --> Editor
+    Form --> WaveEditor
+    WaveEditor --> WaveView
+    WaveEditor --> WaveformSvc
+    WaveEditor --> Player
+    WaveView --> WaveRenderer
     AnalysisSvc --> Analyzer
     TrimSvc --> Trimmer
     Analyzer --> Decoder
@@ -260,6 +267,8 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
      - *Abrir en Audacity*: Abre simultáneamente todas las pistas seleccionadas en una sesión de Audacity (o haz doble clic sobre cualquier fila para abrirla de inmediato).
      - *Editar propiedades*: Abre la ventana modal nativa de propiedades para consultar o editar metadatos ID3/Vorbis (título, artistas, año, álbum, etc.) o renombrar el archivo físico en disco.
      - *Eliminar archivo(s)*: Elimina permanentemente los archivos seleccionados del disco tras confirmar la operación (también disponible pulsando la tecla **Suprimir** en la cuadrícula).
+   - **Limpiar metadatos (`Limpiar metadatos`)**: Elimina todas las etiquetas (título, artistas, portada, etc.) de las pistas cargadas, tras confirmar la operación. Modifica los archivos originales.
+   - **Normalizar (`Normalizar`)**: Quita los acentos (conservando la «ñ») y pone en mayúscula la inicial de cada palabra tanto en el nombre del archivo como en los metadatos de texto de las pistas cargadas, tras confirmar la operación. Modifica y renombra los archivos originales.
    - **Exportar (`Exportar`)**: Genera un archivo CSV codificado en UTF-8 con BOM y separador regional, listo para abrirse en Microsoft Excel con todas las métricas acústicas de cada pista.
 
 ---
