@@ -1,21 +1,30 @@
 namespace EchoCut.Audio;
 
 /// <summary>
-/// Resultado del análisis de la cola de una pista. Incluye tanto la decisión de recorte
-/// como las métricas que la justifican, para poder auditar el algoritmo desde el CSV.
+/// Resultado del análisis de uno de los bordes de una pista —su final o su principio—. Incluye
+/// tanto la decisión de recorte como las métricas que la justifican, para poder auditar el
+/// algoritmo desde el CSV.
 /// </summary>
-public sealed class SilenceResult
+/// <remarks>
+/// Es el mismo tipo para ambos bordes porque el principio se analiza como el final de la curva de
+/// nivel invertida en el tiempo (ver <see cref="SilenceDetector.AnalyzeLeadingFrames"/>). Las
+/// métricas de pendiente y fondo se refieren a esa curva vista desde el borde hacia la música.
+/// </remarks>
+public sealed record SilenceResult
 {
-    /// <summary>Silencio detectado al final de la pista, en segundos.</summary>
-    /// <value>Duración del silencio final, en segundos.</value>
-    public double TrailingSilenceSeconds { get; init; }
+    /// <summary>Silencio detectado en el borde analizado, en segundos.</summary>
+    /// <value>Duración del silencio entre el borde del archivo y la música.</value>
+    public double SilenceSeconds { get; init; }
 
     /// <summary>Instante de corte absoluto dentro del archivo, en segundos.</summary>
-    /// <value>Segundo del archivo en el que se produciría el corte.</value>
+    /// <value>
+    /// Segundo del archivo en el que se produciría el corte: el final de la copia si se analizó el
+    /// final, o su comienzo si se analizó el principio.
+    /// </value>
     public double CutSeconds { get; init; }
 
-    /// <summary>Segundos que se eliminarían al recortar.</summary>
-    /// <value>Duración que se ahorraría al escribir la copia recortada, en segundos.</value>
+    /// <summary>Segundos que se eliminarían en este borde al recortar.</summary>
+    /// <value>Duración entre el corte y el borde del archivo, en segundos.</value>
     public double SavedSeconds { get; init; }
 
     /// <summary>True si el silencio supera el mínimo y la ganancia justifica reescribir el archivo.</summary>

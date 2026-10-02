@@ -38,6 +38,7 @@ namespace EchoCut
             contextMenuStrip = new ContextMenuStrip(components);
             mnuOpenFolder = new ToolStripMenuItem();
             mnuOpenAudacity = new ToolStripMenuItem();
+            mnuWaveform = new ToolStripMenuItem();
             mnuEditSong = new ToolStripMenuItem();
             mnuDeleteSong = new ToolStripMenuItem();
             btnAnalyze = new Button();
@@ -125,9 +126,17 @@ namespace EchoCut
             // 
             // contextMenuStrip
             // 
-            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuOpenFolder, mnuOpenAudacity, mnuEditSong, mnuDeleteSong });
+            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuWaveform, mnuOpenFolder, mnuOpenAudacity, mnuEditSong, mnuDeleteSong });
             contextMenuStrip.Name = "contextMenuStrip";
-            contextMenuStrip.Size = new Size(213, 92);
+            contextMenuStrip.Size = new Size(296, 114);
+            // 
+            // mnuWaveform
+            // 
+            mnuWaveform.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            mnuWaveform.Name = "mnuWaveform";
+            mnuWaveform.Size = new Size(295, 22);
+            mnuWaveform.Text = "Ver forma de onda y ajustar recorte…";
+            mnuWaveform.Click += mnuWaveform_Click;
             // 
             // mnuOpenFolder
             // 
@@ -407,6 +416,7 @@ namespace EchoCut
         private ContextMenuStrip contextMenuStrip;
         private ToolStripMenuItem mnuOpenFolder;
         private ToolStripMenuItem mnuOpenAudacity;
+        private ToolStripMenuItem mnuWaveform;
         private Button btnFile;
         private OpenFileDialog openFileDialog;
         private ToolStripMenuItem mnuEditSong;

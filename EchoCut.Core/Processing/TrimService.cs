@@ -3,10 +3,10 @@ using EchoCut.Library;
 
 namespace EchoCut.Processing;
 
-/// <summary>Una pista y el punto por el que hay que cortarla.</summary>
+/// <summary>Una pista y el tramo que debe conservar su copia recortada.</summary>
 /// <param name="Track">Pista a recortar.</param>
-/// <param name="CutSeconds">Instante de corte, en segundos desde el principio del archivo.</param>
-public sealed record TrimRequest(TrackInfo Track, double CutSeconds);
+/// <param name="Range">Tramo del original que se conserva.</param>
+public sealed record TrimRequest(TrackInfo Track, TrimRange Range);
 
 /// <summary>Dónde quedó la copia recortada de una pista.</summary>
 /// <param name="OutputPath">Ruta absoluta del archivo escrito.</param>
@@ -81,7 +81,7 @@ public sealed class TrimService
             {
                 string targetDirectory = outputDirectoryResolver(request);
                 return new TrimOutcome(await trimmer
-                    .TrimAsync(request.Track.FilePath, request.CutSeconds, targetDirectory, token)
+                    .TrimAsync(request.Track.FilePath, request.Range, targetDirectory, token)
                     .ConfigureAwait(false));
             },
             progress,
@@ -129,7 +129,7 @@ public sealed class TrimService
         AudioTrimmer trimmer = new(_locator.Require().FFmpeg);
 
         return new TrimOutcome(await trimmer
-            .TrimAsync(request.Track.FilePath, request.CutSeconds, outputDirectory, cancellationToken)
+            .TrimAsync(request.Track.FilePath, request.Range, outputDirectory, cancellationToken)
             .ConfigureAwait(false));
     }
 }

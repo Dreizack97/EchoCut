@@ -131,7 +131,7 @@ public static class SilenceDetector
             // Ninguna trama del búfer contiene música: la ventana de sondeo se quedó corta.
             return new SilenceResult
             {
-                TrailingSilenceSeconds = timeline.TotalSeconds,
+                SilenceSeconds = timeline.TotalSeconds,
                 CutSeconds = totalDurationSeconds,
                 SavedSeconds = 0,
                 ShouldTrim = false,
@@ -187,7 +187,7 @@ public static class SilenceDetector
 
         return new SilenceResult
         {
-            TrailingSilenceSeconds = trailingSilenceSeconds,
+            SilenceSeconds = trailingSilenceSeconds,
             CutSeconds = cutSeconds,
             SavedSeconds = savedSeconds,
             ShouldTrim = trailingSilenceSeconds >= options.MinSilenceSeconds
@@ -207,6 +207,76 @@ public static class SilenceDetector
             AnalyzedSeconds = timeline.TotalSeconds,
             FrameCount = frameCount,
         };
+    }
+
+    /// <summary>
+    /// Analiza el principio de una pista a partir de la curva de nivel de su tramo inicial.
+    /// </summary>
+    /// <param name="frameDb">
+    /// Nivel RMS de cada trama, en dBFS, en orden cronológico. La primera trama debe empezar en la
+    /// primera muestra del archivo: es la referencia de tiempo del corte.
+    /// </param>
+    /// <param name="frameSeconds">Duración de una trama completa.</param>
+    /// <param name="peakDbfs">Pico absoluto medido sobre las muestras, solo para diagnóstico.</param>
+    /// <param name="options">
+    /// Parámetros del algoritmo de detección. El silencio mínimo exigido es
+    /// <see cref="SilenceOptions.MinLeadingSilenceSeconds"/>; el resto se comparte con el final.
+    /// </param>
+    /// <returns>
+    /// Resultado del inicio: <see cref="SilenceResult.CutSeconds"/> es el instante donde empezaría la
+    /// copia y coincide con <see cref="SilenceResult.SavedSeconds"/>.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// El principio de una pista es su final visto con el tiempo invertido, así que no hace falta un
+    /// segundo algoritmo: se invierte la curva y se analiza como una cola. Cada pieza conserva su
+    /// sentido en espejo —un fundido de entrada aparece como uno de salida y recibe la misma guarda;
+    /// el ajuste de <c>RefineCut</c> adelanta el comienzo hasta la frontera más silenciosa en lugar
+    /// de retrasar el final— y cualquier mejora del análisis de la cola beneficia a ambos bordes.
+    /// </para>
+    /// <para>
+    /// Todas las tramas se tratan como completas. La única que puede ser más corta es la última del
+    /// tramo, la más alejada del principio, y su duración solo influiría en el total analizado, no en
+    /// la posición del corte.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Se lanza si <paramref name="options"/> es <c>null</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Se lanza si <paramref name="frameSeconds"/> es cero o negativo.</exception>
+    public static SilenceResult AnalyzeLeadingFrames(
+        ReadOnlySpan<double> frameDb,
+        double frameSeconds,
+        double peakDbfs,
+        SilenceOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(frameSeconds);
+
+        SilenceOptions leading = options.Clone();
+        leading.MinSilenceSeconds = options.MinLeadingSilenceSeconds;
+
+        double[] rented = ArrayPool<double>.Shared.Rent(Math.Max(1, frameDb.Length));
+        try
+        {
+            Span<double> reversed = rented.AsSpan(0, frameDb.Length);
+            frameDb.CopyTo(reversed);
+            reversed.Reverse();
+
+            SilenceResult mirrored = AnalyzeFrames(
+                reversed,
+                frameSeconds,
+                frameSeconds,
+                peakDbfs,
+                frameDb.Length * frameSeconds,
+                leading);
+
+            // En la curva invertida, lo que se ahorra antes del "final" es la distancia desde el
+            // principio del archivo: ese es el instante en el que debe empezar la copia.
+            return mirrored with { CutSeconds = mirrored.SavedSeconds };
+        }
+        finally
+        {
+            ArrayPool<double>.Shared.Return(rented);
+        }
     }
 
     /// <summary>
@@ -569,7 +639,7 @@ public static class SilenceDetector
         double analyzedSeconds,
         int frameCount) => new()
         {
-            TrailingSilenceSeconds = 0,
+            SilenceSeconds = 0,
             CutSeconds = totalDurationSeconds,
             SavedSeconds = 0,
             ShouldTrim = false,

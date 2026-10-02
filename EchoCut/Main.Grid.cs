@@ -23,6 +23,7 @@ namespace EchoCut
         {
             EnsureActionColumns();
 
+            FormatNumericColumn(nameof(Song.LeadingSilence));
             FormatNumericColumn(nameof(Song.Silence));
             FormatNumericColumn(nameof(Song.Crop));
 
@@ -100,7 +101,8 @@ namespace EchoCut
             SetColumnLayout(nameof(Song.Extension), 55, 50, DataGridViewContentAlignment.MiddleCenter);
             SetColumnLayout(nameof(Song.Bitrate), 80, 64, DataGridViewContentAlignment.MiddleRight);
             SetColumnLayout(nameof(Song.Size), 80, 70, DataGridViewContentAlignment.MiddleRight);
-            SetColumnLayout(nameof(Song.Silence), 90, 90);
+            SetColumnLayout(nameof(Song.LeadingSilence), 130, 127);
+            SetColumnLayout(nameof(Song.Silence), 120, 119);
             SetColumnLayout(nameof(Song.Crop), 90, 88);
             SetColumnLayout(nameof(Song.Estatus), 120, 72);
         }

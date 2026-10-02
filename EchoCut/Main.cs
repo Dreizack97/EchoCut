@@ -29,6 +29,7 @@ namespace EchoCut
 
         private readonly AnalysisService _analysis;
         private readonly TrimService _trimmer;
+        private readonly WaveformService _waveforms;
 
         private CancellationTokenSource? _analysisCts;
         private CancellationTokenSource? _trimCts;
@@ -38,7 +39,6 @@ namespace EchoCut
         /// <summary>Reproducción de previsualización, creada al primer uso porque necesita FFmpeg.</summary>
         private AudioPreviewPlayer? _preview;
         private CancellationTokenSource? _previewCts;
-        private System.Windows.Forms.Timer? _previewTimer;
         private Song? _playingSong;
 
         /// <summary>Carpetas escaneadas, origen de las pistas cargadas.</summary>
@@ -58,6 +58,7 @@ namespace EchoCut
 
             _analysis = new AnalysisService(_locator);
             _trimmer = new TrimService(_locator);
+            _waveforms = new WaveformService(_locator);
 
             numericTolerance.Value = Clamp(numericTolerance, _settings.Silence.ToleranceSeconds);
 
@@ -353,7 +354,7 @@ namespace EchoCut
                 await _running.ConfigureAwait(true);
 
                 int trimmable = _songs.Count(x => x.ShouldTrim);
-                SetStatus($"Análisis completado. {trimmable} de {_songs.Count} con cola recortable.");
+                SetStatus($"Análisis completado. {trimmable} de {_songs.Count} con silencio recortable.");
             }
             catch (OperationCanceledException)
             {
@@ -508,10 +509,10 @@ namespace EchoCut
 
             try
             {
-                _preview ??= new AudioPreviewPlayer(_locator.Require().FFmpeg);
+                _preview ??= CreatePreviewPlayer();
                 SetStatus($"Preparando el final de {song.Name}…");
 
-                TimeSpan duration = await _preview
+                await _preview
                     .PlayAsync(song.FilePath, window, cts.Token)
                     .ConfigureAwait(true);
 
@@ -522,16 +523,6 @@ namespace EchoCut
 
                 _playingSong = song;
                 SetStatus($"Reproduciendo el final de {song.Name}…");
-
-                // SoundPlayer no avisa de que terminó, así que el glifo se devuelve a su sitio con
-                // un temporizador de la duración ya conocida.
-                _previewTimer = new System.Windows.Forms.Timer
-                {
-                    Interval = (int)Math.Max(1, duration.TotalMilliseconds) + 100,
-                };
-                _previewTimer.Tick += (_, _) => StopPreview();
-                _previewTimer.Start();
-
                 RefreshPlayColumn();
             }
             catch (OperationCanceledException)
@@ -548,17 +539,20 @@ namespace EchoCut
             }
         }
 
+        /// <summary>
+        /// Crea el reproductor en el hilo de la interfaz, que es donde avisará de que el tramo
+        /// terminó: así el glifo vuelve a su sitio justo cuando deja de sonar.
+        /// </summary>
+        private AudioPreviewPlayer CreatePreviewPlayer()
+        {
+            AudioPreviewPlayer player = new(_locator.Require().FFmpeg);
+            player.PlaybackCompleted += (_, _) => StopPreview();
+            return player;
+        }
+
         private void StopPreview()
         {
             _previewCts?.Cancel();
-
-            if (_previewTimer is { } timer)
-            {
-                timer.Stop();
-                timer.Dispose();
-                _previewTimer = null;
-            }
-
             _preview?.Stop();
 
             if (_playingSong is null)
@@ -591,15 +585,15 @@ namespace EchoCut
             StopPreview();
 
             List<TrimRequest> targets = _songs
-                .Where(x => x.ShouldTrim && x.CutSeconds is not null)
-                .Select(x => new TrimRequest(x.Track, x.CutSeconds!.Value))
+                .Where(x => x.ShouldTrim && x.TrimRange is not null)
+                .Select(x => new TrimRequest(x.Track, x.TrimRange!.Value))
                 .ToList();
 
             if (targets.Count == 0)
             {
                 MessageBox.Show(
                     this,
-                    "No hay pistas con cola recortable. Ejecuta primero el análisis.",
+                    "No hay pistas con silencio recortable. Ejecuta primero el análisis.",
                     "Nada que recortar",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
@@ -712,7 +706,7 @@ namespace EchoCut
         /// </remarks>
         private async Task TrimSingleAsync(Song song)
         {
-            if (IsBusy || !EnsureFFmpeg() || song.CutSeconds is not { } cut)
+            if (IsBusy || !EnsureFFmpeg() || song.TrimRange is not { } range)
             {
                 return;
             }
@@ -738,7 +732,7 @@ namespace EchoCut
             try
             {
                 Task<TrimOutcome> trim = _trimmer.TrimOneAsync(
-                    new TrimRequest(song.Track, cut),
+                    new TrimRequest(song.Track, range),
                     outputDirectory,
                     cts.Token);
 
@@ -811,6 +805,13 @@ namespace EchoCut
                 _settings.Silence = dialog.Result;
                 _settings.Save();
                 lblStatus.Text = "Parámetros avanzados actualizados.";
+
+                // Activar o desactivar el principio, o cambiar sus mínimos, debe reflejarse ya en
+                // las pistas analizadas en lugar de esperar a un nuevo análisis.
+                if (!IsBusy)
+                {
+                    ApplyOptionsDynamically();
+                }
             }
         }
 
@@ -829,22 +830,22 @@ namespace EchoCut
                 return;
             }
 
-            double tolerance = (double)numericTolerance.Value;
-            _settings.Silence.ToleranceSeconds = tolerance;
-            ApplyToleranceDynamically(tolerance);
+            _settings.Silence.ToleranceSeconds = (double)numericTolerance.Value;
+            ApplyOptionsDynamically();
         }
 
         /// <summary>
         /// Recalcula dinámicamente el recorte y la decisión de corte para todas las pistas ya analizadas
         /// en memoria, sin necesidad de redecodificar el audio con FFmpeg.
         /// </summary>
-        private void ApplyToleranceDynamically(double tolerance)
+        private void ApplyOptionsDynamically()
         {
             if (_songs.Count == 0)
             {
                 return;
             }
 
+            SilenceOptions options = CurrentOptions();
             bool anyUpdated = false;
             foreach (Song song in _songs)
             {
@@ -853,29 +854,14 @@ namespace EchoCut
                     continue;
                 }
 
-                double keptSeconds = tolerance + (analysis.FadeDetected ? _settings.Silence.FadeGuardSeconds : 0.0);
-                double savedSeconds = Math.Max(0.0, analysis.SilenceSeconds - keptSeconds);
-                double cutSeconds = Math.Clamp(analysis.DurationSeconds - savedSeconds, 0.0, analysis.DurationSeconds);
-                bool shouldTrim = analysis.SilenceSeconds >= _settings.Silence.MinSilenceSeconds
-                                  && savedSeconds >= _settings.Silence.MinSavingsSeconds
-                                  && analysis.ReachesSilenceFloor;
-
-                TrackAnalysis updated = analysis with
-                {
-                    CropSeconds = Math.Round(savedSeconds, 2),
-                    CutSeconds = cutSeconds,
-                    ShouldTrim = shouldTrim
-                };
-
-                song.Analysis = updated;
-                song.Estatus = shouldTrim ? Song.StatusAnalyzed : Song.StatusNoSilence;
+                song.Complete(analysis.WithOptions(options));
                 anyUpdated = true;
             }
 
             if (anyUpdated)
             {
                 int trimmable = _songs.Count(x => x.ShouldTrim);
-                SetStatus($"Tolerancia actualizada a {tolerance:0.0} s. {trimmable} de {_songs.Count} con cola recortable.");
+                SetStatus($"Tolerancia de {options.ToleranceSeconds:0.0} s. {trimmable} de {_songs.Count} con silencio recortable.");
             }
         }
 
@@ -1143,6 +1129,45 @@ namespace EchoCut
             {
                 OpenSongsInAudacity(songs);
             }
+        }
+
+        /// <summary>
+        /// Abre la forma de onda de la pista seleccionada para ver sus silencios y corregir el
+        /// recorte a mano.
+        /// </summary>
+        /// <remarks>
+        /// Funciona también con pistas sin analizar: el tramo parte de la pista completa y el ajuste
+        /// manual basta para recortarla.
+        /// </remarks>
+        private void mnuWaveform_Click(object? sender, EventArgs e)
+        {
+            if (IsBusy || GetSelectedSong() is not { } song || !EnsureFFmpeg())
+            {
+                return;
+            }
+
+            StopPreview();
+
+            double duration = song.DurationSeconds;
+            using WaveformEditor dialog = new(
+                song.Track,
+                duration,
+                song.TrimRange ?? new TrimRange(0.0, duration),
+                song.Analysis?.Range,
+                song.ManualRange is not null,
+                _waveforms,
+                _locator.Require().FFmpeg,
+                _settings.Silence.PreviewSeconds);
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            song.AdjustManually(dialog.ManualRange);
+            SetStatus(dialog.ManualRange is null
+                ? $"{song.Name}: se usa el recorte del análisis."
+                : $"{song.Name}: recorte ajustado a mano, {song.Crop:0.00} s a eliminar.");
         }
 
         private void mnuEditSong_Click(object? sender, EventArgs e)
