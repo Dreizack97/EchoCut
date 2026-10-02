@@ -54,7 +54,7 @@ public sealed record TrackAnalysis(
 
         return new TrackAnalysis(
             DurationSeconds: report.DurationSeconds,
-            SilenceSeconds: Math.Round(result.TrailingSilenceSeconds, 2),
+            SilenceSeconds: Math.Round(result.SilenceSeconds, 2),
             CropSeconds: Math.Round(result.SavedSeconds, 2),
             CutSeconds: result.CutSeconds,
             ShouldTrim: result.ShouldTrim,
