@@ -19,7 +19,7 @@
 
 ## 🎯 ¿Qué es EchoCut?
 
-**EchoCut** es una aplicación de escritorio para Windows y un motor de procesamiento digital de señales (DSP) de alto rendimiento construido sobre **.NET 10** y **C# 14**. Su propósito es analizar carpetas enteras de música y audiolibros, detectar con precisión quirúrgica el silencio innecesario, colas muertas o ruido residual al final de cada archivo, y recortarlos por lote **sin recodificar el audio y sin tocar los archivos originales**.
+**EchoCut** es una aplicación de escritorio para Windows y un motor de procesamiento digital de señales (DSP) de alto rendimiento construido sobre **.NET 10** y **C# 14**. Su propósito es analizar carpetas enteras de música y audiolibros, detectar con precisión quirúrgica el silencio innecesario, entradas y colas muertas o ruido residual al inicio y al final de cada archivo, y recortarlos por lote **sin recodificar el audio y sin tocar los archivos originales**.
 
 Si eres DJ, coleccionista musical, archivista, podcaster o simplemente te desespera el "tiempo muerto" entre canciones en tu auto o reproductor portátil, EchoCut automatiza la limpieza de miles de pistas en minutos, conservando una fidelidad sonora absoluta.
 
@@ -47,6 +47,8 @@ EchoCut fue diseñado bajo principios estrictos de ingeniería acústica:
    El umbral no es estático; se adapta al piso de ruido de la grabación. Una pista grabada de cinta con *hiss* a -44 dBFS no se queda sin recortar ni se corta a la mitad: el algoritmo identifica el piso real y sitúa el umbral por encima con margen seguro.
 8. **Protección de Másters Silenciosos**:
    El umbral nunca se acerca al nivel de programa (el pasaje más sonoro medido en RMS) a menos de una distancia configurable, protegiendo obras de música clásica o grabaciones acústicas con amplio rango dinámico.
+9. **Silencio Inicial por Análisis en Espejo**:
+   El principio de la pista se analiza invirtiendo en el tiempo su curva de nivel y tratándola como una cola, de modo que el umbral adaptativo, la histéresis, la guarda de fundido (aquí, de entrada) y la afinación del corte se aplican idénticos en ambos bordes. Su mínimo es más corto que el del final para respetar las décimas de silencio deliberadas con que arrancan los másters comerciales.
 
 ---
 
@@ -138,7 +140,7 @@ flowchart TD
 
 ## 🎛️ Parámetros del Algoritmo
 
-EchoCut incluye 22 parámetros calibrados exhaustivamente para música comercial masterizada. Puedes ajustarlos desde el diálogo **Avanzado**:
+EchoCut incluye 24 parámetros calibrados exhaustivamente para música comercial masterizada. Puedes ajustarlos desde el diálogo **Avanzado**:
 
 | Categoría | Parámetro | Por Defecto | Descripción |
 | :--- | :--- | :---: | :--- |
@@ -164,6 +166,8 @@ EchoCut incluye 22 parámetros calibrados exhaustivamente para música comercial
 | **5 · Corte** | `Tolerancia (s)` | `0.3 s` | Silencio remanente conservado tras el corte (configurable en la pantalla principal). |
 | | `Búsqueda del corte (s)` | `0.2 s` | Ventana de desplazamiento hacia la frontera de trama más silenciosa (anti-clic). |
 | **6 · Previsualización** | `Tiempo de previsualización (s)` | `3.0 s` | Duración de la música previa al corte que se reproduce al pulsar el botón de previsualización para juzgar cómo quedará el final. |
+| **7 · Inicio** | `Recortar silencio inicial` | `Sí` | Analiza también el principio de la pista y recorta su silencio conservando la tolerancia antes de la música. Desactivarlo ahorra la decodificación del inicio. |
+| | `Silencio inicial mínimo (s)` | `1.0 s` | Silencio inicial mínimo para considerar recortable el principio. El resto de criterios se comparten con el final. |
 
 ---
 
@@ -234,7 +238,7 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
 2. **Ajustar Tolerancia e Hilos**:
    - **Tolerancia**: Los segundos de silencio que deseas conservar al final (0.3 s por defecto es el estándar musical ideal).
    - **Hilos**: Grado de paralelismo (EchoCut calibra automáticamente entre 1 y 8 hilos según tu procesador).
-3. **Analizar (`Analizar`)**: EchoCut procesará las colas de las canciones en paralelo, mostrando el progreso y coloreando las filas recortables en ámbar oscuro.
+3. **Analizar (`Analizar`)**: EchoCut procesará el principio y el final de las canciones en paralelo, mostrando el progreso y coloreando las filas recortables en ámbar oscuro.
 4. **Previsualizar de Oído (`▶` / `⏹`)**: Pulsa el botón de reproducción en cualquier fila. Sonará de inmediato la música previa al punto de corte (3.0 s por defecto, personalizable en **Avanzado**) más la tolerancia conservada, permitiéndote comprobar auditivamente que el corte no interrumpe la frase musical.
 5. **Recortar**:
    - Pulsa **`Recortar todo`** para procesar en lote todas las pistas válidas.
