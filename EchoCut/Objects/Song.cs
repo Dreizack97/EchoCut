@@ -108,7 +108,7 @@ public sealed class Song : INotifyPropertyChanged
     /// <summary>Silencio detectado al final de la pista, en segundos.</summary>
     /// <value>Silencio final en segundos, o <c>null</c> si aún no se ha analizado.</value>
     [DisplayName("Silencio (s)")]
-    public double? Silence => _analysis?.SilenceSeconds;
+    public double? Silence => _analysis?.Trailing.SilenceSeconds;
 
     /// <summary>Segundos que se eliminarían al recortar.</summary>
     /// <value>Segundos que se ahorrarían al recortar, o <c>null</c> si aún no se ha analizado.</value>
@@ -184,19 +184,22 @@ public sealed class Song : INotifyPropertyChanged
     [Browsable(false)]
     public double DurationSeconds => _analysis?.DurationSeconds ?? Track.DurationSeconds;
 
-    /// <summary>Instante de corte calculado, en segundos.</summary>
-    /// <value>Segundo del archivo en el que se produciría el corte, o <c>null</c> si no se ha analizado.</value>
+    /// <summary>Instante en el que terminaría la copia recortada, en segundos.</summary>
+    /// <value>
+    /// Segundo del archivo en el que se produciría el corte final —la duración completa si el final
+    /// no se recorta—, o <c>null</c> si no se ha analizado.
+    /// </value>
     [Browsable(false)]
-    public double? CutSeconds => _analysis?.CutSeconds;
+    public double? CutSeconds => _analysis?.EndSeconds;
 
     /// <summary>Tramo que conservaría la copia recortada.</summary>
     /// <value>
-    /// Del principio del archivo al corte calculado, o <c>null</c> si no se ha analizado. Es el único
-    /// punto del que el recorte toma sus extremos, para que el inicio detectado o ajustado a mano
-    /// llegue al recorte sin tocar a quienes lo piden.
+    /// Del comienzo al final calculados por el análisis, o <c>null</c> si no se ha analizado. Es el
+    /// único punto del que el recorte toma sus extremos, para que un ajuste manual llegue al recorte
+    /// sin tocar a quienes lo piden.
     /// </value>
     [Browsable(false)]
-    public TrimRange? TrimRange => CutSeconds is { } cut ? Audio.TrimRange.EndingAt(cut) : null;
+    public TrimRange? TrimRange => _analysis?.Range;
 
     /// <summary>Si el análisis considera que la pista tiene cola recortable.</summary>
     /// <value><c>true</c> si procede recortar; <c>false</c> en caso contrario.</value>

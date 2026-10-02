@@ -353,7 +353,7 @@ namespace EchoCut
                 await _running.ConfigureAwait(true);
 
                 int trimmable = _songs.Count(x => x.ShouldTrim);
-                SetStatus($"Análisis completado. {trimmable} de {_songs.Count} con cola recortable.");
+                SetStatus($"Análisis completado. {trimmable} de {_songs.Count} con silencio recortable.");
             }
             catch (OperationCanceledException)
             {
@@ -845,6 +845,7 @@ namespace EchoCut
                 return;
             }
 
+            SilenceOptions options = CurrentOptions();
             bool anyUpdated = false;
             foreach (Song song in _songs)
             {
@@ -853,29 +854,17 @@ namespace EchoCut
                     continue;
                 }
 
-                double keptSeconds = tolerance + (analysis.FadeDetected ? _settings.Silence.FadeGuardSeconds : 0.0);
-                double savedSeconds = Math.Max(0.0, analysis.SilenceSeconds - keptSeconds);
-                double cutSeconds = Math.Clamp(analysis.DurationSeconds - savedSeconds, 0.0, analysis.DurationSeconds);
-                bool shouldTrim = analysis.SilenceSeconds >= _settings.Silence.MinSilenceSeconds
-                                  && savedSeconds >= _settings.Silence.MinSavingsSeconds
-                                  && analysis.ReachesSilenceFloor;
-
-                TrackAnalysis updated = analysis with
-                {
-                    CropSeconds = Math.Round(savedSeconds, 2),
-                    CutSeconds = cutSeconds,
-                    ShouldTrim = shouldTrim
-                };
+                TrackAnalysis updated = analysis.WithOptions(options);
 
                 song.Analysis = updated;
-                song.Estatus = shouldTrim ? Song.StatusAnalyzed : Song.StatusNoSilence;
+                song.Estatus = updated.ShouldTrim ? Song.StatusAnalyzed : Song.StatusNoSilence;
                 anyUpdated = true;
             }
 
             if (anyUpdated)
             {
                 int trimmable = _songs.Count(x => x.ShouldTrim);
-                SetStatus($"Tolerancia actualizada a {tolerance:0.0} s. {trimmable} de {_songs.Count} con cola recortable.");
+                SetStatus($"Tolerancia actualizada a {tolerance:0.0} s. {trimmable} de {_songs.Count} con silencio recortable.");
             }
         }
 

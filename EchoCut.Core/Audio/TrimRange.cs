@@ -22,11 +22,6 @@ public readonly record struct TrimRange(double StartSeconds, double EndSeconds)
     /// </value>
     public bool TrimsStart => StartSeconds > 0;
 
-    /// <summary>Tramo que conserva el inicio y corta solo el final.</summary>
-    /// <param name="endSeconds">Instante de corte final, en segundos desde el principio del archivo.</param>
-    /// <returns>Tramo de <c>0</c> a <paramref name="endSeconds"/>.</returns>
-    public static TrimRange EndingAt(double endSeconds) => new(0.0, endSeconds);
-
     /// <summary>Comprueba que el tramo se pueda pasar a FFmpeg.</summary>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Se lanza si algún extremo no es finito, si el inicio es negativo o si el final no queda
