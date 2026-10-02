@@ -10,7 +10,7 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 ## [Sin publicar]
 
 ### Añadido
-* **`TrimRange`**: Valor inmutable con el tramo (inicio y final, en tiempo absoluto del original) que conserva la copia recortada. Base para el recorte del silencio inicial y el ajuste manual desde el espectrograma.
+* **`TrimRange`**: Valor inmutable con el tramo (inicio y final, en tiempo absoluto del original) que conserva la copia recortada. Base para el recorte del silencio inicial y el ajuste manual desde la forma de onda.
 * **Detección y recorte del silencio inicial**: `SilenceDetector.AnalyzeLeadingFrames` analiza el principio invirtiendo en el tiempo su curva de nivel, reutilizando íntegro el algoritmo del final (umbral adaptativo, histéresis, guarda de fundido de entrada y afinación del corte).
 * **Sondeo del principio en `SilenceAnalyzer`**: Ventana inicial de 10 s que se cuadruplica si resulta toda silencio; si la ventana del final ya cubrió el archivo, el principio se analiza sobre las mismas tramas sin decodificar de nuevo.
 * **`AudioDecoder.DecodeRangeIntoAsync`**: Decodificación de un tramo arbitrario, compartiendo con la de la cola el lanzamiento de FFmpeg y la lectura del PCM.
@@ -29,8 +29,13 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 * **Cursor de reproducción**: Al escuchar un borde en `WaveformEditor`, un cursor rojo recorre las vistas con el instante que informa el dispositivo y los botones de escucha pasan a reproducir o detener.
 * **`FFmpegRunner.ReadOutputAsync`**: Lectura a memoria de salidas binarias acotadas de FFmpeg, con la misma gestión de cancelación y errores que el resto del ejecutor.
 
+#### Gestión de Metadatos en Lote
+* **Limpiar metadatos**: Botón **«Limpiar metadatos»** y método `TrackEditor.StripMetadata` que eliminan todas las etiquetas de las pistas cargadas mediante `TagLibSharp`, en paralelo, previa confirmación y con un resumen de los archivos que no se pudieron procesar.
+* **Normalizar**: Botón **«Normalizar»**, método `TrackEditor.NormalizeTrack` y utilidad `TextNormalizer`, que eliminan los acentos diacríticos (conservando la «ñ») y aplican mayúscula inicial a cada palabra en el nombre del archivo y en los metadatos de texto (título, subtítulo, artistas, álbum, género, compositores, copyright y comentarios), previa confirmación.
+
 ### Corregido
 * **Columna «Silencio inicial (s)»**: Se repinta al asignar el análisis; antes podía quedarse vacía hasta el siguiente repintado completo de la fila.
+* **Icono de las ventanas**: Las ventanas de propiedades y de forma de onda muestran el icono de la aplicación, como la principal y la de parámetros avanzados.
 
 ### Modificado
 * **Previsualización con NAudio**: `AudioPreviewPlayer` reproduce PCM estéreo decodificado en memoria con `WaveOut` de NAudio.WinMM en lugar de `SoundPlayer` y un WAV temporal; expone la posición real de reproducción y avisa al terminar, de modo que la rejilla ya no estima el final con un temporizador. NAudio solo se referencia desde el proyecto de interfaz.
