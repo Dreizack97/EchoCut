@@ -26,11 +26,14 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 * **`WaveformView`**: Control con la zona a eliminar resaltada, regla de tiempo y referencias de amplitud; marcas arrastrables o movibles con el teclado y valor expuesto a lectores de pantalla.
 * **Ajuste manual en `Song`**: `ManualRange` prevalece sobre el análisis en el recorte, la previsualización y la columna de recorte, sobrevive a un nuevo análisis y a los cambios de tolerancia durante la sesión, y marca la fila con el nuevo estado «Ajustado».
 * **`AudioDecoder`**: Frecuencia de salida configurable por instancia y `DecodeAllIntoAsync` para decodificar el archivo completo sin acotarlo por la duración de los metadatos.
+* **Cursor de reproducción**: Al escuchar un borde en `WaveformEditor`, un cursor rojo recorre las vistas con el instante que informa el dispositivo y los botones de escucha pasan a reproducir o detener.
+* **`FFmpegRunner.ReadOutputAsync`**: Lectura a memoria de salidas binarias acotadas de FFmpeg, con la misma gestión de cancelación y errores que el resto del ejecutor.
 
 ### Corregido
 * **Columna «Silencio inicial (s)»**: Se repinta al asignar el análisis; antes podía quedarse vacía hasta el siguiente repintado completo de la fila.
 
 ### Modificado
+* **Previsualización con NAudio**: `AudioPreviewPlayer` reproduce PCM estéreo decodificado en memoria con `WaveOut` de NAudio.WinMM en lugar de `SoundPlayer` y un WAV temporal; expone la posición real de reproducción y avisa al terminar, de modo que la rejilla ya no estima el final con un temporizador. NAudio solo se referencia desde el proyecto de interfaz.
 * **`AudioTrimmer` y `TrimRequest`**: El recorte recibe un `TrimRange` en lugar de un único instante de corte. Si el inicio es mayor que cero se añade `-ss` como opción de entrada (antes de `-i`), manteniendo la copia de flujo sin recodificar; si es cero, la línea de órdenes es idéntica a la anterior.
 * **`SilenceResult`**: Pasa a ser un `record` independiente del borde; `TrailingSilenceSeconds` se renombra a `SilenceSeconds`.
 * **Recálculo por tolerancia**: La regla que rehace la decisión al mover la tolerancia pasa de `Main` a `TrackAnalysis.WithOptions`, y también se aplica al aceptar el diálogo Avanzado.
