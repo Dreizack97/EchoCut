@@ -18,6 +18,18 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 * **`EdgeTrim`**: Medida y decisión por borde; `TrackAnalysis` deriva de ambos bordes el tramo conservado, el ahorro total y si procede recortar.
 * **Rejilla y CSV**: Columna «Silencio inicial (s)» y, en el CSV, el inicio de la copia y las métricas de fundido y fondo de cada borde.
 
+#### Forma de Onda y Ajuste Manual del Recorte
+* **`WaveformBuilder` y `Waveform`** (`EchoCut.Core/Waveforms`): Resumen de la señal por bloques de 256 muestras (mínimo, máximo y energía) calculado en streaming sobre `ISampleSink`, con memoria de `ArrayPool`; sirve cualquier nivel de zoom sin volver a decodificar.
+* **`WaveformRenderer`, `AmplitudeScale` y `WaveformPalette`**: Pintado de picos y banda RMS en píxeles ARGB en memoria, en escala lineal o en dB (rango de 60 dB), con los azules de Audacity y una paleta gris para la zona que se eliminaría.
+* **`WaveformService`**: Carga de la pista completa a 44.1 kHz para la vista general y el detalle del principio, y del final con `-sseof` situado con la misma referencia que el corte final.
+* **`WaveformEditor`**: Ventana con la pista completa y el detalle de su principio y su final, marcas y campos numéricos sincronizados, casilla de escala en dB, escucha de cada borde y restablecimiento a la decisión del análisis. Se abre con «Ver forma de onda y ajustar recorte…» en el menú contextual de la rejilla.
+* **`WaveformView`**: Control con la zona a eliminar resaltada, regla de tiempo y referencias de amplitud; marcas arrastrables o movibles con el teclado y valor expuesto a lectores de pantalla.
+* **Ajuste manual en `Song`**: `ManualRange` prevalece sobre el análisis en el recorte, la previsualización y la columna de recorte, sobrevive a un nuevo análisis y a los cambios de tolerancia durante la sesión, y marca la fila con el nuevo estado «Ajustado».
+* **`AudioDecoder`**: Frecuencia de salida configurable por instancia y `DecodeAllIntoAsync` para decodificar el archivo completo sin acotarlo por la duración de los metadatos.
+
+### Corregido
+* **Columna «Silencio inicial (s)»**: Se repinta al asignar el análisis; antes podía quedarse vacía hasta el siguiente repintado completo de la fila.
+
 ### Modificado
 * **`AudioTrimmer` y `TrimRequest`**: El recorte recibe un `TrimRange` en lugar de un único instante de corte. Si el inicio es mayor que cero se añade `-ss` como opción de entrada (antes de `-i`), manteniendo la copia de flujo sin recodificar; si es cero, la línea de órdenes es idéntica a la anterior.
 * **`SilenceResult`**: Pasa a ser un `record` independiente del borde; `TrailingSilenceSeconds` se renombra a `SilenceSeconds`.
