@@ -23,6 +23,9 @@ namespace EchoCut
         /// <summary>Música que se muestra más allá del corte en cada vista de detalle.</summary>
         private const double EdgeContextSeconds = 5.0;
 
+        /// <summary>Texto del botón de escucha mientras su tramo suena.</summary>
+        private const string StopPlaybackText = "⏹ Detener";
+
         private readonly TrackInfo _track;
         private readonly double _durationSeconds;
         private readonly TrimRange? _analysisRange;
@@ -39,6 +42,9 @@ namespace EchoCut
 
         private readonly List<Waveform> _waveforms = [];
         private AudioPreviewPlayer? _player;
+        private Button? _playingButton;
+        private string _playingButtonText = string.Empty;
+        private int _playRequest;
 
         private double _startSeconds;
         private double _endSeconds;
@@ -207,22 +213,48 @@ namespace EchoCut
             ManualRange = _manual ? new TrimRange(_startSeconds, _endSeconds) : null;
 
         private async void btnPlayStart_Click(object? sender, EventArgs e) =>
-            await PlayAsync(new PreviewWindow(_startSeconds, Math.Min(_previewSeconds, _endSeconds - _startSeconds))).ConfigureAwait(true);
+            await TogglePlaybackAsync(
+                btnPlayStart,
+                new PreviewWindow(_startSeconds, Math.Min(_previewSeconds, _endSeconds - _startSeconds))).ConfigureAwait(true);
 
         private async void btnPlayEnd_Click(object? sender, EventArgs e)
         {
             double from = Math.Max(_startSeconds, _endSeconds - _previewSeconds);
-            await PlayAsync(new PreviewWindow(from, _endSeconds - from)).ConfigureAwait(true);
+            await TogglePlaybackAsync(btnPlayEnd, new PreviewWindow(from, _endSeconds - from)).ConfigureAwait(true);
         }
 
-        /// <summary>Reproduce un borde tal como sonaría en la copia recortada.</summary>
+        /// <summary>
+        /// Reproduce un borde tal como sonaría en la copia recortada, o lo detiene si es el que ya
+        /// suena. Mientras suena, el botón ofrece detenerlo y las vistas muestran el cursor.
+        /// </summary>
         /// <remarks>Nunca lanza: es el cuerpo de manejadores <c>async void</c>.</remarks>
-        private async Task PlayAsync(PreviewWindow window)
+        private async Task TogglePlaybackAsync(Button button, PreviewWindow window)
         {
+            bool stopRequested = ReferenceEquals(button, _playingButton);
+            StopPlayback();
+            if (stopRequested)
+            {
+                return;
+            }
+
+            // Un clic posterior invalida este: solo la última petición toca la interfaz al terminar
+            // de decodificar.
+            int request = ++_playRequest;
+
             try
             {
-                _player ??= new AudioPreviewPlayer(_ffmpegPath);
+                _player ??= CreatePlayer();
                 await _player.PlayAsync(_track.FilePath, window, _closing.Token).ConfigureAwait(true);
+
+                if (IsDisposed || request != _playRequest || !_player.IsPlaying)
+                {
+                    return;
+                }
+
+                _playingButton = button;
+                _playingButtonText = button.Text;
+                button.Text = StopPlaybackText;
+                playheadTimer.Start();
             }
             catch (OperationCanceledException)
             {
@@ -234,6 +266,46 @@ namespace EchoCut
                 {
                     MessageBox.Show(this, exception.Message, "No se pudo reproducir", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Crea el reproductor en el hilo de la interfaz, donde avisará del final del tramo para
+        /// devolver el botón y retirar el cursor.
+        /// </summary>
+        private AudioPreviewPlayer CreatePlayer()
+        {
+            AudioPreviewPlayer player = new(_ffmpegPath);
+            player.PlaybackCompleted += (_, _) => StopPlayback();
+            return player;
+        }
+
+        /// <summary>Detiene lo que suene, retira el cursor y devuelve el botón a su texto.</summary>
+        private void StopPlayback()
+        {
+            _playRequest++;
+            _player?.Stop();
+            playheadTimer.Stop();
+
+            foreach (WaveformView view in Views)
+            {
+                view.PlayheadSeconds = null;
+            }
+
+            if (_playingButton is { } button)
+            {
+                button.Text = _playingButtonText;
+                _playingButton = null;
+            }
+        }
+
+        /// <summary>Lleva a las vistas el instante que está sonando, según el propio dispositivo.</summary>
+        private void playheadTimer_Tick(object? sender, EventArgs e)
+        {
+            double? position = _player?.PositionSeconds;
+            foreach (WaveformView view in Views)
+            {
+                view.PlayheadSeconds = position;
             }
         }
 
@@ -276,7 +348,7 @@ namespace EchoCut
         private void WaveformEditor_FormClosing(object? sender, FormClosingEventArgs e)
         {
             _closing.Cancel();
-            _player?.Stop();
+            StopPlayback();
         }
 
         private void WaveformEditor_FormClosed(object? sender, FormClosedEventArgs e)

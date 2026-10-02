@@ -28,6 +28,7 @@ namespace EchoCut
         /// </summary>
         private void InitializeComponent()
         {
+            components = new System.ComponentModel.Container();
             tableMain = new TableLayoutPanel();
             lblTrack = new Label();
             lblOverview = new Label();
@@ -53,6 +54,7 @@ namespace EchoCut
             btnReset = new Button();
             btnAccept = new Button();
             btnCancel = new Button();
+            playheadTimer = new System.Windows.Forms.Timer(components);
             tableMain.SuspendLayout();
             tableEdges.SuspendLayout();
             grpStart.SuspendLayout();
@@ -394,6 +396,11 @@ namespace EchoCut
             btnCancel.Text = "Cancelar";
             btnCancel.UseVisualStyleBackColor = true;
             //
+            // playheadTimer
+            //
+            playheadTimer.Interval = 30;
+            playheadTimer.Tick += playheadTimer_Tick;
+            //
             // WaveformEditor
             //
             AcceptButton = btnAccept;
@@ -460,5 +467,6 @@ namespace EchoCut
         private Button btnReset;
         private Button btnAccept;
         private Button btnCancel;
+        private System.Windows.Forms.Timer playheadTimer;
     }
 }
