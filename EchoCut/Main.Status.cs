@@ -32,8 +32,17 @@ namespace EchoCut
                 return;
             }
 
-            lblStatus.Text = message;
             lblStatus.ToolTipText = message;
+
+            // Mientras la barra muestra la descripción de una opción, el mensaje nuevo espera a
+            // que el ratón la deje; de lo contrario, al salir se restauraría uno ya obsoleto.
+            if (_statusBeforeHint is not null)
+            {
+                _statusBeforeHint = message;
+                return;
+            }
+
+            lblStatus.Text = message;
         }
 
         /// <summary>Hace visible la barra de progreso y el contador para un lote de <paramref name="total"/> pistas.</summary>

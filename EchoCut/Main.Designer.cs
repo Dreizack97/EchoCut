@@ -158,6 +158,7 @@ namespace EchoCut
             mnuWaveform.Name = "mnuWaveform";
             mnuWaveform.Size = new Size(282, 22);
             mnuWaveform.Text = "Ver forma de onda y ajustar recorte…";
+            mnuWaveform.ToolTipText = "Ver la forma de onda de la pista y ajustar a mano el tramo que se conserva";
             mnuWaveform.Click += mnuWaveform_Click;
             // 
             // mnuOpenFolder
@@ -165,6 +166,7 @@ namespace EchoCut
             mnuOpenFolder.Name = "mnuOpenFolder";
             mnuOpenFolder.Size = new Size(282, 22);
             mnuOpenFolder.Text = "Abrir carpeta contenedora";
+            mnuOpenFolder.ToolTipText = "Mostrar el archivo seleccionado en el Explorador";
             mnuOpenFolder.Click += mnuOpenFolder_Click;
             // 
             // mnuOpenAudacity
@@ -173,6 +175,7 @@ namespace EchoCut
             mnuOpenAudacity.ShortcutKeyDisplayString = "Doble clic";
             mnuOpenAudacity.Size = new Size(282, 22);
             mnuOpenAudacity.Text = "Abrir en Audacity";
+            mnuOpenAudacity.ToolTipText = "Abrir las canciones seleccionadas en Audacity";
             mnuOpenAudacity.Click += mnuOpenAudacity_Click;
             // 
             // mnuEditSong
@@ -180,6 +183,7 @@ namespace EchoCut
             mnuEditSong.Name = "mnuEditSong";
             mnuEditSong.Size = new Size(282, 22);
             mnuEditSong.Text = "Editar propiedades";
+            mnuEditSong.ToolTipText = "Ver y editar las etiquetas y el nombre del archivo";
             mnuEditSong.Click += mnuEditSong_Click;
             // 
             // mnuRenameSong
@@ -187,6 +191,7 @@ namespace EchoCut
             mnuRenameSong.Name = "mnuRenameSong";
             mnuRenameSong.Size = new Size(282, 22);
             mnuRenameSong.Text = "Renombrar";
+            mnuRenameSong.ToolTipText = "Cambiar el nombre del archivo directamente en la rejilla";
             mnuRenameSong.Click += mnuRenameSong_Click;
             // 
             // mnuDeleteSong
@@ -194,6 +199,7 @@ namespace EchoCut
             mnuDeleteSong.Name = "mnuDeleteSong";
             mnuDeleteSong.Size = new Size(282, 22);
             mnuDeleteSong.Text = "Eliminar archivo(s)";
+            mnuDeleteSong.ToolTipText = "Eliminar del disco los archivos seleccionados";
             mnuDeleteSong.Click += mnuDeleteSong_Click;
             // 
             // sepColumns
@@ -206,6 +212,7 @@ namespace EchoCut
             mnuColumns.Name = "mnuColumns";
             mnuColumns.Size = new Size(282, 22);
             mnuColumns.Text = "Columnas visibles";
+            mnuColumns.ToolTipText = "Elegir qué columnas muestra la rejilla";
             mnuColumns.DropDownOpening += mnuColumns_DropDownOpening;
             // 
             // columnsMenuStrip
@@ -365,12 +372,14 @@ namespace EchoCut
             mnuMetadata.Name = "mnuMetadata";
             mnuMetadata.Size = new Size(192, 24);
             mnuMetadata.Text = "Metadatos";
+            mnuMetadata.ToolTipText = "Eliminar o agregar etiquetas en todas las canciones cargadas";
             // 
             // mnuCleanMetadata
             // 
             mnuCleanMetadata.Name = "mnuCleanMetadata";
             mnuCleanMetadata.Size = new Size(212, 24);
             mnuCleanMetadata.Text = "Eliminar metadatos";
+            mnuCleanMetadata.ToolTipText = "Eliminar todas las etiquetas de las canciones cargadas";
             mnuCleanMetadata.Click += mnuCleanMetadata_Click;
             // 
             // mnuAddMetadata
@@ -378,6 +387,7 @@ namespace EchoCut
             mnuAddMetadata.Name = "mnuAddMetadata";
             mnuAddMetadata.Size = new Size(212, 24);
             mnuAddMetadata.Text = "Agregar metadatos…";
+            mnuAddMetadata.ToolTipText = "Aplicar artista, título, álbum, género o comentarios a todas las canciones";
             mnuAddMetadata.Click += mnuAddMetadata_Click;
             // 
             // mnuNormalize
@@ -385,6 +395,7 @@ namespace EchoCut
             mnuNormalize.Name = "mnuNormalize";
             mnuNormalize.Size = new Size(192, 24);
             mnuNormalize.Text = "Normalizar…";
+            mnuNormalize.ToolTipText = "Quitar acentos y poner en mayúscula la inicial de cada palabra en las propiedades elegidas";
             mnuNormalize.Click += mnuNormalize_Click;
             // 
             // mnuRename
@@ -393,12 +404,14 @@ namespace EchoCut
             mnuRename.Name = "mnuRename";
             mnuRename.Size = new Size(192, 24);
             mnuRename.Text = "Renombrar";
+            mnuRename.ToolTipText = "Renombrar varias canciones a la vez";
             // 
             // mnuAddSequence
             // 
             mnuAddSequence.Name = "mnuAddSequence";
             mnuAddSequence.Size = new Size(260, 24);
             mnuAddSequence.Text = "Agregar consecutivo…";
+            mnuAddSequence.ToolTipText = "Anteponer un número consecutivo al nombre de las canciones";
             mnuAddSequence.Click += mnuAddSequence_Click;
             // 
             // mnuRemoveLeading
@@ -406,6 +419,7 @@ namespace EchoCut
             mnuRemoveLeading.Name = "mnuRemoveLeading";
             mnuRemoveLeading.Size = new Size(260, 24);
             mnuRemoveLeading.Text = "Quitar caracteres iniciales…";
+            mnuRemoveLeading.ToolTipText = "Quitar caracteres del principio del nombre de las canciones";
             mnuRemoveLeading.Click += mnuRemoveLeading_Click;
             // 
             // sepExplorer

@@ -2,7 +2,7 @@ namespace EchoCut
 {
     /// <summary>
     /// La parte de <see cref="Main"/> que define los atajos de teclado y los da a conocer: en los
-    /// menús y en los tooltips.
+    /// menús, en los tooltips y en la barra de estado.
     /// </summary>
     /// <remarks>
     /// Todos salen de una sola tabla, <see cref="_shortcuts"/>: lo que se anuncia y lo que funciona
@@ -28,6 +28,15 @@ namespace EchoCut
         private sealed record ShortcutBinding(Keys Keys, ToolStripItem Item, ShortcutScope Scope = ShortcutScope.Window);
 
         private IReadOnlyList<ShortcutBinding> _shortcuts = [];
+
+        /// <summary>Descripción de cada opción, sin el atajo, para la barra de estado.</summary>
+        private readonly Dictionary<ToolStripItem, string> _descriptions = [];
+
+        /// <summary>
+        /// Mensaje que había en la barra de estado antes de mostrar una descripción, o <c>null</c>
+        /// si no se está mostrando ninguna.
+        /// </summary>
+        private string? _statusBeforeHint;
 
         /// <summary>Registra los atajos y anuncia cada uno junto a su opción.</summary>
         /// <remarks>
@@ -61,6 +70,11 @@ namespace EchoCut
 
                 new(Keys.Control | Keys.Oemcomma, btnAdvanced),
             ];
+
+            // Las descripciones se toman antes de añadir el atajo a los tooltips.
+            HookHints(toolStrip.Items);
+            HookHints(contextMenuStrip.Items);
+            contextMenuStrip.Closed += (_, _) => HideHint();
 
             foreach (ShortcutBinding shortcut in _shortcuts)
             {
@@ -139,6 +153,86 @@ namespace EchoCut
 
             shortcut.Item.PerformClick();
             return true;
+        }
+
+        // --------------------------------------------------------------- Descripción en la barra
+
+        /// <summary>
+        /// Muestra en la barra de estado qué hace cada opción, y su atajo, al pasar el ratón por ella.
+        /// </summary>
+        /// <remarks>
+        /// La descripción se toma del tooltip de cada opción; en los menús no se muestra como
+        /// tooltip, porque sus desplegables no los muestran, pero sirve de texto para la barra.
+        /// </remarks>
+        private void HookHints(ToolStripItemCollection items)
+        {
+            foreach (ToolStripItem item in items)
+            {
+                if (item is ToolStripSeparator)
+                {
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(item.ToolTipText))
+                {
+                    _descriptions[item] = item.ToolTipText;
+                }
+
+                item.MouseEnter += (_, _) => ShowHint(item);
+                item.MouseLeave += (_, _) => HideHint();
+
+                if (item is ToolStripDropDownItem { DropDownItems.Count: > 0 } dropDown)
+                {
+                    dropDown.DropDown.Closed += (_, _) => HideHint();
+                    HookHints(dropDown.DropDownItems);
+                }
+            }
+        }
+
+        private void ShowHint(ToolStripItem item)
+        {
+            string? keys = _shortcuts.FirstOrDefault(shortcut => shortcut.Item == item) is { } shortcut
+                ? ShortcutText.Of(shortcut.Keys)
+                : null;
+
+            string? description = _descriptions.GetValueOrDefault(item);
+            if (description is null && keys is null)
+            {
+                return;
+            }
+
+            _statusBeforeHint ??= lblStatus.Text;
+            lblStatus.Text = (description, keys) switch
+            {
+                (null, _) => $"{ActionName(item)} · Atajo: {keys}",
+                (_, null) => description,
+                _ => $"{description} · Atajo: {keys}",
+            };
+        }
+
+        /// <summary>Devuelve a la barra de estado el mensaje que había antes de la descripción.</summary>
+        private void HideHint()
+        {
+            if (_statusBeforeHint is not { } previous || !IsAlive)
+            {
+                return;
+            }
+
+            _statusBeforeHint = null;
+            lblStatus.Text = previous;
+        }
+
+        /// <summary>Nombre de una opción sin glifos decorativos ni puntos suspensivos.</summary>
+        private static string ActionName(ToolStripItem item)
+        {
+            string text = (item.Text ?? string.Empty).Replace("&", string.Empty).TrimEnd('…').Trim();
+            int start = 0;
+            while (start < text.Length && !char.IsLetterOrDigit(text[start]))
+            {
+                start++;
+            }
+
+            return text[start..];
         }
     }
 }
