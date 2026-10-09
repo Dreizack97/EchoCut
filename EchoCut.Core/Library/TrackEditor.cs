@@ -183,14 +183,31 @@ public static class TrackEditor
     }
 
     /// <summary>
-    /// Normaliza los metadatos y el nombre de archivo de una pista de audio (eliminando acentos diacríticos,
-    /// preservando la «ñ» / «Ñ» y aplicando TitleCase), y actualiza el archivo en disco.
+    /// Normaliza las propiedades indicadas de una pista —quita los acentos diacríticos conservando
+    /// la «ñ» / «Ñ» y aplica TitleCase— y actualiza el archivo en disco.
     /// </summary>
     /// <param name="filePath">Ruta absoluta del archivo a normalizar.</param>
+    /// <param name="fields">
+    /// Propiedades a normalizar. Por defecto, todas; con <see cref="NormalizableFields.FileName"/>
+    /// el archivo puede quedar renombrado.
+    /// </param>
     /// <returns>La información de pista actualizada tras la normalización y posible renombrado.</returns>
     /// <exception cref="ArgumentException">Si <paramref name="filePath"/> es nulo o está en blanco.</exception>
     /// <exception cref="FileNotFoundException">Si el archivo no existe en disco.</exception>
-    public static TrackInfo NormalizeTrack(string filePath)
+    /// <exception cref="IOException">Si el nombre normalizado ya lo usa otro archivo de la carpeta.</exception>
+    /// <remarks>
+    /// <para>
+    /// Solo se escriben las etiquetas elegidas, y no todas a través de
+    /// <see cref="SaveProperties"/>: aquella vuelve a partir las listas por «;» y «/», lo que
+    /// rompería un intérprete como «AC/DC» aunque el usuario solo hubiera pedido normalizar el
+    /// título. Las listas se normalizan elemento a elemento, conservando su estructura.
+    /// </para>
+    /// <para>
+    /// Si ninguna etiqueta cambia, el archivo no se reescribe: guardar con TagLib reserializa
+    /// todas las etiquetas y altera la fecha de modificación de un archivo que ya estaba bien.
+    /// </para>
+    /// </remarks>
+    public static TrackInfo NormalizeTrack(string filePath, NormalizableFields fields = NormalizableFields.All)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         if (!File.Exists(filePath))
@@ -198,19 +215,119 @@ public static class TrackEditor
             throw new FileNotFoundException("El archivo de audio no existe en disco.", filePath);
         }
 
-        TrackProperties properties = LoadProperties(filePath);
+        NormalizeTags(filePath, fields);
 
-        properties.FileName = TextNormalizer.NormalizeTitleCase(properties.FileName);
-        properties.Title = TextNormalizer.NormalizeTitleCase(properties.Title);
-        properties.Subtitle = TextNormalizer.NormalizeTitleCase(properties.Subtitle);
-        properties.Comment = TextNormalizer.NormalizeTitleCase(properties.Comment);
-        properties.Performers = TextNormalizer.NormalizeTitleCase(properties.Performers);
-        properties.AlbumArtist = TextNormalizer.NormalizeTitleCase(properties.AlbumArtist);
-        properties.Album = TextNormalizer.NormalizeTitleCase(properties.Album);
-        properties.Genre = TextNormalizer.NormalizeTitleCase(properties.Genre);
-        properties.Composers = TextNormalizer.NormalizeTitleCase(properties.Composers);
-        properties.Copyright = TextNormalizer.NormalizeTitleCase(properties.Copyright);
+        string currentPath = filePath;
+        if (fields.HasFlag(NormalizableFields.FileName))
+        {
+            string normalized = TextNormalizer.NormalizeTitleCase(Path.GetFileNameWithoutExtension(filePath));
+            if (!string.IsNullOrWhiteSpace(normalized))
+            {
+                currentPath = Rename(filePath, normalized);
+            }
+        }
 
-        return SaveProperties(properties);
+        return TrackScanner.Read(currentPath);
+    }
+
+    /// <summary>Normaliza las etiquetas elegidas y guarda el archivo solo si alguna cambió.</summary>
+    private static void NormalizeTags(string filePath, NormalizableFields fields)
+    {
+        if ((fields & ~NormalizableFields.FileName) == NormalizableFields.None)
+        {
+            return;
+        }
+
+        using TagLib.File tagFile = TagLib.File.Create(filePath);
+        TagLib.Tag tag = tagFile.Tag;
+        bool changed = false;
+
+        if (fields.HasFlag(NormalizableFields.Title))
+        {
+            changed |= TryNormalize(tag.Title, value => tag.Title = value);
+        }
+
+        if (fields.HasFlag(NormalizableFields.Subtitle))
+        {
+            changed |= TryNormalize(tag.Subtitle, value => tag.Subtitle = value);
+        }
+
+        if (fields.HasFlag(NormalizableFields.Comment))
+        {
+            changed |= TryNormalize(tag.Comment, value => tag.Comment = value);
+        }
+
+        if (fields.HasFlag(NormalizableFields.Performers))
+        {
+            changed |= TryNormalize(tag.Performers, values => tag.Performers = values);
+        }
+
+        if (fields.HasFlag(NormalizableFields.AlbumArtists))
+        {
+            changed |= TryNormalize(tag.AlbumArtists, values => tag.AlbumArtists = values);
+        }
+
+        if (fields.HasFlag(NormalizableFields.Album))
+        {
+            changed |= TryNormalize(tag.Album, value => tag.Album = value);
+        }
+
+        if (fields.HasFlag(NormalizableFields.Genres))
+        {
+            changed |= TryNormalize(tag.Genres, values => tag.Genres = values);
+        }
+
+        if (fields.HasFlag(NormalizableFields.Composers))
+        {
+            changed |= TryNormalize(tag.Composers, values => tag.Composers = values);
+        }
+
+        if (fields.HasFlag(NormalizableFields.Copyright))
+        {
+            changed |= TryNormalize(tag.Copyright, value => tag.Copyright = value);
+        }
+
+        if (changed)
+        {
+            tagFile.Save();
+        }
+    }
+
+    /// <summary>Normaliza un valor de texto y lo asigna solo si cambia.</summary>
+    /// <returns><c>true</c> si el valor cambió y se asignó.</returns>
+    private static bool TryNormalize(string? value, Action<string> assign)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return false;
+        }
+
+        string normalized = TextNormalizer.NormalizeTitleCase(value);
+        if (string.Equals(value, normalized, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        assign(normalized);
+        return true;
+    }
+
+    /// <summary>Normaliza cada elemento de una lista y la asigna solo si alguno cambia.</summary>
+    /// <returns><c>true</c> si la lista cambió y se asignó.</returns>
+    private static bool TryNormalize(string[]? values, Action<string[]> assign)
+    {
+        if (values is not { Length: > 0 })
+        {
+            return false;
+        }
+
+        string[] normalized = [.. values.Select(value => TextNormalizer.NormalizeTitleCase(value))];
+        if (values.SequenceEqual(normalized, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        assign(normalized);
+        return true;
     }
 }
