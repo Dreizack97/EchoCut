@@ -86,7 +86,7 @@ graph TD
             BiquadFilter["Biquad (Paso Alto EBU R128)"]
             Decoder["AudioDecoder (FFmpeg f32le Mono)"]
             Trimmer["AudioTrimmer (FFmpeg -c copy)"]
-            Fader["AudioFader (FadeEnvelope entre dos FFmpeg)"]
+            Renderer["AudioRenderer (PcmEditor entre dos FFmpeg)"]
             Locator["FFmpegLocator"]
         end
 
@@ -192,7 +192,7 @@ EchoCut incluye 24 parámetros calibrados exhaustivamente para música comercial
 
 Gracias a la integración combinada de **TagLibSharp** (lectura de metadatos) y **FFmpeg** (decodificación y copia de flujo), EchoCut soporta 19 extensiones:
 
-| Formato | Extensiones | Corte sin pérdida (`-c copy`) | Fundidos (recodifica) |
+| Formato | Extensiones | Corte sin pérdida (`-c copy`) | Fundidos y borrados (recodifica) |
 | :--- | :--- | :---: | :---: |
 | **MPEG Audio** | `.mp3` | ✅ | ✅ |
 | **Free Lossless Audio Codec** | `.flac` | ✅ | ✅ sin pérdida |
@@ -208,7 +208,7 @@ Gracias a la integración combinada de **TagLibSharp** (lectura de metadatos) y 
 | **WebM / Opus** | `.webm` | ✅ | ✅ |
 | **Audible Audiobooks** | `.aa`, `.aax` | ✅ | ❌ |
 
-Una copia con fundido no puede salir por copia de flujo: se recodifica al **mismo códec** del original (a su misma tasa de bits en los formatos con pérdida, y a su misma resolución en los sin pérdida) y se le copian etiquetas y carátula. Las pistas sin fundido siguen recortándose con `-c copy`. Los formatos marcados con ❌ no tienen codificador en FFmpeg y la copia con fundido falla con un mensaje claro.
+Una copia con fundidos o fragmentos borrados no puede salir por copia de flujo: se recodifica al **mismo códec** del original (a su misma tasa de bits en los formatos con pérdida, y a su misma resolución en los sin pérdida) y se le copian etiquetas y carátula. Las pistas sin ediciones siguen recortándose con `-c copy`. Los formatos marcados con ❌ no tienen codificador en FFmpeg y la copia editada falla con un mensaje claro.
 
 ---
 
@@ -265,8 +265,12 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
    - Las copias resultantes se crearán en la subcarpeta `Recortados/` correspondiente a la carpeta de cada archivo.
 6. **Auditoría, Edición de Metadatos y Gestión**:
    - **Clic derecho sobre una o varias filas**:
-     - *Ver forma de onda y ajustar recorte*: Muestra la forma de onda de la pista completa y, en detalle, su principio y su final con el recorte superpuesto; lo que se eliminaría aparece con fondo gris y onda atenuada, como una selección de Audacity. La casilla *Escala en dB* agranda las colas de fundido y el hiss que en escala lineal parecen una línea plana. Arrastra las marcas con el ratón, muévelas con ← y → (10 ms; 100 ms con Mayús; 1 s con Ctrl) o escribe el instante exacto, y escucha cada borde tal como quedará mientras un cursor rojo recorre la forma de onda (el mismo botón lo detiene). El ajuste manual prevalece sobre el análisis durante la sesión, aunque cambies la tolerancia o vuelvas a analizar, y la fila pasa a estado *Ajustado*. También funciona con pistas sin analizar.
-       - **Fundidos (aparición/desaparición)**: Arrastra sobre el detalle del *inicio* para seleccionar el tramo de la aparición, y sobre el del *final* para el de la desaparición, como una selección de Audacity; arrastra un borde del tramo para ajustarlo (los extremos se adhieren a las marcas de recorte cercanas). También puedes activarlos con su casilla (propone 1 s de aparición desde el inicio de la copia y 3 s de desaparición hasta su final) y escribir los instantes exactos. La curva se elige entre los preajustes de «Adjustable fade» de Audacity —*Lineal* (el Fade In/Out integrado), *Curva S*, *Coseno*, *Redondeada*, *Logarítmica* y *Exponencial*— y su envolvente se dibuja en ámbar sobre la onda. Como en Audacity, el efecto solo toca la selección. La escucha de los bordes ya suena con el fundido aplicado, y la copia que lo lleve se recodifica (ver *Formatos de Audio Compatibles*).
+     - *Ver forma de onda y ajustar recorte*: Abre una ventana propia para la pista; puedes tener varias abiertas a la vez, una por canción, y seguir usando la ventana principal (volver a abrir una canción trae su ventana al frente). Muestra la forma de onda de la pista completa y, en detalle, su principio y su final con el recorte superpuesto; lo que se eliminaría aparece con fondo gris y onda atenuada, como una selección de Audacity. La casilla *Escala en dB* agranda las colas de fundido y el hiss que en escala lineal parecen una línea plana. Arrastra las marcas con el ratón, muévelas con ← y → (10 ms; 100 ms con Mayús; 1 s con Ctrl) o escribe el instante exacto, y escucha cada borde tal como quedará mientras un cursor rojo recorre la forma de onda (el mismo botón lo detiene). El ajuste manual prevalece sobre el análisis durante la sesión, aunque cambies la tolerancia o vuelvas a analizar, y la fila pasa a estado *Ajustado*. También funciona con pistas sin analizar.
+       - **Selección**: Como en Audacity, arrastra sobre cualquiera de las tres vistas —también la de la pista completa— para seleccionar un tramo y después actúa sobre él con los botones de la barra de selección; un clic suelto la quita y `Esc` también. Los bordes de la selección y de los fundidos se pueden arrastrar, y los extremos se adhieren a las marcas de recorte y a los bordes de lo borrado cercanos.
+       - **Fundidos (aparición/desaparición)**: Con un tramo seleccionado, pulsa *Aparición* o *Desaparición*. También puedes activarlos con su casilla (propone 1 s de aparición desde el inicio de la copia y 3 s de desaparición hasta su final) y escribir los instantes exactos. La curva se elige entre los preajustes de «Adjustable fade» de Audacity —*Lineal* (el Fade In/Out integrado), *Curva S*, *Coseno*, *Redondeada*, *Logarítmica* y *Exponencial*— y su envolvente se dibuja en ámbar sobre la onda. Como en Audacity, el efecto solo toca la selección.
+       - **Borrar selección** (`Supr`): Quita de la copia el audio seleccionado y une lo anterior con lo posterior, como el *Borrar* de Audacity: la canción se acorta y el empalme queda en seco, exacto a la muestra. Lo borrado se ve gris y rayado, y la escucha y el cursor lo saltan. Haz clic sobre un fragmento borrado para seleccionarlo entero y pulsa *Restaurar* para devolverlo (restaura solo lo que caiga dentro de la selección).
+       - **Escuchar**: Los bordes y la selección (hasta 30 s) suenan con los fundidos y los borrados ya aplicados. Solo suena una cosa a la vez en toda la aplicación: empezar a escuchar en una ventana detiene lo que sonara en otra.
+       - **Guardar** (`💾 Guardar`): Aplica los ajustes a la fila y escribe la copia en `Recortados/`, sin tocar el original y sin cerrar la ventana; la fila pasa a *Recortado*. *Aceptar* aplica los ajustes y cierra; *Cancelar* cierra y, si hay cambios sin aplicar, pregunta qué hacer con ellos. Una copia con fundidos o borrados se recodifica (ver *Formatos de Audio Compatibles*).
      - *Abrir ubicación*: Revela los archivos en el Explorador de Windows con las canciones seleccionadas.
      - *Abrir en Audacity*: Abre simultáneamente todas las pistas seleccionadas en una sesión de Audacity (o haz doble clic sobre cualquier fila para abrirla de inmediato).
      - *Editar propiedades*: Abre la ventana modal nativa de propiedades para consultar o editar metadatos ID3/Vorbis (título, artistas, año, álbum, etc.) o renombrar el archivo físico en disco.
@@ -303,6 +307,7 @@ El botón **⌨ Atajos** de la barra de herramientas, o `F1`, muestra la lista c
 | Filtro | Ir al filtro / vaciarlo | `Ctrl+F` / `Esc` |
 | Forma de onda | Elegir la marca de inicio o de fin | `Inicio` / `Fin` |
 | Forma de onda | Mover la marca 0,01 s / 0,1 s / 1 s | `←` `→` / `Shift+←` `→` / `Ctrl+←` `→` |
+| Forma de onda | Borrar la selección / quitarla | `Supr` / `Esc` |
 | Opciones | Parámetros avanzados / Atajos de teclado | `Ctrl+,` / `F1` |
 
 Los atajos de la rejilla funcionan con la lista de canciones seleccionada.
