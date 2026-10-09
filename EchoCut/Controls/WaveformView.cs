@@ -38,6 +38,14 @@ public sealed class FadeAdjustedEventArgs(FadeDirection direction, double startS
     public double EndSeconds { get; } = endSeconds;
 }
 
+/// <summary>Instante en el que el usuario hizo clic sin llegar a arrastrar.</summary>
+/// <param name="seconds">Instante, en segundos del archivo.</param>
+public sealed class WaveformClickEventArgs(double seconds) : EventArgs
+{
+    /// <value>Instante del clic, en segundos del archivo.</value>
+    public double Seconds { get; } = seconds;
+}
+
 /// <summary>
 /// Muestra un tramo de una <see cref="Waveforms.Waveform"/> con las marcas de recorte superpuestas
 /// y permite moverlas con el ratón o con el teclado.
@@ -57,10 +65,11 @@ public sealed class FadeAdjustedEventArgs(FadeDirection direction, double startS
 /// </para>
 /// <para>
 /// Selección: como en Audacity, arrastrar fuera de las marcas selecciona un tramo, y lo que se haga
-/// con él —un fundido, borrarlo— lo decide quien contiene la vista. Un clic suelto quita la
-/// selección, salvo sobre un fragmento borrado, que lo selecciona entero para poder restaurarlo.
-/// Los bordes de la selección y de los fundidos se pueden arrastrar, y los extremos se adhieren a
-/// las marcas de recorte y a los bordes de lo borrado cercanos.
+/// con él —un fundido, borrarlo— lo decide quien contiene la vista. Un clic suelto no selecciona:
+/// avisa con <see cref="WaveformClicked"/> y quien contiene la vista decide si sitúa el cursor de
+/// reproducción, selecciona un fragmento borrado o muestra un fundido. Los bordes de la selección
+/// y de los fundidos se pueden arrastrar, y los extremos se adhieren a las marcas de recorte y a
+/// los bordes de lo borrado cercanos.
 /// </para>
 /// <para>
 /// Zoom: la rueda desplaza la vista y Ctrl+rueda acerca o aleja alrededor del puntero, siempre
@@ -95,6 +104,9 @@ public sealed class WaveformView : Control
     /// <summary>Rayado de lo borrado: la forma, y no solo el gris, lo distingue de lo que quita el recorte.</summary>
     private static readonly Color DeletedHatchColor = Color.FromArgb(150, 0x40, 0x40, 0x40);
 
+    /// <summary>Gris oscuro del cursor de reproducción en reposo: contrasta 12.6:1 con el fondo blanco.</summary>
+    private static readonly Color CursorColor = Color.FromArgb(0x33, 0x33, 0x33);
+
     /// <summary>
     /// Tramo visible más corto: unos cuantos bloques del resumen de la onda. Por debajo, la imagen
     /// no tiene más detalle que mostrar.
@@ -128,6 +140,7 @@ public sealed class WaveformView : Control
     private double _viewEndSeconds = 1.0;
     private double _scrollMinSeconds;
     private double _scrollMaxSeconds = 1.0;
+    private double? _cursorSeconds;
     private double _startMarkerSeconds;
     private double _endMarkerSeconds = 1.0;
     private bool _showStartMarker = true;
@@ -185,10 +198,29 @@ public sealed class WaveformView : Control
     [Description("Se produce mientras el usuario arrastra un borde de un fundido.")]
     public event EventHandler<FadeAdjustedEventArgs>? FadeAdjusted;
 
+    /// <summary>Se produce con un clic que no llegó a arrastrar fuera de las marcas.</summary>
+    [Category("Forma de onda")]
+    [Description("Se produce con un clic sin arrastre sobre la forma de onda.")]
+    public event EventHandler<WaveformClickEventArgs>? WaveformClicked;
+
     /// <summary>Se produce cuando cambia el tramo visible, por zoom o desplazamiento.</summary>
     [Category("Forma de onda")]
     [Description("Se produce cuando cambia el tramo visible.")]
     public event EventHandler? ViewChanged;
+
+    /// <summary>Punto desde el que sonará la reproducción si no hay selección.</summary>
+    /// <value>Segundos del archivo, o <c>null</c> si no se fijó.</value>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public double? CursorSeconds
+    {
+        get => _cursorSeconds;
+        set
+        {
+            _cursorSeconds = value;
+            Invalidate();
+        }
+    }
 
     /// <summary>Fundidos que se dibujan sobre la onda.</summary>
     /// <value>Los fundidos de la pista, o <c>null</c> si no hay ninguno.</value>
@@ -500,6 +532,11 @@ public sealed class WaveformView : Control
             DrawMarker(g, image, TrimMarker.End, _endMarkerSeconds);
         }
 
+        if (_cursorSeconds is { } cursor && _playheadSeconds is null)
+        {
+            DrawCursor(g, image, cursor);
+        }
+
         if (_playheadSeconds is { } playhead)
         {
             DrawPlayhead(g, image, playhead);
@@ -634,13 +671,11 @@ public sealed class WaveformView : Control
     /// <inheritdoc/>
     protected override void OnMouseUp(MouseEventArgs e)
     {
-        // Un clic que no llegó a arrastrar quita la selección, como en Audacity; sobre lo borrado,
-        // lo selecciona entero, que es lo que hace falta para restaurarlo.
+        // Un clic que no llegó a arrastrar no es una selección: lo interpreta quien contiene la
+        // vista, que sabe si toca situar el cursor, seleccionar lo borrado o mostrar un fundido.
         if (_dragTarget == DragTarget.Selection && !_dragStarted)
         {
-            _selection = _deletions.RegionAt(SecondsAt(e.X));
-            Invalidate();
-            SelectionChanged?.Invoke(this, EventArgs.Empty);
+            WaveformClicked?.Invoke(this, new WaveformClickEventArgs(Math.Clamp(SecondsAt(e.X), 0.0, _durationSeconds)));
         }
 
         EndDrag();
@@ -1102,6 +1137,23 @@ public sealed class WaveformView : Control
         g.FillRectangle(active ? Brushes.Yellow : Brushes.White, box);
         g.DrawRectangle(Pens.Black, box);
         TextRenderer.DrawText(g, label, Font, box, Color.Black, TextFormatFlags.NoPadding);
+    }
+
+    /// <summary>
+    /// Dibuja el punto desde el que sonará la reproducción: una línea gris oscura discontinua. El
+    /// trazo, y no solo el color, lo distingue del cursor que avanza mientras suena, que es rojo,
+    /// continuo y con triángulo.
+    /// </summary>
+    private void DrawCursor(Graphics g, Rectangle image, double seconds)
+    {
+        float x = XFor(seconds);
+        if (x < 0 || x > image.Width)
+        {
+            return;
+        }
+
+        using Pen line = new(CursorColor, LogicalToDeviceUnits(1)) { DashStyle = DashStyle.Dot };
+        g.DrawLine(line, x, 0, x, image.Bottom);
     }
 
     /// <summary>

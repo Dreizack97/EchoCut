@@ -5,28 +5,60 @@ using EchoCut.Playback;
 namespace EchoCut
 {
     /// <summary>
-    /// La parte de <see cref="WaveformEditor"/> que escucha: los bordes y la selección, tal como
-    /// sonarán en la copia, con el cursor de reproducción sobre las vistas.
+    /// La parte de <see cref="WaveformEditor"/> que escucha: la reproducción general (Espacio), los
+    /// bordes de la copia y el cursor que recorre las vistas mientras suena.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Lo que suena pasa por las mismas ediciones que la copia —fundidos y borrados—, así que se
     /// juzga de oído exactamente lo que se va a guardar.
+    /// </para>
+    /// <para>
+    /// Como en Audacity, la reproducción general suena la selección si la hay y, si no, desde el
+    /// punto marcado con un clic; sin ninguno de los dos, desde el comienzo de la copia.
+    /// </para>
     /// </remarks>
     public partial class WaveformEditor
     {
-        /// <summary>Texto del botón de escucha mientras su tramo suena.</summary>
+        /// <summary>Texto de los botones de escucha mientras su tramo suena.</summary>
         private const string StopPlaybackText = "⏹ Detener";
 
         /// <summary>
-        /// Lo más que se escucha de una selección. El reproductor retiene el tramo en memoria, y
-        /// medio minuto basta para juzgar un fundido o un empalme sin cargar una canción entera.
+        /// Lo más que suena de una vez. El reproductor retiene el tramo en memoria, y medio minuto
+        /// basta para juzgar un fundido o un empalme sin cargar una canción entera.
         /// </summary>
-        private const double MaximumSelectionPlaybackSeconds = 30.0;
+        private const double MaximumPlaybackSeconds = 30.0;
 
         private AudioPreviewPlayer? _player;
-        private Button? _playingButton;
-        private string _playingButtonText = string.Empty;
+        private object? _playingItem;
+        private string _playingItemText = string.Empty;
         private int _playRequest;
+        private double? _cursorSeconds;
+
+        /// <summary>Marca en todas las vistas el punto desde el que sonará la reproducción general.</summary>
+        private void SetCursor(double? seconds)
+        {
+            _cursorSeconds = seconds;
+            foreach (WaveformView view in Views)
+            {
+                view.CursorSeconds = seconds;
+            }
+        }
+
+        private async void btnPlay_Click(object? sender, EventArgs e) =>
+            await TogglePlaybackAsync(btnPlay, PlaybackWindow()).ConfigureAwait(true);
+
+        /// <summary>Qué suena con la reproducción general: la selección, o desde el cursor, o desde el comienzo de la copia.</summary>
+        private PreviewWindow PlaybackWindow()
+        {
+            if (_selection is { } selection)
+            {
+                return new PreviewWindow(selection.StartSeconds, Math.Min(selection.DurationSeconds, MaximumPlaybackSeconds));
+            }
+
+            double from = _cursorSeconds is { } cursor && cursor < _endSeconds ? cursor : _startSeconds;
+            return new PreviewWindow(from, Math.Min(MaximumPlaybackSeconds, Math.Max(WaveformView.MinimumGapSeconds, _endSeconds - from)));
+        }
 
         private async void btnPlayStart_Click(object? sender, EventArgs e) =>
             await TogglePlaybackAsync(
@@ -39,25 +71,22 @@ namespace EchoCut
             await TogglePlaybackAsync(btnPlayEnd, new PreviewWindow(from, _endSeconds - from)).ConfigureAwait(true);
         }
 
-        private async void btnSelPlay_Click(object? sender, EventArgs e)
-        {
-            if (_selection is { } selection)
-            {
-                PreviewWindow window = new(selection.StartSeconds, Math.Min(selection.DurationSeconds, MaximumSelectionPlaybackSeconds));
-                await TogglePlaybackAsync(btnSelPlay, window).ConfigureAwait(true);
-            }
-        }
-
         /// <summary>
         /// Reproduce un tramo tal como sonaría en la copia, o lo detiene si es el que ya suena.
-        /// Mientras suena, el botón ofrece detenerlo y las vistas muestran el cursor.
+        /// Mientras suena, el botón que lo pidió ofrece detenerlo y las vistas muestran el cursor.
         /// </summary>
-        /// <remarks>Nunca lanza: es el cuerpo de manejadores <c>async void</c>.</remarks>
-        private async Task TogglePlaybackAsync(Button button, PreviewWindow window)
+        /// <param name="item">Botón o elemento de la barra que pidió la escucha.</param>
+        /// <param name="window">Tramo a reproducir.</param>
+        /// <remarks>
+        /// Pulsar cualquier botón de escucha mientras algo suena lo detiene, sin empezar otra cosa: es
+        /// lo que se espera de Espacio, que alterna entre sonar y callar.
+        /// </remarks>
+        private async Task TogglePlaybackAsync(object item, PreviewWindow window)
         {
-            bool stopRequested = ReferenceEquals(button, _playingButton);
+            bool wasPlaying = _playingItem is not null;
+            bool sameItem = ReferenceEquals(item, _playingItem);
             StopPlayback();
-            if (stopRequested)
+            if (sameItem || (wasPlaying && ReferenceEquals(item, btnPlay)))
             {
                 return;
             }
@@ -76,9 +105,9 @@ namespace EchoCut
                     return;
                 }
 
-                _playingButton = button;
-                _playingButtonText = button.Text;
-                button.Text = StopPlaybackText;
+                _playingItem = item;
+                _playingItemText = TextOf(item);
+                SetText(item, StopPlaybackText);
                 playheadTimer.Start();
             }
             catch (OperationCanceledException)
@@ -118,10 +147,10 @@ namespace EchoCut
                 view.PlayheadSeconds = null;
             }
 
-            if (_playingButton is { } button)
+            if (_playingItem is { } item)
             {
-                button.Text = _playingButtonText;
-                _playingButton = null;
+                SetText(item, _playingItemText);
+                _playingItem = null;
             }
         }
 
@@ -132,6 +161,27 @@ namespace EchoCut
             foreach (WaveformView view in Views)
             {
                 view.PlayheadSeconds = position;
+            }
+        }
+
+        private static string TextOf(object item) => item switch
+        {
+            ToolStripItem toolItem => toolItem.Text ?? string.Empty,
+            Control control => control.Text,
+            _ => string.Empty,
+        };
+
+        private static void SetText(object item, string text)
+        {
+            switch (item)
+            {
+                case ToolStripItem toolItem:
+                    toolItem.Text = text;
+                    break;
+
+                case Control control:
+                    control.Text = text;
+                    break;
             }
         }
     }

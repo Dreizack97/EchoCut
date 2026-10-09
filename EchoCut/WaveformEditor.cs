@@ -14,15 +14,20 @@ namespace EchoCut
     /// </summary>
     /// <remarks>
     /// <para>
+    /// Sigue el estilo de la ventana principal: una barra de herramientas con las acciones, una barra
+    /// de estado que describe cada opción y resume el resultado, y atajos anunciados en cada tooltip
+    /// y reunidos en «Atajos» (F1). A la derecha, un inspector muestra la copia y los detalles de lo
+    /// que se haya seleccionado: la selección, un fundido o un fragmento borrado.
+    /// </para>
+    /// <para>
     /// Es una ventana sin modo: se pueden tener varias abiertas, una por pista, y seguir usando la
     /// ventana principal. Por eso no toca la fila por su cuenta: avisa con <see cref="Applied"/> y
     /// expone sus decisiones en <see cref="ManualRange"/> y <see cref="Edits"/>, y quien la abre las
     /// aplica, igual que con el diálogo de propiedades.
     /// </para>
     /// <para>
-    /// Las ediciones siguen el modelo de Audacity: se selecciona un tramo en cualquier vista y
-    /// después se actúa sobre él (aparición, desaparición, borrar o restaurar). Los campos numéricos
-    /// de los fundidos ofrecen lo mismo desde el teclado.
+    /// El resto vive en archivos parciales: la edición y el inspector, el historial de deshacer, la
+    /// escucha, el zoom y la ayuda.
     /// </para>
     /// </remarks>
     public partial class WaveformEditor : Form
@@ -54,14 +59,11 @@ namespace EchoCut
         private bool _manual;
         private bool _syncing;
 
-        /// <summary>Si hay cambios que todavía no se llevaron a la fila.</summary>
-        private bool _dirty;
-
         /// <summary>Si se está guardando: la ventana no se puede cerrar ni editar a medias.</summary>
         private bool _saving;
 
-        /// <summary>Resultado del último guardado, que el resumen muestra hasta el siguiente cambio.</summary>
-        private string _saveNote = string.Empty;
+        /// <summary>Si hay cambios que todavía no se llevaron a la fila.</summary>
+        private bool _dirty;
 
         /// <summary>Prepara la ventana para una pista, partiendo de lo que ya tenga decidido su fila.</summary>
         /// <param name="song">Fila de la pista a mostrar.</param>
@@ -95,43 +97,33 @@ namespace EchoCut
             _fadeIn = song.Edits?.Fades?.FadeIn;
             _fadeOut = song.Edits?.Fades?.FadeOut;
             _deletions = song.Edits?.Deletions ?? DeletedRegions.Empty;
+            _lastCurveIn = _fadeIn?.Curve ?? FadeCurve.Linear;
+            _lastCurveOut = _fadeOut?.Curve ?? FadeCurve.Linear;
 
             ShowTrackName();
             song.PropertyChanged += Song_PropertyChanged;
             btnReset.Text = _analysisRange is null ? "Quitar ajuste" : "Restablecer análisis";
 
-            foreach (NumericUpDown field in (NumericUpDown[])[numStart, numEnd, numFadeInStart, numFadeInEnd, numFadeOutStart, numFadeOutEnd])
+            foreach (NumericUpDown field in (NumericUpDown[])[numStart, numEnd, numFrom, numTo])
             {
                 field.Maximum = (decimal)_durationSeconds;
             }
 
-            foreach (ComboBox combo in (ComboBox[])[cmbFadeInCurve, cmbFadeOutCurve])
-            {
-                combo.Items.AddRange([.. FadeText.Curves.Select(FadeText.Name)]);
-            }
-
-            cmbFadeInCurve.SelectedIndex = CurveIndex(_fadeIn?.Curve ?? FadeCurve.Linear);
-            cmbFadeOutCurve.SelectedIndex = CurveIndex(_fadeOut?.Curve ?? FadeCurve.Linear);
+            cmbCurve.Items.AddRange([.. FadeText.Curves.Select(FadeText.Name)]);
 
             // Cada vista de detalle abarca su silencio y unos segundos de música, para juzgar el corte
             // en contexto aunque la pista arrastre silencios largos, y el fundido que ya tuviera.
             double headSeconds = Math.Min(_durationSeconds, Math.Max(MinimumEdgeWindowSeconds, Math.Max(current.StartSeconds, _fadeIn?.EndSeconds ?? 0.0) + EdgeContextSeconds));
             double tailSeconds = Math.Min(_durationSeconds, Math.Max(MinimumEdgeWindowSeconds, _durationSeconds - Math.Min(current.EndSeconds, _fadeOut?.StartSeconds ?? _durationSeconds) + EdgeContextSeconds));
-
-            viewOverview.SetView(_durationSeconds, 0.0, _durationSeconds);
-            viewStart.SetView(_durationSeconds, 0.0, headSeconds);
-            viewEnd.SetView(_durationSeconds, _durationSeconds - tailSeconds, _durationSeconds);
-
-            foreach (WaveformView view in Views)
-            {
-                view.StatusText = "Calculando forma de onda…";
-            }
+            InitializeViews(headSeconds, tailSeconds);
 
             ApplyRange(current.StartSeconds, current.EndSeconds);
             ApplyFades();
             ApplyDeletions();
             ApplySelection(null);
-            _dirty = false;
+            ShowInspector(InspectorTarget.None);
+            InitializeHelp();
+            MarkApplied();
         }
 
         /// <summary>Se produce cuando el usuario pide llevar sus decisiones a la fila, al aceptar o al guardar.</summary>
@@ -160,31 +152,8 @@ namespace EchoCut
         /// <remarks>Para cuando la fila deja de existir: preguntar si aplicar a algo que ya no está no tiene sentido.</remarks>
         public void Discard()
         {
-            _dirty = false;
+            MarkApplied();
             Close();
-        }
-
-        /// <inheritdoc/>
-        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
-        {
-            // Supr y Esc actúan sobre la selección salvo mientras se escribe en un campo, donde
-            // conservan su significado de siempre.
-            if (ActiveControl is not (NumericUpDown or TextBoxBase or ComboBox))
-            {
-                if (keyData == Keys.Delete && btnSelDelete.Enabled)
-                {
-                    DeleteSelection();
-                    return true;
-                }
-
-                if (keyData == Keys.Escape && _selection is not null)
-                {
-                    ApplySelection(null);
-                    return true;
-                }
-            }
-
-            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private async void WaveformEditor_Shown(object? sender, EventArgs e)
@@ -255,6 +224,8 @@ namespace EchoCut
             }
         }
 
+        // ------------------------------------------------------------------------------- Recorte
+
         private void View_MarkersChanged(object? sender, EventArgs e)
         {
             if (sender is WaveformView view)
@@ -289,104 +260,13 @@ namespace EchoCut
             MarkDirty();
         }
 
-        private void chkDecibels_CheckedChanged(object? sender, EventArgs e)
-        {
-            AmplitudeScale scale = chkDecibels.Checked ? AmplitudeScale.Decibels : AmplitudeScale.Linear;
-            foreach (WaveformView view in Views)
-            {
-                view.AmplitudeScale = scale;
-            }
-        }
-
         private void btnReset_Click(object? sender, EventArgs e)
         {
             TrimRange range = _analysisRange ?? new TrimRange(0.0, _durationSeconds);
             _manual = false;
             ApplyRange(range.StartSeconds, range.EndSeconds);
             MarkDirty();
-        }
-
-        private void btnAccept_Click(object? sender, EventArgs e)
-        {
-            Apply();
-            Close();
-        }
-
-        private void btnCancel_Click(object? sender, EventArgs e) => Close();
-
-        /// <summary>Lleva las decisiones a la fila y escribe la copia sin cerrar la ventana.</summary>
-        /// <remarks>Nunca lanza: es el cuerpo de un manejador <c>async void</c>.</remarks>
-        private async void btnSave_Click(object? sender, EventArgs e)
-        {
-            if (Edits is { } edits && edits.KeptSeconds(KeptRange) < WaveformView.MinimumGapSeconds)
-            {
-                MessageBox.Show(this, "Lo borrado no deja audio en la copia: restaura algo antes de guardar.", "Nada que guardar", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            StopPlayback();
-            SetSaving(true);
-            try
-            {
-                string? written = await _save(this).ConfigureAwait(true);
-                if (IsDisposed)
-                {
-                    return;
-                }
-
-                if (written is not null)
-                {
-                    _dirty = false;
-                    _saveNote = $"Guardado en «{Path.GetFileName(Path.GetDirectoryName(written))}{Path.DirectorySeparatorChar}{Path.GetFileName(written)}».";
-                }
-                else
-                {
-                    _saveNote = "No se guardó la copia; el motivo está en la ventana principal.";
-                }
-            }
-            catch (Exception exception)
-            {
-                if (!IsDisposed)
-                {
-                    _saveNote = $"No se guardó la copia: {exception.Message}";
-                }
-            }
-            finally
-            {
-                if (!IsDisposed)
-                {
-                    SetSaving(false);
-                    UpdateSummary();
-                }
-            }
-        }
-
-        /// <summary>Avisa a quien abrió la ventana para que lleve las decisiones a la fila.</summary>
-        internal void Apply()
-        {
-            Applied?.Invoke(this, EventArgs.Empty);
-            _dirty = false;
-        }
-
-        /// <summary>Mientras se guarda, nada de la ventana se puede tocar.</summary>
-        private void SetSaving(bool saving)
-        {
-            _saving = saving;
-            tableMain.Enabled = !saving;
-            UseWaitCursor = saving;
-            if (saving)
-            {
-                _saveNote = "Guardando la copia…";
-                UpdateSummary();
-            }
-        }
-
-        /// <summary>Anota que hay cambios sin llevar a la fila; el aviso del último guardado ya no vale.</summary>
-        private void MarkDirty()
-        {
-            _dirty = true;
-            _saveNote = string.Empty;
-            UpdateSummary();
+            SetStatus(_analysisRange is null ? "Se quitó el ajuste: la copia conserva la pista completa." : "Se restableció el recorte del análisis.");
         }
 
         /// <summary>Lleva el tramo a todas las vistas, a los campos numéricos y al resumen.</summary>
@@ -414,21 +294,93 @@ namespace EchoCut
             UpdateSummary();
         }
 
-        private void UpdateSummary()
+        // -------------------------------------------------------------------- Aplicar y guardar
+
+        private void btnAccept_Click(object? sender, EventArgs e)
         {
-            double removedStart = _startSeconds;
-            double removedEnd = _durationSeconds - _endSeconds;
-            string origin = _manual ? "Ajuste manual." : _analysisRange is null ? "Sin análisis." : "Según el análisis.";
-
-            string trim = removedStart + removedEnd < 0.0005
-                ? $"No se recorta nada en los bordes. {origin}"
-                : $"Se eliminarán {removedStart:0.00} s al inicio y {removedEnd:0.00} s al final. {origin}";
-
-            // Tres líneas como mucho: el recorte con lo borrado, los fundidos con su consecuencia y el
-            // resultado del último guardado.
-            List<string> lines = [trim + DescribeDeletions(), string.Join(" ", DescribeEdits()), _saveNote];
-            lblSummary.Text = string.Join(Environment.NewLine, lines.Where(line => line.Length > 0));
+            Apply();
+            Close();
         }
+
+        private void btnCancel_Click(object? sender, EventArgs e) => Close();
+
+        /// <summary>Lleva las decisiones a la fila y escribe la copia sin cerrar la ventana.</summary>
+        /// <remarks>Nunca lanza: es el cuerpo de un manejador <c>async void</c>.</remarks>
+        private async void btnSave_Click(object? sender, EventArgs e)
+        {
+            if (_saving)
+            {
+                return;
+            }
+
+            if (Edits is { } edits && edits.KeptSeconds(KeptRange) < WaveformView.MinimumGapSeconds)
+            {
+                MessageBox.Show(this, "Lo borrado no deja audio en la copia: restaura algo antes de guardar.", "Nada que guardar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            StopPlayback();
+            SetSaving(true);
+            try
+            {
+                string? written = await _save(this).ConfigureAwait(true);
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                SetStatus(written is not null
+                    ? $"Guardado en «{Path.GetFileName(Path.GetDirectoryName(written))}{Path.DirectorySeparatorChar}{Path.GetFileName(written)}»."
+                    : "No se guardó la copia; el motivo está en la ventana principal.");
+            }
+            catch (Exception exception)
+            {
+                if (!IsDisposed)
+                {
+                    SetStatus($"No se guardó la copia: {exception.Message}");
+                }
+            }
+            finally
+            {
+                if (!IsDisposed)
+                {
+                    SetSaving(false);
+                }
+            }
+        }
+
+        /// <summary>Avisa a quien abrió la ventana para que lleve las decisiones a la fila.</summary>
+        internal void Apply()
+        {
+            Applied?.Invoke(this, EventArgs.Empty);
+            MarkApplied();
+        }
+
+        /// <summary>Mientras se guarda, nada de la ventana se puede tocar.</summary>
+        private void SetSaving(bool saving)
+        {
+            _saving = saving;
+            tableMain.Enabled = !saving;
+            toolStrip.Enabled = !saving;
+            UseWaitCursor = saving;
+            if (saving)
+            {
+                SetStatus("Guardando la copia…");
+            }
+        }
+
+        /// <value><c>true</c> si hay cambios que todavía no se llevaron a la fila.</value>
+        private bool IsDirty => _dirty;
+
+        /// <summary>Anota que hubo un cambio sin llevar a la fila y lo refleja en el resumen.</summary>
+        private void MarkDirty()
+        {
+            _dirty = true;
+            UpdateSummary();
+        }
+
+        /// <summary>Anota que lo que hay ahora es lo que tiene la fila.</summary>
+        private void MarkApplied() => _dirty = false;
 
         /// <summary>Si hay cambios sin aplicar, pregunta qué hacer con ellos antes de cerrar.</summary>
         private void WaveformEditor_FormClosing(object? sender, FormClosingEventArgs e)
@@ -439,7 +391,7 @@ namespace EchoCut
                 return;
             }
 
-            if (_dirty)
+            if (IsDirty)
             {
                 DialogResult answer = MessageBox.Show(
                     this,
