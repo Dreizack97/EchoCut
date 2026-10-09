@@ -1,4 +1,5 @@
 using EchoCut.Audio;
+using EchoCut.Library;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -27,6 +28,22 @@ public sealed class AppSettings
     /// <summary>Parámetros del algoritmo editables desde el diálogo "Avanzado".</summary>
     /// <value>Instancia de <see cref="SilenceOptions"/> vigente.</value>
     public SilenceOptions Silence { get; set; } = new();
+
+    /// <summary>Columnas de la rejilla que el usuario ocultó.</summary>
+    /// <value>
+    /// Nombres de las columnas ocultas, que coinciden con las propiedades de la fila que muestran.
+    /// Se guardan como texto y no como índices para que añadir o reordenar columnas en una versión
+    /// posterior no oculte por error una columna distinta; los nombres que ya no existan se ignoran.
+    /// </value>
+    public List<string> HiddenColumns { get; set; } = [];
+
+    /// <summary>Propiedades que la acción «Normalizar» modifica.</summary>
+    /// <value>
+    /// Las elegidas la última vez; por defecto, todas, que es lo que la acción normalizaba antes de
+    /// poder elegir. Se guarda como número y no como nombres: una versión anterior que lea un campo
+    /// añadido después solo descarta un bit, en vez de fallar al leer el JSON entero.
+    /// </value>
+    public NormalizableFields NormalizeFields { get; set; } = NormalizableFields.All;
 
     /// <summary>
     /// Por defecto se acotan los hilos: pasado cierto punto el cuello de botella deja de ser la CPU.
@@ -68,6 +85,18 @@ public sealed class AppSettings
                     // es lo que evita que un JSON retocado reviente el análisis mucho más adelante.
                     loaded.Silence.Normalize();
                     loaded.ThreadCount = Math.Clamp(loaded.ThreadCount, 1, 64);
+                    loaded.HiddenColumns = loaded.HiddenColumns?
+                        .Where(name => !string.IsNullOrWhiteSpace(name))
+                        .Distinct(StringComparer.Ordinal)
+                        .ToList() ?? [];
+
+                    // Bits que esta versión no conoce, o una selección vacía que el diálogo nunca
+                    // guardaría, vuelven a un valor con el que la acción tenga sentido.
+                    loaded.NormalizeFields &= NormalizableFields.All;
+                    if (loaded.NormalizeFields == NormalizableFields.None)
+                    {
+                        loaded.NormalizeFields = NormalizableFields.All;
+                    }
                     return loaded;
                 }
             }
