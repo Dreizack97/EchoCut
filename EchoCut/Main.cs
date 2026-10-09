@@ -643,7 +643,7 @@ namespace EchoCut
 
             List<TrimRequest> targets = _songs
                 .Where(x => x.ShouldTrim && x.TrimRange is not null)
-                .Select(x => new TrimRequest(x.Track, x.TrimRange!.Value))
+                .Select(x => new TrimRequest(x.Track, x.TrimRange!.Value, x.Fades))
                 .ToList();
 
             if (targets.Count == 0)
@@ -787,7 +787,7 @@ namespace EchoCut
             try
             {
                 Task<TrimOutcome> trim = _trimmer.TrimOneAsync(
-                    new TrimRequest(song.Track, range),
+                    new TrimRequest(song.Track, range, song.Fades),
                     outputDirectory,
                     cts.Token);
 
