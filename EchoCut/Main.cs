@@ -85,6 +85,7 @@ namespace EchoCut
 
             UpdateButtons();
             RefreshSummary();
+            InitializeShortcuts();
         }
 
         /// <summary>
@@ -1079,52 +1080,6 @@ namespace EchoCut
             Close();
         }
 
-        /// <summary>
-        /// Atajos de teclado de la barra de herramientas, anunciados en el tooltip de cada botón.
-        /// </summary>
-        /// <remarks>
-        /// <see cref="ToolStripButton"/> no admite <c>ShortcutKeys</c>, así que se resuelven aquí.
-        /// Pasar por <see cref="ToolStripItem.PerformClick"/> respeta el estado habilitado: un atajo
-        /// nunca dispara lo que el botón, deshabilitado, no permitiría. Esc solo se consume si hay
-        /// algo que detener, para no robárselo a la edición de los controles numéricos.
-        /// Ctrl+F lleva al filtro y, dentro de él, Esc lo vacía antes que detener un lote: es la
-        /// acción más cercana a donde está el foco.
-        /// </remarks>
-        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
-        {
-            if (keyData == (Keys.Control | Keys.F))
-            {
-                txtFilter.Focus();
-                txtFilter.SelectAll();
-                return true;
-            }
-
-            if (keyData == Keys.Escape && txtFilter.Focused && txtFilter.TextLength > 0)
-            {
-                ClearFilter();
-                return true;
-            }
-
-            ToolStripItem? target = keyData switch
-            {
-                Keys.Control | Keys.O => btnFile,
-                Keys.Control | Keys.Shift | Keys.O => btnPath,
-                Keys.F5 => btnAnalyze,
-                Keys.Control | Keys.R => btnCropAll,
-                Keys.Control | Keys.E => btnExport,
-                Keys.Escape when btnStop.Enabled => btnStop,
-                _ => null,
-            };
-
-            if (target is { Enabled: true })
-            {
-                target.PerformClick();
-                return true;
-            }
-
-            return base.ProcessCmdKey(ref msg, keyData);
-        }
-
         private static decimal Clamp(NumericUpDown control, double value) =>
             Math.Clamp((decimal)value, control.Minimum, control.Maximum);
 
@@ -1147,10 +1102,25 @@ namespace EchoCut
                     dataGrid.ClearSelection();
                     dataGrid.CurrentCell = cell;
                 }
-                mnuEditSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count == 1;
-                mnuRenameSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count == 1;
-                mnuDeleteSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count > 0;
+
+                UpdateRowMenuState();
             }
+        }
+
+        /// <summary>
+        /// Habilita las opciones del menú contextual según la selección: las de una sola pista
+        /// solo con una fila seleccionada.
+        /// </summary>
+        /// <remarks>
+        /// Se llama al abrir el menú con el ratón y antes de cada atajo de la rejilla, porque la
+        /// selección también cambia con el teclado.
+        /// </remarks>
+        private void UpdateRowMenuState()
+        {
+            int selected = dataGrid.SelectedRows.Count;
+            mnuEditSong.Enabled = !IsBusy && selected == 1;
+            mnuRenameSong.Enabled = !IsBusy && selected == 1;
+            mnuDeleteSong.Enabled = !IsBusy && selected > 0;
         }
 
         /// <summary>Pistas seleccionadas y visibles, en el orden de la rejilla.</summary>
@@ -1302,20 +1272,6 @@ namespace EchoCut
             };
 
             dialog.ShowDialog(this);
-        }
-
-        private void dataGrid_KeyDown(object? sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Delete)
-            {
-                e.Handled = true;
-                DeleteSelectedSongs();
-            }
-            else if (e.KeyCode == Keys.F2)
-            {
-                e.Handled = true;
-                BeginRename();
-            }
         }
 
         private void mnuDeleteSong_Click(object? sender, EventArgs e)

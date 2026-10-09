@@ -145,7 +145,6 @@ namespace EchoCut
             dataGrid.DragLeave += Main_DragLeave;
             dataGrid.Paint += dataGrid_Paint;
             dataGrid.SizeChanged += dataGrid_SizeChanged;
-            dataGrid.KeyDown += dataGrid_KeyDown;
             // 
             // contextMenuStrip
             // 
@@ -186,7 +185,6 @@ namespace EchoCut
             // mnuRenameSong
             // 
             mnuRenameSong.Name = "mnuRenameSong";
-            mnuRenameSong.ShortcutKeyDisplayString = "F2";
             mnuRenameSong.Size = new Size(282, 22);
             mnuRenameSong.Text = "Renombrar";
             mnuRenameSong.Click += mnuRenameSong_Click;
@@ -194,7 +192,6 @@ namespace EchoCut
             // mnuDeleteSong
             // 
             mnuDeleteSong.Name = "mnuDeleteSong";
-            mnuDeleteSong.ShortcutKeyDisplayString = "Supr";
             mnuDeleteSong.Size = new Size(282, 22);
             mnuDeleteSong.Text = "Eliminar archivo(s)";
             mnuDeleteSong.Click += mnuDeleteSong_Click;
@@ -301,7 +298,7 @@ namespace EchoCut
             btnPath.Name = "btnPath";
             btnPath.Size = new Size(106, 23);
             btnPath.Text = "Abrir carpeta(s)";
-            btnPath.ToolTipText = "Abrir carpeta(s) con pistas de audio (Ctrl+Shift+O)";
+            btnPath.ToolTipText = "Abrir carpeta(s) con pistas de audio";
             btnPath.Click += btnPath_Click;
             // 
             // btnFile
@@ -310,7 +307,7 @@ namespace EchoCut
             btnFile.Name = "btnFile";
             btnFile.Size = new Size(105, 23);
             btnFile.Text = "Abrir archivo(s)";
-            btnFile.ToolTipText = "Abrir archivo(s) de audio sueltos (Ctrl+O)";
+            btnFile.ToolTipText = "Abrir archivo(s) de audio sueltos";
             btnFile.Click += btnFile_Click;
             // 
             // sepSource
@@ -325,7 +322,7 @@ namespace EchoCut
             btnAnalyze.Name = "btnAnalyze";
             btnAnalyze.Size = new Size(77, 23);
             btnAnalyze.Text = "▶ Analizar";
-            btnAnalyze.ToolTipText = "Detectar el silencio inicial y final de todas las pistas (F5)";
+            btnAnalyze.ToolTipText = "Detectar el silencio inicial y final de todas las pistas";
             btnAnalyze.Click += btnAnalyze_Click;
             // 
             // btnCropAll
@@ -335,7 +332,7 @@ namespace EchoCut
             btnCropAll.Name = "btnCropAll";
             btnCropAll.Size = new Size(120, 23);
             btnCropAll.Text = "✂ Recortar todo";
-            btnCropAll.ToolTipText = "Escribir copias recortadas de las pistas con silencio recortable (Ctrl+R)";
+            btnCropAll.ToolTipText = "Escribir copias recortadas de las pistas con silencio recortable";
             btnCropAll.Click += btnCropAll_Click;
             // 
             // btnStop
@@ -344,7 +341,7 @@ namespace EchoCut
             btnStop.Name = "btnStop";
             btnStop.Size = new Size(85, 23);
             btnStop.Text = "⏹ Detener";
-            btnStop.ToolTipText = "Detener la operación en curso (Esc)";
+            btnStop.ToolTipText = "Detener la operación en curso";
             btnStop.Click += btnStop_Click;
             // 
             // sepProcess
@@ -430,7 +427,7 @@ namespace EchoCut
             btnExport.Name = "btnExport";
             btnExport.Size = new Size(93, 23);
             btnExport.Text = "Exportar CSV";
-            btnExport.ToolTipText = "Exportar los resultados a un archivo CSV (Ctrl+E)";
+            btnExport.ToolTipText = "Exportar los resultados a un archivo CSV";
             btnExport.Click += btnExport_Click;
             // 
             // btnAdvanced
