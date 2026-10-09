@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     Microsoft ResX Schema
@@ -133,7 +133,7 @@
     <value>656, 17</value>
   </metadata>
   <data name="openFileDialog.Filter" xml:space="preserve">
-    <value>Archivos de audio (*.aa;*.aax;*.aac;*.aiff;*.ape;*.dsf;*.flac;*.m4a;*.m4b;*.m4p;*.mp3;*.mpc;*.mpp;*.ogg;*.oga;*.wav;*.wma;*.wv;*.webm)|*.aa;*.aax;*.aac;*.aiff;*.ape;*.dsf;*.flac;*.m4a;*.m4b;*.m4p;*.mp3;*.mpc;*.mpp;*.ogg;*.oga;*.wav;*.wma;*.wv;*.webm|Todos los archivos (*.*)|*.*</value>
+    <value>Archivos de audio (*.aa;*.aax;*.aac;*.aiff;*.ape;*.dsf;*.flac;*.m4a;*.m4b;*.m4p;*.mp2;*.mp3;*.mpc;*.mpp;*.ogg;*.oga;*.wav;*.wma;*.wv;*.webm)|*.aa;*.aax;*.aac;*.aiff;*.ape;*.dsf;*.flac;*.m4a;*.m4b;*.m4p;*.mp2;*.mp3;*.mpc;*.mpp;*.ogg;*.oga;*.wav;*.wma;*.wv;*.webm|Todos los archivos (*.*)|*.*</value>
   </data>
   <metadata name="toolStrip.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
     <value>789, 17</value>
