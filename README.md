@@ -86,6 +86,7 @@ graph TD
             BiquadFilter["Biquad (Paso Alto EBU R128)"]
             Decoder["AudioDecoder (FFmpeg f32le Mono)"]
             Trimmer["AudioTrimmer (FFmpeg -c copy)"]
+            Fader["AudioFader (FadeEnvelope entre dos FFmpeg)"]
             Locator["FFmpegLocator"]
         end
 
@@ -191,21 +192,23 @@ EchoCut incluye 24 parámetros calibrados exhaustivamente para música comercial
 
 Gracias a la integración combinada de **TagLibSharp** (lectura de metadatos) y **FFmpeg** (decodificación y copia de flujo), EchoCut soporta 19 extensiones:
 
-| Formato | Extensiones | Corte sin pérdida (`-c copy`) |
-| :--- | :--- | :---: |
-| **MPEG Audio** | `.mp3` | ✅ |
-| **Free Lossless Audio Codec** | `.flac` | ✅ |
-| **Waveform Audio** | `.wav` | ✅ |
-| **Advanced Audio Coding** | `.aac`, `.m4a`, `.m4b`, `.m4p` | ✅ |
-| **Ogg Vorbis / Audio** | `.ogg`, `.oga` | ✅ |
-| **Windows Media Audio** | `.wma` | ✅ |
-| **Audio Interchange (Apple)** | `.aiff` | ✅ |
-| **Monkey's Audio** | `.ape` | ✅ |
-| **WavPack** | `.wv` | ✅ |
-| **Musepack** | `.mpc`, `.mpp` | ✅ |
-| **Direct Stream Digital** | `.dsf` | ✅ |
-| **WebM / Opus** | `.webm` | ✅ |
-| **Audible Audiobooks** | `.aa`, `.aax` | ✅ |
+| Formato | Extensiones | Corte sin pérdida (`-c copy`) | Fundidos (recodifica) |
+| :--- | :--- | :---: | :---: |
+| **MPEG Audio** | `.mp3` | ✅ | ✅ |
+| **Free Lossless Audio Codec** | `.flac` | ✅ | ✅ sin pérdida |
+| **Waveform Audio** | `.wav` | ✅ | ✅ sin pérdida |
+| **Advanced Audio Coding** | `.aac`, `.m4a`, `.m4b`, `.m4p` | ✅ | ✅ (salvo `.m4p`) |
+| **Ogg Vorbis / Audio** | `.ogg`, `.oga` | ✅ | ✅ |
+| **Windows Media Audio** | `.wma` | ✅ | ✅ |
+| **Audio Interchange (Apple)** | `.aiff` | ✅ | ✅ sin pérdida |
+| **Monkey's Audio** | `.ape` | ✅ | ❌ |
+| **WavPack** | `.wv` | ✅ | ✅ sin pérdida |
+| **Musepack** | `.mpc`, `.mpp` | ✅ | ❌ |
+| **Direct Stream Digital** | `.dsf` | ✅ | ❌ |
+| **WebM / Opus** | `.webm` | ✅ | ✅ |
+| **Audible Audiobooks** | `.aa`, `.aax` | ✅ | ❌ |
+
+Una copia con fundido no puede salir por copia de flujo: se recodifica al **mismo códec** del original (a su misma tasa de bits en los formatos con pérdida, y a su misma resolución en los sin pérdida) y se le copian etiquetas y carátula. Las pistas sin fundido siguen recortándose con `-c copy`. Los formatos marcados con ❌ no tienen codificador en FFmpeg y la copia con fundido falla con un mensaje claro.
 
 ---
 
@@ -263,6 +266,7 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
 6. **Auditoría, Edición de Metadatos y Gestión**:
    - **Clic derecho sobre una o varias filas**:
      - *Ver forma de onda y ajustar recorte*: Muestra la forma de onda de la pista completa y, en detalle, su principio y su final con el recorte superpuesto; lo que se eliminaría aparece con fondo gris y onda atenuada, como una selección de Audacity. La casilla *Escala en dB* agranda las colas de fundido y el hiss que en escala lineal parecen una línea plana. Arrastra las marcas con el ratón, muévelas con ← y → (10 ms; 100 ms con Mayús; 1 s con Ctrl) o escribe el instante exacto, y escucha cada borde tal como quedará mientras un cursor rojo recorre la forma de onda (el mismo botón lo detiene). El ajuste manual prevalece sobre el análisis durante la sesión, aunque cambies la tolerancia o vuelvas a analizar, y la fila pasa a estado *Ajustado*. También funciona con pistas sin analizar.
+       - **Fundidos (aparición/desaparición)**: Arrastra sobre el detalle del *inicio* para seleccionar el tramo de la aparición, y sobre el del *final* para el de la desaparición, como una selección de Audacity; arrastra un borde del tramo para ajustarlo (los extremos se adhieren a las marcas de recorte cercanas). También puedes activarlos con su casilla (propone 1 s de aparición desde el inicio de la copia y 3 s de desaparición hasta su final) y escribir los instantes exactos. La curva se elige entre los preajustes de «Adjustable fade» de Audacity —*Lineal* (el Fade In/Out integrado), *Curva S*, *Coseno*, *Redondeada*, *Logarítmica* y *Exponencial*— y su envolvente se dibuja en ámbar sobre la onda. Como en Audacity, el efecto solo toca la selección. La escucha de los bordes ya suena con el fundido aplicado, y la copia que lo lleve se recodifica (ver *Formatos de Audio Compatibles*).
      - *Abrir ubicación*: Revela los archivos en el Explorador de Windows con las canciones seleccionadas.
      - *Abrir en Audacity*: Abre simultáneamente todas las pistas seleccionadas en una sesión de Audacity (o haz doble clic sobre cualquier fila para abrirla de inmediato).
      - *Editar propiedades*: Abre la ventana modal nativa de propiedades para consultar o editar metadatos ID3/Vorbis (título, artistas, año, álbum, etc.) o renombrar el archivo físico en disco.
