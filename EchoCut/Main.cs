@@ -766,11 +766,12 @@ namespace EchoCut
         /// marshalar, y encolar la mutación la haría llegar después del «Recortado» que se fija
         /// tras el <c>await</c>, dejando la fila clavada en «Recortando…».
         /// </remarks>
-        private async Task TrimSingleAsync(Song song)
+        /// <returns>Ruta de la copia escrita, o <c>null</c> si no se escribió.</returns>
+        private async Task<string?> TrimSingleAsync(Song song)
         {
             if (IsBusy || !EnsureFFmpeg() || song.TrimRange is not { } range)
             {
-                return;
+                return null;
             }
 
             // El archivo que se va a reescribir no puede estar sonando.
@@ -799,20 +800,23 @@ namespace EchoCut
                     cts.Token);
 
                 _running = trim;
-                await trim.ConfigureAwait(true);
+                TrimOutcome outcome = await trim.ConfigureAwait(true);
 
                 song.Estatus = Song.StatusTrimmed;
                 SetStatus($"Recortado en «{outputDirectory}»: {song.Name}.");
+                return outcome.OutputPath;
             }
             catch (OperationCanceledException)
             {
                 song.Estatus = Song.StatusCancelled;
                 SetStatus("Recorte detenido.");
+                return null;
             }
             catch (Exception exception)
             {
                 song.Fail(exception);
                 ShowError("No se pudo recortar la pista.", exception);
+                return null;
             }
             finally
             {
@@ -1228,7 +1232,7 @@ namespace EchoCut
         /// </para>
         /// <para>
         /// Funciona también con pistas sin analizar y mientras corre un lote: hasta que el usuario
-        /// acepta, el editor no toca la fila.
+        /// acepta o guarda, el editor no toca la fila.
         /// </para>
         /// </remarks>
         private void mnuWaveform_Click(object? sender, EventArgs e)
@@ -1249,7 +1253,7 @@ namespace EchoCut
                 return;
             }
 
-            WaveformEditor editor = new(song, _waveforms, _locator.Require().FFmpeg, _settings.Silence.PreviewSeconds);
+            WaveformEditor editor = new(song, _waveforms, _locator.Require().FFmpeg, _settings.Silence.PreviewSeconds, SaveFromEditorAsync);
             editor.Applied += (_, _) => ApplyEditorDecisions(editor);
             editor.FormClosed += (_, _) => _editors.Remove(song);
             _editors[song] = editor;
@@ -1268,6 +1272,29 @@ namespace EchoCut
                 : $"recorte ajustado a mano, {song.Crop:0.00} s a eliminar";
             string edits = song.Edits is null ? string.Empty : "; la copia llevará ediciones y se volverá a codificar";
             SetStatus($"{song.Name}: {trim}{edits}.");
+        }
+
+        /// <summary>Guarda desde un editor: aplica sus decisiones a la fila y escribe la copia en «Recortados».</summary>
+        /// <returns>Ruta de la copia escrita, o <c>null</c> si no se pudo escribir.</returns>
+        /// <remarks>
+        /// Pasa por el mismo recorte individual que la rejilla, con su progreso, su cancelación y su
+        /// estado de fila; por eso espera a que no haya otro lote en curso.
+        /// </remarks>
+        private async Task<string?> SaveFromEditorAsync(WaveformEditor editor)
+        {
+            if (IsBusy)
+            {
+                MessageBox.Show(
+                    editor,
+                    "Hay una tarea en curso en la ventana principal. Espera a que termine para guardar.",
+                    "Guardar",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return null;
+            }
+
+            editor.Apply();
+            return await TrimSingleAsync(editor.Song).ConfigureAwait(true);
         }
 
         /// <summary>Cierra sin preguntar los editores de filas que dejan de existir.</summary>

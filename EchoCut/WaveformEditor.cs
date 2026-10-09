@@ -38,6 +38,7 @@ namespace EchoCut
         private readonly WaveformService _service;
         private readonly string _ffmpegPath;
         private readonly double _previewSeconds;
+        private readonly Func<WaveformEditor, Task<string?>> _save;
 
         /// <summary>
         /// Cancela la carga y la reproducción al cerrar. No se libera: los procesos de FFmpeg que lo
@@ -56,16 +57,27 @@ namespace EchoCut
         /// <summary>Si hay cambios que todavía no se llevaron a la fila.</summary>
         private bool _dirty;
 
+        /// <summary>Si se está guardando: la ventana no se puede cerrar ni editar a medias.</summary>
+        private bool _saving;
+
+        /// <summary>Resultado del último guardado, que el resumen muestra hasta el siguiente cambio.</summary>
+        private string _saveNote = string.Empty;
+
         /// <summary>Prepara la ventana para una pista, partiendo de lo que ya tenga decidido su fila.</summary>
         /// <param name="song">Fila de la pista a mostrar.</param>
         /// <param name="service">Servicio que carga las formas de onda.</param>
         /// <param name="ffmpegPath">Ruta de FFmpeg para escuchar.</param>
         /// <param name="previewSeconds">Segundos que se escuchan de cada borde.</param>
+        /// <param name="save">
+        /// Aplica las decisiones a la fila y escribe la copia; devuelve la ruta escrita, o <c>null</c>
+        /// si no se pudo guardar (quien guarda ya habrá explicado por qué).
+        /// </param>
         public WaveformEditor(
             Song song,
             WaveformService service,
             string ffmpegPath,
-            double previewSeconds)
+            double previewSeconds,
+            Func<WaveformEditor, Task<string?>> save)
         {
             ArgumentNullException.ThrowIfNull(song);
             InitializeComponent();
@@ -76,6 +88,7 @@ namespace EchoCut
             _service = service;
             _ffmpegPath = ffmpegPath;
             _previewSeconds = previewSeconds;
+            _save = save;
             _manual = song.ManualRange is not null;
 
             TrimRange current = song.TrimRange ?? new TrimRange(0.0, _durationSeconds);
@@ -121,7 +134,7 @@ namespace EchoCut
             _dirty = false;
         }
 
-        /// <summary>Se produce cuando el usuario pide llevar sus decisiones a la fila, al aceptar.</summary>
+        /// <summary>Se produce cuando el usuario pide llevar sus decisiones a la fila, al aceptar o al guardar.</summary>
         public event EventHandler? Applied;
 
         /// <value>Fila de la pista que se edita.</value>
@@ -301,6 +314,53 @@ namespace EchoCut
 
         private void btnCancel_Click(object? sender, EventArgs e) => Close();
 
+        /// <summary>Lleva las decisiones a la fila y escribe la copia sin cerrar la ventana.</summary>
+        /// <remarks>Nunca lanza: es el cuerpo de un manejador <c>async void</c>.</remarks>
+        private async void btnSave_Click(object? sender, EventArgs e)
+        {
+            if (Edits is { } edits && edits.KeptSeconds(KeptRange) < WaveformView.MinimumGapSeconds)
+            {
+                MessageBox.Show(this, "Lo borrado no deja audio en la copia: restaura algo antes de guardar.", "Nada que guardar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            StopPlayback();
+            SetSaving(true);
+            try
+            {
+                string? written = await _save(this).ConfigureAwait(true);
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                if (written is not null)
+                {
+                    _dirty = false;
+                    _saveNote = $"Guardado en «{Path.GetFileName(Path.GetDirectoryName(written))}{Path.DirectorySeparatorChar}{Path.GetFileName(written)}».";
+                }
+                else
+                {
+                    _saveNote = "No se guardó la copia; el motivo está en la ventana principal.";
+                }
+            }
+            catch (Exception exception)
+            {
+                if (!IsDisposed)
+                {
+                    _saveNote = $"No se guardó la copia: {exception.Message}";
+                }
+            }
+            finally
+            {
+                if (!IsDisposed)
+                {
+                    SetSaving(false);
+                    UpdateSummary();
+                }
+            }
+        }
+
         /// <summary>Avisa a quien abrió la ventana para que lleve las decisiones a la fila.</summary>
         internal void Apply()
         {
@@ -308,10 +368,24 @@ namespace EchoCut
             _dirty = false;
         }
 
-        /// <summary>Anota que hay cambios sin llevar a la fila.</summary>
+        /// <summary>Mientras se guarda, nada de la ventana se puede tocar.</summary>
+        private void SetSaving(bool saving)
+        {
+            _saving = saving;
+            tableMain.Enabled = !saving;
+            UseWaitCursor = saving;
+            if (saving)
+            {
+                _saveNote = "Guardando la copia…";
+                UpdateSummary();
+            }
+        }
+
+        /// <summary>Anota que hay cambios sin llevar a la fila; el aviso del último guardado ya no vale.</summary>
         private void MarkDirty()
         {
             _dirty = true;
+            _saveNote = string.Empty;
             UpdateSummary();
         }
 
@@ -350,14 +424,21 @@ namespace EchoCut
                 ? $"No se recorta nada en los bordes. {origin}"
                 : $"Se eliminarán {removedStart:0.00} s al inicio y {removedEnd:0.00} s al final. {origin}";
 
-            // Dos líneas: el recorte con lo borrado, y los fundidos con su consecuencia.
-            List<string> lines = [trim + DescribeDeletions(), string.Join(" ", DescribeEdits())];
+            // Tres líneas como mucho: el recorte con lo borrado, los fundidos con su consecuencia y el
+            // resultado del último guardado.
+            List<string> lines = [trim + DescribeDeletions(), string.Join(" ", DescribeEdits()), _saveNote];
             lblSummary.Text = string.Join(Environment.NewLine, lines.Where(line => line.Length > 0));
         }
 
         /// <summary>Si hay cambios sin aplicar, pregunta qué hacer con ellos antes de cerrar.</summary>
         private void WaveformEditor_FormClosing(object? sender, FormClosingEventArgs e)
         {
+            if (_saving)
+            {
+                e.Cancel = true;
+                return;
+            }
+
             if (_dirty)
             {
                 DialogResult answer = MessageBox.Show(

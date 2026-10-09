@@ -72,6 +72,7 @@ namespace EchoCut
             lblSummary = new Label();
             chkDecibels = new CheckBox();
             btnReset = new Button();
+            btnSave = new Button();
             btnAccept = new Button();
             btnCancel = new Button();
             playheadTimer = new System.Windows.Forms.Timer(components);
@@ -596,18 +597,20 @@ namespace EchoCut
             // tableBottom
             // 
             tableBottom.AutoSize = true;
-            tableBottom.ColumnCount = 5;
+            tableBottom.ColumnCount = 6;
             tableBottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             tableBottom.ColumnStyles.Add(new ColumnStyle());
             tableBottom.ColumnStyles.Add(new ColumnStyle());
             tableBottom.ColumnStyles.Add(new ColumnStyle());
             tableBottom.ColumnStyles.Add(new ColumnStyle());
+            tableBottom.ColumnStyles.Add(new ColumnStyle());
             tableBottom.Controls.Add(lblSummary, 0, 0);
-            tableBottom.SetColumnSpan(lblSummary, 5);
+            tableBottom.SetColumnSpan(lblSummary, 6);
             tableBottom.Controls.Add(chkDecibels, 1, 1);
             tableBottom.Controls.Add(btnReset, 2, 1);
-            tableBottom.Controls.Add(btnAccept, 3, 1);
-            tableBottom.Controls.Add(btnCancel, 4, 1);
+            tableBottom.Controls.Add(btnSave, 3, 1);
+            tableBottom.Controls.Add(btnAccept, 4, 1);
+            tableBottom.Controls.Add(btnCancel, 5, 1);
             tableBottom.Dock = DockStyle.Fill;
             tableBottom.Location = new Point(9, 661);
             tableBottom.Margin = new Padding(0, 3, 0, 0);
@@ -655,6 +658,19 @@ namespace EchoCut
             btnReset.UseVisualStyleBackColor = true;
             btnReset.Click += btnReset_Click;
             // 
+            // btnSave
+            // 
+            btnSave.AccessibleDescription = "Aplica los ajustes a la fila y escribe la copia en la carpeta «Recortados», sin cerrar la ventana.";
+            btnSave.Anchor = AnchorStyles.Right;
+            btnSave.AutoSize = true;
+            btnSave.MinimumSize = new Size(105, 29);
+            btnSave.Name = "btnSave";
+            btnSave.Size = new Size(105, 29);
+            btnSave.TabIndex = 3;
+            btnSave.Text = "💾 Guardar";
+            btnSave.UseVisualStyleBackColor = true;
+            btnSave.Click += btnSave_Click;
+            // 
             // btnAccept
             // 
             btnAccept.Anchor = AnchorStyles.Right;
@@ -663,7 +679,7 @@ namespace EchoCut
             btnAccept.MinimumSize = new Size(105, 29);
             btnAccept.Name = "btnAccept";
             btnAccept.Size = new Size(105, 29);
-            btnAccept.TabIndex = 3;
+            btnAccept.TabIndex = 4;
             btnAccept.Text = "Aceptar";
             btnAccept.UseVisualStyleBackColor = true;
             btnAccept.Click += btnAccept_Click;
@@ -676,7 +692,7 @@ namespace EchoCut
             btnCancel.MinimumSize = new Size(105, 29);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(106, 29);
-            btnCancel.TabIndex = 4;
+            btnCancel.TabIndex = 5;
             btnCancel.Text = "Cancelar";
             btnCancel.UseVisualStyleBackColor = true;
             btnCancel.Click += btnCancel_Click;
@@ -777,6 +793,7 @@ namespace EchoCut
         private Label lblSummary;
         private CheckBox chkDecibels;
         private Button btnReset;
+        private Button btnSave;
         private Button btnAccept;
         private Button btnCancel;
         private System.Windows.Forms.Timer playheadTimer;
