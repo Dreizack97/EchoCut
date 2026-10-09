@@ -39,6 +39,7 @@ namespace EchoCut
             mnuOpenFolder = new ToolStripMenuItem();
             mnuOpenAudacity = new ToolStripMenuItem();
             mnuEditSong = new ToolStripMenuItem();
+            mnuRenameSong = new ToolStripMenuItem();
             mnuDeleteSong = new ToolStripMenuItem();
             sepColumns = new ToolStripSeparator();
             mnuColumns = new ToolStripMenuItem();
@@ -143,7 +144,7 @@ namespace EchoCut
             // 
             // contextMenuStrip
             // 
-            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuWaveform, mnuOpenFolder, mnuOpenAudacity, mnuEditSong, mnuDeleteSong, sepColumns, mnuColumns });
+            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuWaveform, mnuOpenFolder, mnuOpenAudacity, mnuEditSong, mnuRenameSong, mnuDeleteSong, sepColumns, mnuColumns });
             contextMenuStrip.Name = "contextMenuStrip";
             contextMenuStrip.Size = new Size(283, 114);
             // 
@@ -176,6 +177,14 @@ namespace EchoCut
             mnuEditSong.Size = new Size(282, 22);
             mnuEditSong.Text = "Editar propiedades";
             mnuEditSong.Click += mnuEditSong_Click;
+            // 
+            // mnuRenameSong
+            // 
+            mnuRenameSong.Name = "mnuRenameSong";
+            mnuRenameSong.ShortcutKeyDisplayString = "F2";
+            mnuRenameSong.Size = new Size(282, 22);
+            mnuRenameSong.Text = "Renombrar";
+            mnuRenameSong.Click += mnuRenameSong_Click;
             // 
             // mnuDeleteSong
             // 
@@ -531,6 +540,7 @@ namespace EchoCut
         private ToolStripMenuItem mnuWaveform;
         private OpenFileDialog openFileDialog;
         private ToolStripMenuItem mnuEditSong;
+        private ToolStripMenuItem mnuRenameSong;
         private ToolStripMenuItem mnuDeleteSong;
         private ToolStripSeparator sepColumns;
         private ToolStripMenuItem mnuColumns;

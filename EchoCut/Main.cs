@@ -1009,6 +1009,7 @@ namespace EchoCut
             numericThreads.Enabled = !IsBusy;
             numericTolerance.Enabled = !IsBusy;
             mnuEditSong.Enabled = !IsBusy && hasSongs;
+            mnuRenameSong.Enabled = !IsBusy && hasSongs;
             mnuDeleteSong.Enabled = !IsBusy && hasSongs;
         }
 
@@ -1137,6 +1138,7 @@ namespace EchoCut
                     dataGrid.CurrentCell = cell;
                 }
                 mnuEditSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count == 1;
+                mnuRenameSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count == 1;
                 mnuDeleteSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count > 0;
             }
         }
@@ -1298,6 +1300,11 @@ namespace EchoCut
             {
                 e.Handled = true;
                 DeleteSelectedSongs();
+            }
+            else if (e.KeyCode == Keys.F2)
+            {
+                e.Handled = true;
+                BeginRename();
             }
         }
 
