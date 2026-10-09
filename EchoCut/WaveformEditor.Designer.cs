@@ -42,6 +42,12 @@ namespace EchoCut
             lblStartCaption = new Label();
             numStart = new NumericUpDown();
             btnPlayStart = new Button();
+            flowFadeIn = new FlowLayoutPanel();
+            chkFadeIn = new CheckBox();
+            numFadeInStart = new NumericUpDown();
+            lblFadeInTo = new Label();
+            numFadeInEnd = new NumericUpDown();
+            cmbFadeInCurve = new ComboBox();
             grpEnd = new GroupBox();
             tableEnd = new TableLayoutPanel();
             viewEnd = new EchoCut.Controls.WaveformView();
@@ -49,6 +55,12 @@ namespace EchoCut
             lblEndCaption = new Label();
             numEnd = new NumericUpDown();
             btnPlayEnd = new Button();
+            flowFadeOut = new FlowLayoutPanel();
+            chkFadeOut = new CheckBox();
+            numFadeOutStart = new NumericUpDown();
+            lblFadeOutTo = new Label();
+            numFadeOutEnd = new NumericUpDown();
+            cmbFadeOutCurve = new ComboBox();
             tableBottom = new TableLayoutPanel();
             lblSummary = new Label();
             chkDecibels = new CheckBox();
@@ -62,10 +74,16 @@ namespace EchoCut
             tableStart.SuspendLayout();
             flowStart.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numStart).BeginInit();
+            flowFadeIn.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)numFadeInStart).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)numFadeInEnd).BeginInit();
             grpEnd.SuspendLayout();
             tableEnd.SuspendLayout();
             flowEnd.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numEnd).BeginInit();
+            flowFadeOut.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)numFadeOutStart).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)numFadeOutEnd).BeginInit();
             tableBottom.SuspendLayout();
             SuspendLayout();
             // 
@@ -157,18 +175,20 @@ namespace EchoCut
             tableStart.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             tableStart.Controls.Add(viewStart, 0, 0);
             tableStart.Controls.Add(flowStart, 0, 1);
+            tableStart.Controls.Add(flowFadeIn, 0, 2);
             tableStart.Dock = DockStyle.Fill;
             tableStart.Location = new Point(3, 21);
             tableStart.Name = "tableStart";
-            tableStart.RowCount = 2;
+            tableStart.RowCount = 3;
             tableStart.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableStart.RowStyles.Add(new RowStyle());
             tableStart.RowStyles.Add(new RowStyle());
             tableStart.Size = new Size(571, 388);
             tableStart.TabIndex = 0;
             // 
             // viewStart
             // 
-            viewStart.AccessibleDescription = "Detalle del inicio de la pista. Flechas izquierda y derecha mueven el comienzo de la copia: 10 ms, 100 ms con Mayús y 1 s con Ctrl.";
+            viewStart.AccessibleDescription = "Detalle del inicio de la pista. Flechas izquierda y derecha mueven el comienzo de la copia: 10 ms, 100 ms con Mayús y 1 s con Ctrl. Arrastrar con el ratón selecciona el tramo de la aparición.";
             viewStart.AccessibleName = "Forma de onda del inicio";
             viewStart.Dock = DockStyle.Fill;
             viewStart.Location = new Point(3, 3);
@@ -177,6 +197,7 @@ namespace EchoCut
             viewStart.Size = new Size(565, 341);
             viewStart.TabIndex = 0;
             viewStart.MarkersChanged += View_MarkersChanged;
+            viewStart.FadeSelected += View_FadeSelected;
             // 
             // flowStart
             // 
@@ -225,6 +246,82 @@ namespace EchoCut
             btnPlayStart.UseVisualStyleBackColor = true;
             btnPlayStart.Click += btnPlayStart_Click;
             // 
+            // flowFadeIn
+            // 
+            flowFadeIn.AutoSize = true;
+            flowFadeIn.Controls.Add(chkFadeIn);
+            flowFadeIn.Controls.Add(numFadeInStart);
+            flowFadeIn.Controls.Add(lblFadeInTo);
+            flowFadeIn.Controls.Add(numFadeInEnd);
+            flowFadeIn.Controls.Add(cmbFadeInCurve);
+            flowFadeIn.Dock = DockStyle.Fill;
+            flowFadeIn.Location = new Point(3, 350);
+            flowFadeIn.Name = "flowFadeIn";
+            flowFadeIn.Size = new Size(565, 35);
+            flowFadeIn.TabIndex = 2;
+            flowFadeIn.WrapContents = false;
+            // 
+            // chkFadeIn
+            // 
+            chkFadeIn.AccessibleDescription = "Activa la aparición en la copia. También se elige arrastrando sobre la forma de onda de arriba.";
+            chkFadeIn.Anchor = AnchorStyles.Left;
+            chkFadeIn.AutoSize = true;
+            chkFadeIn.Location = new Point(3, 6);
+            chkFadeIn.Name = "chkFadeIn";
+            chkFadeIn.Size = new Size(140, 23);
+            chkFadeIn.TabIndex = 0;
+            chkFadeIn.Text = "Aparición de (s):";
+            chkFadeIn.UseVisualStyleBackColor = true;
+            chkFadeIn.CheckedChanged += chkFadeIn_CheckedChanged;
+            // 
+            // numFadeInStart
+            // 
+            numFadeInStart.AccessibleName = "Comienzo de la aparición en segundos";
+            numFadeInStart.Anchor = AnchorStyles.Left;
+            numFadeInStart.DecimalPlaces = 3;
+            numFadeInStart.Increment = new decimal(new int[] { 1, 0, 0, 131072 });
+            numFadeInStart.Location = new Point(149, 5);
+            numFadeInStart.Name = "numFadeInStart";
+            numFadeInStart.Size = new Size(95, 25);
+            numFadeInStart.TabIndex = 1;
+            numFadeInStart.TextAlign = HorizontalAlignment.Right;
+            numFadeInStart.ValueChanged += numFadeIn_ValueChanged;
+            // 
+            // lblFadeInTo
+            // 
+            lblFadeInTo.Anchor = AnchorStyles.Left;
+            lblFadeInTo.AutoSize = true;
+            lblFadeInTo.Location = new Point(250, 8);
+            lblFadeInTo.Name = "lblFadeInTo";
+            lblFadeInTo.Size = new Size(15, 19);
+            lblFadeInTo.TabIndex = 2;
+            lblFadeInTo.Text = "a";
+            // 
+            // numFadeInEnd
+            // 
+            numFadeInEnd.AccessibleName = "Final de la aparición en segundos";
+            numFadeInEnd.Anchor = AnchorStyles.Left;
+            numFadeInEnd.DecimalPlaces = 3;
+            numFadeInEnd.Increment = new decimal(new int[] { 1, 0, 0, 131072 });
+            numFadeInEnd.Location = new Point(271, 5);
+            numFadeInEnd.Name = "numFadeInEnd";
+            numFadeInEnd.Size = new Size(95, 25);
+            numFadeInEnd.TabIndex = 3;
+            numFadeInEnd.TextAlign = HorizontalAlignment.Right;
+            numFadeInEnd.ValueChanged += numFadeIn_ValueChanged;
+            // 
+            // cmbFadeInCurve
+            // 
+            cmbFadeInCurve.AccessibleName = "Curva de la aparición";
+            cmbFadeInCurve.Anchor = AnchorStyles.Left;
+            cmbFadeInCurve.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbFadeInCurve.FormattingEnabled = true;
+            cmbFadeInCurve.Location = new Point(372, 4);
+            cmbFadeInCurve.Name = "cmbFadeInCurve";
+            cmbFadeInCurve.Size = new Size(125, 25);
+            cmbFadeInCurve.TabIndex = 4;
+            cmbFadeInCurve.SelectedIndexChanged += cmbFadeInCurve_SelectedIndexChanged;
+            // 
             // grpEnd
             // 
             grpEnd.Controls.Add(tableEnd);
@@ -242,18 +339,20 @@ namespace EchoCut
             tableEnd.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             tableEnd.Controls.Add(viewEnd, 0, 0);
             tableEnd.Controls.Add(flowEnd, 0, 1);
+            tableEnd.Controls.Add(flowFadeOut, 0, 2);
             tableEnd.Dock = DockStyle.Fill;
             tableEnd.Location = new Point(3, 21);
             tableEnd.Name = "tableEnd";
-            tableEnd.RowCount = 2;
+            tableEnd.RowCount = 3;
             tableEnd.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableEnd.RowStyles.Add(new RowStyle());
             tableEnd.RowStyles.Add(new RowStyle());
             tableEnd.Size = new Size(571, 388);
             tableEnd.TabIndex = 0;
             // 
             // viewEnd
             // 
-            viewEnd.AccessibleDescription = "Detalle del final de la pista. Flechas izquierda y derecha mueven el final de la copia: 10 ms, 100 ms con Mayús y 1 s con Ctrl.";
+            viewEnd.AccessibleDescription = "Detalle del final de la pista. Flechas izquierda y derecha mueven el final de la copia: 10 ms, 100 ms con Mayús y 1 s con Ctrl. Arrastrar con el ratón selecciona el tramo de la desaparición.";
             viewEnd.AccessibleName = "Forma de onda del final";
             viewEnd.Dock = DockStyle.Fill;
             viewEnd.Location = new Point(3, 3);
@@ -262,6 +361,7 @@ namespace EchoCut
             viewEnd.Size = new Size(565, 341);
             viewEnd.TabIndex = 0;
             viewEnd.MarkersChanged += View_MarkersChanged;
+            viewEnd.FadeSelected += View_FadeSelected;
             // 
             // flowEnd
             // 
@@ -309,6 +409,82 @@ namespace EchoCut
             btnPlayEnd.Text = "▶ Escuchar final";
             btnPlayEnd.UseVisualStyleBackColor = true;
             btnPlayEnd.Click += btnPlayEnd_Click;
+            // 
+            // flowFadeOut
+            // 
+            flowFadeOut.AutoSize = true;
+            flowFadeOut.Controls.Add(chkFadeOut);
+            flowFadeOut.Controls.Add(numFadeOutStart);
+            flowFadeOut.Controls.Add(lblFadeOutTo);
+            flowFadeOut.Controls.Add(numFadeOutEnd);
+            flowFadeOut.Controls.Add(cmbFadeOutCurve);
+            flowFadeOut.Dock = DockStyle.Fill;
+            flowFadeOut.Location = new Point(3, 350);
+            flowFadeOut.Name = "flowFadeOut";
+            flowFadeOut.Size = new Size(565, 35);
+            flowFadeOut.TabIndex = 2;
+            flowFadeOut.WrapContents = false;
+            // 
+            // chkFadeOut
+            // 
+            chkFadeOut.AccessibleDescription = "Activa la desaparición en la copia. También se elige arrastrando sobre la forma de onda de arriba.";
+            chkFadeOut.Anchor = AnchorStyles.Left;
+            chkFadeOut.AutoSize = true;
+            chkFadeOut.Location = new Point(3, 6);
+            chkFadeOut.Name = "chkFadeOut";
+            chkFadeOut.Size = new Size(140, 23);
+            chkFadeOut.TabIndex = 0;
+            chkFadeOut.Text = "Desaparición de (s):";
+            chkFadeOut.UseVisualStyleBackColor = true;
+            chkFadeOut.CheckedChanged += chkFadeOut_CheckedChanged;
+            // 
+            // numFadeOutStart
+            // 
+            numFadeOutStart.AccessibleName = "Comienzo de la desaparición en segundos";
+            numFadeOutStart.Anchor = AnchorStyles.Left;
+            numFadeOutStart.DecimalPlaces = 3;
+            numFadeOutStart.Increment = new decimal(new int[] { 1, 0, 0, 131072 });
+            numFadeOutStart.Location = new Point(149, 5);
+            numFadeOutStart.Name = "numFadeOutStart";
+            numFadeOutStart.Size = new Size(95, 25);
+            numFadeOutStart.TabIndex = 1;
+            numFadeOutStart.TextAlign = HorizontalAlignment.Right;
+            numFadeOutStart.ValueChanged += numFadeOut_ValueChanged;
+            // 
+            // lblFadeOutTo
+            // 
+            lblFadeOutTo.Anchor = AnchorStyles.Left;
+            lblFadeOutTo.AutoSize = true;
+            lblFadeOutTo.Location = new Point(250, 8);
+            lblFadeOutTo.Name = "lblFadeOutTo";
+            lblFadeOutTo.Size = new Size(15, 19);
+            lblFadeOutTo.TabIndex = 2;
+            lblFadeOutTo.Text = "a";
+            // 
+            // numFadeOutEnd
+            // 
+            numFadeOutEnd.AccessibleName = "Final de la desaparición en segundos";
+            numFadeOutEnd.Anchor = AnchorStyles.Left;
+            numFadeOutEnd.DecimalPlaces = 3;
+            numFadeOutEnd.Increment = new decimal(new int[] { 1, 0, 0, 131072 });
+            numFadeOutEnd.Location = new Point(271, 5);
+            numFadeOutEnd.Name = "numFadeOutEnd";
+            numFadeOutEnd.Size = new Size(95, 25);
+            numFadeOutEnd.TabIndex = 3;
+            numFadeOutEnd.TextAlign = HorizontalAlignment.Right;
+            numFadeOutEnd.ValueChanged += numFadeOut_ValueChanged;
+            // 
+            // cmbFadeOutCurve
+            // 
+            cmbFadeOutCurve.AccessibleName = "Curva de la desaparición";
+            cmbFadeOutCurve.Anchor = AnchorStyles.Left;
+            cmbFadeOutCurve.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbFadeOutCurve.FormattingEnabled = true;
+            cmbFadeOutCurve.Location = new Point(372, 4);
+            cmbFadeOutCurve.Name = "cmbFadeOutCurve";
+            cmbFadeOutCurve.Size = new Size(125, 25);
+            cmbFadeOutCurve.TabIndex = 4;
+            cmbFadeOutCurve.SelectedIndexChanged += cmbFadeOutCurve_SelectedIndexChanged;
             // 
             // tableBottom
             // 
@@ -408,17 +584,17 @@ namespace EchoCut
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = btnCancel;
-            ClientSize = new Size(1184, 721);
+            ClientSize = new Size(1184, 760);
             Controls.Add(tableMain);
             Font = new Font("Segoe UI", 10F);
             Icon = (Icon)resources.GetObject("$this.Icon");
             MinimizeBox = false;
-            MinimumSize = new Size(900, 600);
+            MinimumSize = new Size(1000, 640);
             Name = "WaveformEditor";
             ShowIcon = false;
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterParent;
-            Text = "Forma de onda y ajuste del recorte";
+            Text = "Forma de onda, recorte y fundidos";
             FormClosing += WaveformEditor_FormClosing;
             FormClosed += WaveformEditor_FormClosed;
             Shown += WaveformEditor_Shown;
@@ -431,12 +607,20 @@ namespace EchoCut
             flowStart.ResumeLayout(false);
             flowStart.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)numStart).EndInit();
+            flowFadeIn.ResumeLayout(false);
+            flowFadeIn.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)numFadeInStart).EndInit();
+            ((System.ComponentModel.ISupportInitialize)numFadeInEnd).EndInit();
             grpEnd.ResumeLayout(false);
             tableEnd.ResumeLayout(false);
             tableEnd.PerformLayout();
             flowEnd.ResumeLayout(false);
             flowEnd.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)numEnd).EndInit();
+            flowFadeOut.ResumeLayout(false);
+            flowFadeOut.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)numFadeOutStart).EndInit();
+            ((System.ComponentModel.ISupportInitialize)numFadeOutEnd).EndInit();
             tableBottom.ResumeLayout(false);
             tableBottom.PerformLayout();
             ResumeLayout(false);
@@ -456,6 +640,12 @@ namespace EchoCut
         private Label lblStartCaption;
         private NumericUpDown numStart;
         private Button btnPlayStart;
+        private FlowLayoutPanel flowFadeIn;
+        private CheckBox chkFadeIn;
+        private NumericUpDown numFadeInStart;
+        private Label lblFadeInTo;
+        private NumericUpDown numFadeInEnd;
+        private ComboBox cmbFadeInCurve;
         private GroupBox grpEnd;
         private TableLayoutPanel tableEnd;
         private EchoCut.Controls.WaveformView viewEnd;
@@ -463,6 +653,12 @@ namespace EchoCut
         private Label lblEndCaption;
         private NumericUpDown numEnd;
         private Button btnPlayEnd;
+        private FlowLayoutPanel flowFadeOut;
+        private CheckBox chkFadeOut;
+        private NumericUpDown numFadeOutStart;
+        private Label lblFadeOutTo;
+        private NumericUpDown numFadeOutEnd;
+        private ComboBox cmbFadeOutCurve;
         private TableLayoutPanel tableBottom;
         private Label lblSummary;
         private CheckBox chkDecibels;

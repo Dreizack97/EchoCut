@@ -1221,6 +1221,7 @@ namespace EchoCut
                 song.TrimRange ?? new TrimRange(0.0, duration),
                 song.Analysis?.Range,
                 song.ManualRange is not null,
+                song.Fades,
                 _waveforms,
                 _locator.Require().FFmpeg,
                 _settings.Silence.PreviewSeconds);
@@ -1231,9 +1232,13 @@ namespace EchoCut
             }
 
             song.AdjustManually(dialog.ManualRange);
-            SetStatus(dialog.ManualRange is null
-                ? $"{song.Name}: se usa el recorte del análisis."
-                : $"{song.Name}: recorte ajustado a mano, {song.Crop:0.00} s a eliminar.");
+            song.ApplyFades(dialog.Fades);
+
+            string trim = dialog.ManualRange is null
+                ? "se usa el recorte del análisis"
+                : $"recorte ajustado a mano, {song.Crop:0.00} s a eliminar";
+            string fades = song.Fades is null ? string.Empty : "; la copia llevará fundidos y se volverá a codificar";
+            SetStatus($"{song.Name}: {trim}{fades}.");
         }
 
         private void mnuEditSong_Click(object? sender, EventArgs e)
