@@ -135,41 +135,43 @@ namespace EchoCut
             // 
             contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuWaveform, mnuOpenFolder, mnuOpenAudacity, mnuEditSong, mnuDeleteSong });
             contextMenuStrip.Name = "contextMenuStrip";
-            contextMenuStrip.Size = new Size(283, 114);
+            contextMenuStrip.Size = new Size(331, 114);
             // 
             // mnuWaveform
             // 
             mnuWaveform.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             mnuWaveform.Name = "mnuWaveform";
-            mnuWaveform.Size = new Size(282, 22);
+            mnuWaveform.Size = new Size(330, 22);
             mnuWaveform.Text = "Ver forma de onda y ajustar recorte…";
             mnuWaveform.Click += mnuWaveform_Click;
             // 
             // mnuOpenFolder
             // 
             mnuOpenFolder.Name = "mnuOpenFolder";
-            mnuOpenFolder.Size = new Size(282, 22);
+            mnuOpenFolder.Size = new Size(330, 22);
             mnuOpenFolder.Text = "Abrir carpeta contenedora";
             mnuOpenFolder.Click += mnuOpenFolder_Click;
             // 
             // mnuOpenAudacity
             // 
             mnuOpenAudacity.Name = "mnuOpenAudacity";
-            mnuOpenAudacity.Size = new Size(282, 22);
+            mnuOpenAudacity.Size = new Size(330, 22);
+            mnuOpenAudacity.ShortcutKeyDisplayString = "Doble clic";
             mnuOpenAudacity.Text = "Abrir en Audacity";
             mnuOpenAudacity.Click += mnuOpenAudacity_Click;
             // 
             // mnuEditSong
             // 
             mnuEditSong.Name = "mnuEditSong";
-            mnuEditSong.Size = new Size(282, 22);
+            mnuEditSong.Size = new Size(330, 22);
             mnuEditSong.Text = "Editar propiedades";
             mnuEditSong.Click += mnuEditSong_Click;
             // 
             // mnuDeleteSong
             // 
             mnuDeleteSong.Name = "mnuDeleteSong";
-            mnuDeleteSong.Size = new Size(282, 22);
+            mnuDeleteSong.Size = new Size(330, 22);
+            mnuDeleteSong.ShortcutKeyDisplayString = "Supr";
             mnuDeleteSong.Text = "Eliminar archivo(s)";
             mnuDeleteSong.Click += mnuDeleteSong_Click;
             // 
@@ -255,7 +257,7 @@ namespace EchoCut
             btnPath.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnPath.Name = "btnPath";
             btnPath.Size = new Size(106, 23);
-            btnPath.ToolTipText = "Abrir carpeta(s) con pistas de audio";
+            btnPath.ToolTipText = "Abrir carpeta(s) con pistas de audio (Ctrl+Shift+O)";
             btnPath.Text = "Abrir carpeta(s)";
             btnPath.Click += btnPath_Click;
             // 
@@ -264,7 +266,7 @@ namespace EchoCut
             btnFile.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnFile.Name = "btnFile";
             btnFile.Size = new Size(105, 23);
-            btnFile.ToolTipText = "Abrir archivo(s) de audio sueltos";
+            btnFile.ToolTipText = "Abrir archivo(s) de audio sueltos (Ctrl+O)";
             btnFile.Text = "Abrir archivo(s)";
             btnFile.Click += btnFile_Click;
             // 
@@ -279,7 +281,7 @@ namespace EchoCut
             btnAnalyze.Font = new Font("Segoe UI", 10F);
             btnAnalyze.Name = "btnAnalyze";
             btnAnalyze.Size = new Size(77, 23);
-            btnAnalyze.ToolTipText = "Detectar el silencio inicial y final de todas las pistas";
+            btnAnalyze.ToolTipText = "Detectar el silencio inicial y final de todas las pistas (F5)";
             btnAnalyze.Text = "▶ Analizar";
             btnAnalyze.Click += btnAnalyze_Click;
             // 
@@ -289,7 +291,7 @@ namespace EchoCut
             btnCropAll.ImageTransparentColor = Color.Magenta;
             btnCropAll.Name = "btnCropAll";
             btnCropAll.Size = new Size(120, 23);
-            btnCropAll.ToolTipText = "Escribir copias recortadas de las pistas con silencio recortable";
+            btnCropAll.ToolTipText = "Escribir copias recortadas de las pistas con silencio recortable (Ctrl+R)";
             btnCropAll.Text = "✂ Recortar todo";
             btnCropAll.Click += btnCropAll_Click;
             // 
@@ -298,7 +300,7 @@ namespace EchoCut
             btnStop.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnStop.Name = "btnStop";
             btnStop.Size = new Size(85, 23);
-            btnStop.ToolTipText = "Detener la operación en curso";
+            btnStop.ToolTipText = "Detener la operación en curso (Esc)";
             btnStop.Text = "⏹ Detener";
             btnStop.Click += btnStop_Click;
             // 
@@ -335,7 +337,7 @@ namespace EchoCut
             btnExport.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnExport.Name = "btnExport";
             btnExport.Size = new Size(93, 23);
-            btnExport.ToolTipText = "Exportar los resultados a un archivo CSV";
+            btnExport.ToolTipText = "Exportar los resultados a un archivo CSV (Ctrl+E)";
             btnExport.Text = "Exportar CSV";
             btnExport.Click += btnExport_Click;
             // 

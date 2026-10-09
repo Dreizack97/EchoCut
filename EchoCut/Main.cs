@@ -1053,6 +1053,37 @@ namespace EchoCut
             Close();
         }
 
+        /// <summary>
+        /// Atajos de teclado de la barra de herramientas, anunciados en el tooltip de cada botón.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="ToolStripButton"/> no admite <c>ShortcutKeys</c>, así que se resuelven aquí.
+        /// Pasar por <see cref="ToolStripItem.PerformClick"/> respeta el estado habilitado: un atajo
+        /// nunca dispara lo que el botón, deshabilitado, no permitiría. Esc solo se consume si hay
+        /// algo que detener, para no robárselo a la edición de los controles numéricos.
+        /// </remarks>
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            ToolStripItem? target = keyData switch
+            {
+                Keys.Control | Keys.O => btnFile,
+                Keys.Control | Keys.Shift | Keys.O => btnPath,
+                Keys.F5 => btnAnalyze,
+                Keys.Control | Keys.R => btnCropAll,
+                Keys.Control | Keys.E => btnExport,
+                Keys.Escape when btnStop.Enabled => btnStop,
+                _ => null,
+            };
+
+            if (target is { Enabled: true })
+            {
+                target.PerformClick();
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
         private static decimal Clamp(NumericUpDown control, double value) =>
             Math.Clamp((decimal)value, control.Minimum, control.Maximum);
 
