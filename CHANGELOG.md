@@ -10,6 +10,14 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 ## [Sin publicar]
 
 ### Añadido
+#### Editor de Forma de Onda Rediseñado
+* **Estilo de la ventana principal**: Barra de herramientas con las acciones agrupadas (reproducir | aplicar a la selección | deshacer | zoom, con ayuda y escala en dB a la derecha) y barra de estado que describe cada opción al pasar el ratón y resume la copia: duración final, fundidos, borrado y si saldrá sin pérdida o se recodificará. Desaparecen los marcos de grupo y la barra de selección.
+* **Inspector**: Panel a la derecha con la copia (comienzo, final, duración final y escucha de los bordes) y una sección contextual para la selección, un fundido —con su curva dibujada y su nivel a mitad de camino— o un fragmento borrado, todos con sus instantes editables. Un clic sobre un fundido o sobre lo borrado lo muestra.
+* **Deshacer y rehacer** (`Ctrl+Z` / `Ctrl+Y`): Historial de instantáneas del tramo, los fundidos y los borrados; un arrastre cuenta como un solo cambio, y el aviso de cambios sin aplicar compara con lo que tiene la fila.
+* **Reproducción general** (`Espacio`): Suena la selección o, sin ella, desde el punto marcado con un clic, con las ediciones aplicadas.
+* **Zoom y desplazamiento**: Rueda para desplazar y `Ctrl`+rueda para acercar bajo el puntero en cualquier vista, además de *Acercar*, *Alejar*, *Ver selección* y *Ver todo* sobre la última vista tocada; la vista del final no sale del audio cargado.
+* **Tabla única de atajos**: Los del editor se atienden, se anuncian en tooltips y barra de estado, se listan en su ventana *Atajos* (`F1`) y aparecen en la de la ventana principal desde la misma tabla.
+
 #### Selección, Borrado y Ventanas de Forma de Onda
 * **Seleccionar y luego actuar**: Como en Audacity, se arrastra en cualquiera de las tres vistas —también la de la pista completa— para seleccionar un tramo, compartido por todas, y se le aplica una aparición, una desaparición, un borrado o una restauración desde la nueva barra de selección. Los bordes de la selección y de los fundidos se arrastran en cualquier vista.
 * **Borrar selección** (`Supr`): Quita el audio seleccionado y une lo anterior con lo posterior, como el `WaveTrack::Clear` de Audacity: muestras ajustadas a la más cercana y empalme en seco. Lo borrado se dibuja gris y rayado; un clic sobre él lo selecciona y *Restaurar* lo devuelve.
