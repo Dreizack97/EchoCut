@@ -1090,6 +1090,20 @@ public sealed class WaveformView : Control
         }
 
         int left = fade.Direction == FadeDirection.In ? x0 + padding : x1 - text.Width - padding;
+
+        // Como las etiquetas de las marcas, empieza donde terminan las referencias de amplitud:
+        // encima de ellas quedaría tapada.
+        int gutter = _waveform is null ? 0 : AmplitudeLabelsWidth(g) + padding;
+        if (left < gutter)
+        {
+            if (gutter + text.Width + padding > x1)
+            {
+                return;
+            }
+
+            left = gutter;
+        }
+
         Rectangle box = new(left, image.Bottom - text.Height - padding, text.Width, text.Height);
 
         g.FillRectangle(Brushes.White, box);
