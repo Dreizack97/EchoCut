@@ -10,15 +10,24 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 ## [Sin publicar]
 
 ### Añadido
+#### Selección, Borrado y Ventanas de Forma de Onda
+* **Seleccionar y luego actuar**: Como en Audacity, se arrastra en cualquiera de las tres vistas —también la de la pista completa— para seleccionar un tramo, compartido por todas, y se le aplica una aparición, una desaparición, un borrado o una restauración desde la nueva barra de selección. Los bordes de la selección y de los fundidos se arrastran en cualquier vista.
+* **Borrar selección** (`Supr`): Quita el audio seleccionado y une lo anterior con lo posterior, como el `WaveTrack::Clear` de Audacity: muestras ajustadas a la más cercana y empalme en seco. Lo borrado se dibuja gris y rayado; un clic sobre él lo selecciona y *Restaurar* lo devuelve.
+* **`TimeRegion`, `DeletedRegions`, `AudioEdits` y `PcmEditor`** (`EchoCut.Core/Audio`): Tramo de tiempo, conjunto normalizado e inmutable de fragmentos borrados con su traducción a tramas y al cursor, agregado de fundidos y borrados, y editor de PCM por bloques que comparten la copia y la escucha.
+* **Botón «Guardar»**: Aplica los ajustes a la fila y escribe la copia en `Recortados/` sin cerrar el editor, por la misma vía que el recorte individual de la rejilla.
+* **Varias ventanas de forma de onda**: El editor deja de ser modal; hay una ventana por pista, con su nombre en el título y en la barra de tareas, y volver a abrirla la trae al frente. Al cerrarla con cambios sin aplicar pregunta qué hacer; se cierra sola si su fila desaparece.
+* **Escucha de la selección** (hasta 30 s) con las ediciones aplicadas, y reproducción exclusiva en toda la aplicación: empezar a escuchar en una ventana detiene lo que sonara en otra.
+
 #### Fundidos de Aparición y Desaparición
 * **`Fade`, `TrackFades` y `FadeShape`** (`EchoCut.Core/Audio`): Modelo inmutable del fundido sobre la selección del usuario (tiempo absoluto del original) y curvas portadas de los preajustes de «Adjustable fade» de Audacity: lineal, curva S, coseno, redondeada, logarítmica (−3 dB a mitad) y exponencial (desde −60 dB).
 * **`FadeEnvelope`**: Aplicación muestra a muestra con la indexación del `FadeEffectBase` de Audacity (`n/N` al aparecer, `(N−1−n)/N` al desaparecer), misma ganancia en todos los canales y bloques fuera del fundido sin recorrer.
-* **`AudioFader`**: Copia con fundido mediante dos procesos de FFmpeg unidos por tubería (decodificación `f32le` exacta a la muestra → envolvente → codificación), sin materializar el audio y borrando la salida a medias si falla o se cancela.
+* **`AudioRenderer`**: Copia editada mediante dos procesos de FFmpeg unidos por tubería (decodificación `f32le` exacta a la muestra → fundidos y borrados → codificación), sin materializar el audio y borrando la salida a medias si falla o se cancela.
 * **`AudioStreamInfo` y `AudioEncoding`**: Sondeo del formato con ffprobe y recodificación al mismo códec, tasa de bits y resolución del original (MP3, AAC, Vorbis, Opus, WMA, FLAC, ALAC, WavPack y PCM).
 * **`TrackEditor.CopyTags`**: Copia de etiquetas y carátula del original a la copia recodificada con TagLibSharp.
 * **Editor de forma de onda**: Selección del tramo de aparición y desaparición arrastrando sobre el detalle de cada borde (con imán a las marcas de recorte y bordes ajustables), casilla, campos numéricos y curva por fundido, envolvente ámbar en las tres vistas y escucha con el fundido aplicado.
 
 ### Cambiado
+* **`AudioPreviewPlayer`**: Decodifica en flotante para pasar por `PcmEditor` y sitúa el cursor saltando lo borrado.
 * **`TrimService`**: Las pistas sin fundido que llegue a la copia siguen recortándose con `-c copy`; solo las que lo llevan se recodifican.
 * **`Song`**: Los fundidos (`Fades`) duran la sesión, hacen recortable la pista aunque no se elimine silencio y la marcan como «Ajustado».
 * **`FFmpegRunner.Start`**: Puede redirigir la entrada estándar.
