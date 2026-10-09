@@ -115,6 +115,12 @@ namespace EchoCut
             {
                 dataGrid.InvalidateRow(e.NewIndex);
             }
+
+            // Normalizar o editar una pista puede cambiar su nombre y, con él, si pasa el filtro.
+            if (e.ListChangedType == ListChangedType.ItemChanged && property == nameof(Song.Name))
+            {
+                ApplyFilter(e.NewIndex);
+            }
         }
 
         private bool IsBusy => _analysisCts is not null || _trimCts is not null || _cleanCts is not null || _normalizeCts is not null;
@@ -1107,9 +1113,15 @@ namespace EchoCut
             }
         }
 
+        /// <summary>Pistas seleccionadas y visibles, en el orden de la rejilla.</summary>
+        /// <remarks>
+        /// Se descartan las filas ocultas por el filtro: una acción sobre la selección, como
+        /// eliminar del disco, nunca debe alcanzar una pista que el usuario no está viendo.
+        /// </remarks>
         private List<Song> GetSelectedSongs() =>
             dataGrid.SelectedRows
                 .Cast<DataGridViewRow>()
+                .Where(r => r.Visible)
                 .OrderBy(r => r.Index)
                 .Select(r => r.DataBoundItem)
                 .OfType<Song>()

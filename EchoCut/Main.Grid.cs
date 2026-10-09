@@ -28,6 +28,145 @@ namespace EchoCut
             FormatNumericColumn(nameof(Song.Crop));
 
             ApplyColumnLayout();
+
+            // Ordenar o recargar la lista regenera las filas, y con ellas se pierde su visibilidad.
+            ApplyFilter();
+        }
+
+        // ---------------------------------------------------------------------------- Filtro
+
+        /// <summary>Si se está aplicando el filtro; evita reentrar desde el reenlace que provoca.</summary>
+        private bool _applyingFilter;
+
+        /// <summary>Texto vigente del filtro, sin espacios en los extremos.</summary>
+        private string FilterText => txtFilter.Text.Trim();
+
+        private void txtFilter_TextChanged(object? sender, EventArgs e) => ApplyFilter();
+
+        /// <summary>Si el nombre de una pista contiene el texto del filtro, sin distinguir mayúsculas.</summary>
+        /// <remarks>
+        /// Se compara con la cultura actual y no con la invariante para que las mayúsculas de los
+        /// caracteres propios del español —«Ñ», vocales acentuadas— se plieguen igual que las
+        /// demás. Un filtro vacío deja pasar todo.
+        /// </remarks>
+        private static bool MatchesFilter(Song song, string filter) =>
+            filter.Length == 0 || song.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase);
+
+        /// <summary>
+        /// Muestra solo las filas cuyo nombre coincide con el filtro.
+        /// </summary>
+        /// <remarks>
+        /// El filtro es solo de presentación: oculta filas, pero <see cref="_songs"/> sigue siendo la
+        /// lista completa, así que los lotes y la exportación actúan sobre todas las pistas cargadas.
+        /// La rejilla prohíbe ocultar la fila en la que está posicionado el enlace, de ahí que se
+        /// suspenda mientras se cambia la visibilidad.
+        /// </remarks>
+        private void ApplyFilter()
+        {
+            if (_applyingFilter || !IsAlive || BindingContext?[_songs] is not CurrencyManager manager)
+            {
+                return;
+            }
+
+            _applyingFilter = true;
+            string filter = FilterText;
+
+            // Suspender el enlace descarta la celda actual; se recuerda para devolverla si su fila
+            // sigue a la vista, y que el teclado no pierda su sitio en cada pulsación del filtro.
+            Point current = dataGrid.CurrentCellAddress;
+
+            manager.SuspendBinding();
+            try
+            {
+                foreach (DataGridViewRow row in dataGrid.Rows)
+                {
+                    SetRowVisibility(row, filter);
+                }
+            }
+            finally
+            {
+                manager.ResumeBinding();
+                _applyingFilter = false;
+            }
+
+            RestoreCurrentCell(current);
+
+            RefreshSummary();
+
+            // El aviso de «sin coincidencias» se pinta sobre la rejilla.
+            dataGrid.Invalidate();
+        }
+
+        /// <summary>
+        /// Reevalúa el filtro para una sola fila, cuando cambia el nombre de su pista al normalizarla
+        /// o editar sus propiedades.
+        /// </summary>
+        private void ApplyFilter(int rowIndex)
+        {
+            if (FilterText.Length == 0
+                || rowIndex < 0 || rowIndex >= dataGrid.Rows.Count
+                || BindingContext?[_songs] is not CurrencyManager manager)
+            {
+                return;
+            }
+
+            Point current = dataGrid.CurrentCellAddress;
+
+            manager.SuspendBinding();
+            try
+            {
+                SetRowVisibility(dataGrid.Rows[rowIndex], FilterText);
+            }
+            finally
+            {
+                manager.ResumeBinding();
+            }
+
+            RestoreCurrentCell(current);
+            QueueSummaryRefresh();
+        }
+
+        /// <summary>Devuelve la celda actual a la dirección indicada si su fila sigue visible.</summary>
+        private void RestoreCurrentCell(Point address)
+        {
+            if (address.Y < 0 || address.Y >= dataGrid.Rows.Count
+                || address.X < 0 || address.X >= dataGrid.Columns.Count
+                || !dataGrid.Rows[address.Y].Visible
+                || !dataGrid.Columns[address.X].Visible
+                || dataGrid.CurrentCellAddress == address)
+            {
+                return;
+            }
+
+            // Fijar la celda actual selecciona su fila en modo de fila completa; se conserva la
+            // selección que hubiera para no deshacer una multiselección al teclear en el filtro.
+            List<DataGridViewRow> selected = [.. dataGrid.SelectedRows.Cast<DataGridViewRow>()];
+            dataGrid.CurrentCell = dataGrid.Rows[address.Y].Cells[address.X];
+
+            foreach (DataGridViewRow row in selected)
+            {
+                row.Selected = true;
+            }
+        }
+
+        /// <summary>
+        /// Muestra u oculta una fila. Una fila que se oculta deja de estar seleccionada: si no, las
+        /// acciones sobre la selección —eliminar, sobre todo— alcanzarían pistas que no se ven.
+        /// </summary>
+        private static void SetRowVisibility(DataGridViewRow row, string filter)
+        {
+            bool visible = row.DataBoundItem is not Song song || MatchesFilter(song, filter);
+            if (row.Visible == visible)
+            {
+                return;
+            }
+
+            if (!visible)
+            {
+                row.Selected = false;
+            }
+
+            row.Visible = visible;
         }
 
         /// <summary>
@@ -186,6 +325,7 @@ namespace EchoCut
         {
             if (_songs.Count > 0)
             {
+                PaintNoFilterMatches(e.Graphics);
                 return;
             }
 
@@ -242,6 +382,42 @@ namespace EchoCut
                 new Rectangle(textBounds.Left, y + titleSize.Height + 8, textBounds.Width, hintSize.Height),
                 SongPresentation.Inconclusive,
                 flags);
+        }
+
+        /// <summary>
+        /// Avisa, cuando el filtro oculta todas las filas, de que la lista no está vacía: sin el
+        /// aviso, una rejilla en blanco parece una carga fallida.
+        /// </summary>
+        private void PaintNoFilterMatches(Graphics graphics)
+        {
+            if (FilterText.Length == 0 || dataGrid.Rows.GetRowCount(DataGridViewElementStates.Visible) > 0)
+            {
+                return;
+            }
+
+            int top = dataGrid.ColumnHeadersVisible ? dataGrid.ColumnHeadersHeight : 0;
+            Rectangle bounds = Rectangle.FromLTRB(
+                DropZoneMargin,
+                top + DropZoneMargin,
+                dataGrid.ClientSize.Width - DropZoneMargin,
+                dataGrid.ClientSize.Height - DropZoneMargin);
+
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+            {
+                return;
+            }
+
+            string message = $"Ninguna pista coincide con «{FilterText}».\n"
+                + "Vacía el filtro para volver a mostrar "
+                + (_songs.Count == 1 ? "la pista cargada." : $"las {_songs.Count} pistas cargadas.");
+
+            TextRenderer.DrawText(
+                graphics,
+                message,
+                dataGrid.Font,
+                bounds,
+                SongPresentation.Inconclusive,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
         }
     }
 }

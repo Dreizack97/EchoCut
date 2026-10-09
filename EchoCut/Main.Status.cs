@@ -132,7 +132,17 @@ namespace EchoCut
                 }
             }
 
-            lblTotal.Text = total == 1 ? "1 pista" : $"{total} pistas";
+            // Con el filtro activo se dice cuántas se ven de cuántas hay: los lotes actúan sobre todas,
+            // y es lo único que delata que hay filas ocultas que también se procesarán.
+            string filter = FilterText;
+            int visible = filter.Length == 0 ? total : _songs.Count(song => MatchesFilter(song, filter));
+
+            lblTotal.Text = visible == total
+                ? (total == 1 ? "1 pista" : $"{total} pistas")
+                : $"{visible} de {total} pistas";
+            lblTotal.ToolTipText = visible == total
+                ? "Pistas cargadas en la lista"
+                : "Pistas que pasan el filtro de las cargadas; los lotes actúan sobre todas";
 
             lblTrimmable.Text = $"{SongPresentation.TrimGlyph} {trimmable} {(trimmable == 1 ? "recortable" : "recortables")}";
             lblTrimmable.ForeColor = trimmable > 0 ? SongPresentation.Trimmable : SongPresentation.Inconclusive;
