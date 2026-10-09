@@ -60,7 +60,22 @@ public sealed class AudioTrimmer
         CancellationToken cancellationToken)
     {
         range.ThrowIfInvalid();
+        string destination = PrepareDestination(filePath, outputDirectory);
 
+        await FFmpegRunner
+            .RunCheckedAsync(_ffmpegPath, BuildArguments(filePath, range, destination), cancellationToken)
+            .ConfigureAwait(false);
+
+        return destination;
+    }
+
+    /// <summary>Crea la carpeta de salida y calcula la ruta de la copia, sin pisar nunca el original.</summary>
+    /// <param name="filePath">Ruta del archivo original.</param>
+    /// <param name="outputDirectory">Carpeta donde escribir la copia; se crea si no existe.</param>
+    /// <returns>Ruta completa de la copia, con el mismo nombre que el original.</returns>
+    /// <exception cref="FFmpegException">Se lanza si el destino calculado coincide con el original.</exception>
+    internal static string PrepareDestination(string filePath, string outputDirectory)
+    {
         Directory.CreateDirectory(outputDirectory);
         string destination = Path.Combine(outputDirectory, Path.GetFileName(filePath));
 
@@ -68,10 +83,6 @@ public sealed class AudioTrimmer
         {
             throw new FFmpegException("El archivo de salida coincide con el original; se omite para no sobrescribirlo.");
         }
-
-        await FFmpegRunner
-            .RunCheckedAsync(_ffmpegPath, BuildArguments(filePath, range, destination), cancellationToken)
-            .ConfigureAwait(false);
 
         return destination;
     }
