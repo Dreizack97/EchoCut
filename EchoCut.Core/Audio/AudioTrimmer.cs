@@ -72,12 +72,16 @@ public sealed class AudioTrimmer
     /// <summary>Crea la carpeta de salida y calcula la ruta de la copia, sin pisar nunca el original.</summary>
     /// <param name="filePath">Ruta del archivo original.</param>
     /// <param name="outputDirectory">Carpeta donde escribir la copia; se crea si no existe.</param>
+    /// <param name="extension">
+    /// Extensión de la copia, con el punto, si cambia de formato; <c>null</c> para conservar la del original.
+    /// </param>
     /// <returns>Ruta completa de la copia, con el mismo nombre que el original.</returns>
     /// <exception cref="FFmpegException">Se lanza si el destino calculado coincide con el original.</exception>
-    internal static string PrepareDestination(string filePath, string outputDirectory)
+    internal static string PrepareDestination(string filePath, string outputDirectory, string? extension = null)
     {
         Directory.CreateDirectory(outputDirectory);
-        string destination = Path.Combine(outputDirectory, Path.GetFileName(filePath));
+        string fileName = extension is null ? Path.GetFileName(filePath) : Path.GetFileNameWithoutExtension(filePath) + extension;
+        string destination = Path.Combine(outputDirectory, fileName);
 
         if (string.Equals(Path.GetFullPath(destination), Path.GetFullPath(filePath), StringComparison.OrdinalIgnoreCase))
         {

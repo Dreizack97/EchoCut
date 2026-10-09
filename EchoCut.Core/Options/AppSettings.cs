@@ -45,6 +45,13 @@ public sealed class AppSettings
     /// </value>
     public NormalizableFields NormalizeFields { get; set; } = NormalizableFields.All;
 
+    /// <summary>Calidad con la que «Convertir a MP3» codifica.</summary>
+    /// <value>
+    /// La elegida la última vez; por defecto, VBR V0, transparente con menos tamaño que 320 kbps. Se
+    /// guarda como número, igual que <see cref="NormalizeFields"/>.
+    /// </value>
+    public Mp3Quality Mp3Quality { get; set; } = Mp3Quality.VbrV0;
+
     /// <summary>
     /// Por defecto se acotan los hilos: pasado cierto punto el cuello de botella deja de ser la CPU.
     /// Medido sobre 43 MP3 reales, de 1 a 4 hilos se gana 3,1×, de 4 a 8 solo 1,27× más, y por
@@ -97,6 +104,12 @@ public sealed class AppSettings
                     {
                         loaded.NormalizeFields = NormalizableFields.All;
                     }
+
+                    if (!Enum.IsDefined(loaded.Mp3Quality))
+                    {
+                        loaded.Mp3Quality = Mp3Quality.VbrV0;
+                    }
+
                     return loaded;
                 }
             }
