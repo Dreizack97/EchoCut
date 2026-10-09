@@ -1,3 +1,4 @@
+using EchoCut.Library;
 using EchoCut.Objects;
 
 namespace EchoCut
@@ -41,16 +42,31 @@ namespace EchoCut
         /// <summary>Texto vigente del filtro, sin espacios en los extremos.</summary>
         private string FilterText => txtFilter.Text.Trim();
 
+        /// <summary>Texto del filtro ya sin acentos, listo para <see cref="MatchesFilter"/>.</summary>
+        /// <remarks>
+        /// Se pliega una sola vez por aplicación del filtro y no en cada comparación, que se repite
+        /// por cada fila de la lista.
+        /// </remarks>
+        private string FilterKey => TextNormalizer.RemoveAccents(FilterText);
+
         private void txtFilter_TextChanged(object? sender, EventArgs e) => ApplyFilter();
 
-        /// <summary>Si el nombre de una pista contiene el texto del filtro, sin distinguir mayúsculas.</summary>
+        /// <summary>
+        /// Si el nombre de una pista contiene el filtro, sin distinguir mayúsculas ni acentos.
+        /// </summary>
+        /// <param name="song">Pista cuyo nombre se comprueba.</param>
+        /// <param name="filterKey">Filtro ya plegado con <see cref="FilterKey"/>.</param>
         /// <remarks>
-        /// Se compara con la cultura actual y no con la invariante para que las mayúsculas de los
-        /// caracteres propios del español —«Ñ», vocales acentuadas— se plieguen igual que las
-        /// demás. Un filtro vacío deja pasar todo.
+        /// Los nombres de archivo llegan con y sin tilde según quién los etiquetó, así que «cancion»
+        /// debe encontrar «Canción». Se reutiliza <see cref="TextNormalizer.RemoveAccents"/>, que
+        /// conserva la «ñ» como letra propia y no como «n» acentuada: «ano» no encuentra «año»,
+        /// igual que la normalización de nombres tampoco las confunde.
+        /// Se compara con la cultura actual para que las mayúsculas de «Ñ» se plieguen igual que
+        /// las demás. Un filtro vacío deja pasar todo.
         /// </remarks>
-        private static bool MatchesFilter(Song song, string filter) =>
-            filter.Length == 0 || song.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase);
+        private static bool MatchesFilter(Song song, string filterKey) =>
+            filterKey.Length == 0
+            || TextNormalizer.RemoveAccents(song.Name).Contains(filterKey, StringComparison.CurrentCultureIgnoreCase);
 
         /// <summary>
         /// Muestra solo las filas cuyo nombre coincide con el filtro.
@@ -69,7 +85,7 @@ namespace EchoCut
             }
 
             _applyingFilter = true;
-            string filter = FilterText;
+            string filter = FilterKey;
 
             // Suspender el enlace descarta la celda actual; se recuerda para devolverla si su fila
             // sigue a la vista, y que el teclado no pierda su sitio en cada pulsación del filtro.
@@ -115,7 +131,7 @@ namespace EchoCut
             manager.SuspendBinding();
             try
             {
-                SetRowVisibility(dataGrid.Rows[rowIndex], FilterText);
+                SetRowVisibility(dataGrid.Rows[rowIndex], FilterKey);
             }
             finally
             {
@@ -153,9 +169,9 @@ namespace EchoCut
         /// Muestra u oculta una fila. Una fila que se oculta deja de estar seleccionada: si no, las
         /// acciones sobre la selección —eliminar, sobre todo— alcanzarían pistas que no se ven.
         /// </summary>
-        private static void SetRowVisibility(DataGridViewRow row, string filter)
+        private static void SetRowVisibility(DataGridViewRow row, string filterKey)
         {
-            bool visible = row.DataBoundItem is not Song song || MatchesFilter(song, filter);
+            bool visible = row.DataBoundItem is not Song song || MatchesFilter(song, filterKey);
             if (row.Visible == visible)
             {
                 return;

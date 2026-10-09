@@ -134,7 +134,7 @@ namespace EchoCut
 
             // Con el filtro activo se dice cuántas se ven de cuántas hay: los lotes actúan sobre todas,
             // y es lo único que delata que hay filas ocultas que también se procesarán.
-            string filter = FilterText;
+            string filter = FilterKey;
             int visible = filter.Length == 0 ? total : _songs.Count(song => MatchesFilter(song, filter));
 
             lblTotal.Text = visible == total
