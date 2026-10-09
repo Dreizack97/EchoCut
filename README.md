@@ -278,6 +278,31 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
    - **Exportar (`Exportar`)**: Genera un archivo CSV codificado en UTF-8 con BOM y separador regional, listo para abrirse en Microsoft Excel con todas las métricas acústicas de cada pista.
    - **Integrar con el Explorador de Windows (`Utilidades`)**: Agrega o quita «Abrir con EchoCut» en el menú contextual de los archivos de audio y las carpetas, sin permisos de administrador. En Windows 11 aparece en «Mostrar más opciones». Lo abierto desde el Explorador se suma al listado de la ventana ya abierta; si se mueve la carpeta de EchoCut, basta con volver a activar la opción.
 
+### ⌨️ Atajos de teclado
+
+El botón **⌨ Atajos** de la barra de herramientas, o `F1`, muestra la lista completa. Los botones y menús indican su atajo, y al pasar el ratón por ellos la barra de estado describe qué hacen.
+
+| Contexto | Acción | Atajo |
+|---|---|---|
+| Abrir canciones | Abrir archivo(s) / carpeta(s) | `Ctrl+O` / `Ctrl+Shift+O` |
+| Procesar | Analizar | `F5` |
+| Procesar | Recortar todo | `Ctrl+R` |
+| Procesar | Detener la operación en curso | `Esc` |
+| Procesar | Exportar CSV | `Ctrl+E` |
+| Utilidades | Agregar metadatos / Normalizar | `Ctrl+M` / `Ctrl+N` |
+| Utilidades | Agregar consecutivo / Quitar caracteres iniciales | `Ctrl+Shift+C` / `Ctrl+Shift+Q` |
+| Rejilla | Ver forma de onda y ajustar recorte | `Entrar` |
+| Rejilla | Renombrar / Editar propiedades | `F2` / `Alt+Entrar` |
+| Rejilla | Abrir carpeta contenedora | `Ctrl+Shift+E` |
+| Rejilla | Eliminar archivo(s) | `Supr` |
+| Rejilla | Abrir en Audacity | Doble clic |
+| Filtro | Ir al filtro / vaciarlo | `Ctrl+F` / `Esc` |
+| Forma de onda | Elegir la marca de inicio o de fin | `Inicio` / `Fin` |
+| Forma de onda | Mover la marca 0,01 s / 0,1 s / 1 s | `←` `→` / `Shift+←` `→` / `Ctrl+←` `→` |
+| Opciones | Parámetros avanzados / Atajos de teclado | `Ctrl+,` / `F1` |
+
+Los atajos de la rejilla funcionan con la lista de canciones seleccionada.
+
 ---
 
 ## 🤝 Contribución y Comunidad
