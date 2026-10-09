@@ -73,10 +73,12 @@ namespace EchoCut
             _songs.ListChanged += Songs_ListChanged;
 
             UpdateButtons();
+            RefreshSummary();
         }
 
         /// <summary>
-        /// Fuerza el repintado de toda la fila cuando cambia <see cref="Song.Estatus"/>.
+        /// Mantiene al día el resumen de la barra de estado y fuerza el repintado de toda la fila
+        /// cuando cambia <see cref="Song.Estatus"/>.
         /// </summary>
         /// <remarks>
         /// El color de texto de cada columna depende del estado, pero <c>ListChanged</c> solo marca
@@ -86,15 +88,27 @@ namespace EchoCut
         /// </remarks>
         private void Songs_ListChanged(object? sender, ListChangedEventArgs e)
         {
-            if (!IsAlive
-                || e.ListChangedType != ListChangedType.ItemChanged
-                || e.PropertyDescriptor?.Name != nameof(Song.Estatus)
-                || e.NewIndex < 0 || e.NewIndex >= dataGrid.Rows.Count)
+            if (!IsAlive)
             {
                 return;
             }
 
-            dataGrid.InvalidateRow(e.NewIndex);
+            string? property = e.PropertyDescriptor?.Name;
+
+            // El resumen depende de cuántas filas hay y de su estado o recorte; el resto de cambios
+            // (metadatos renombrados, por ejemplo) no lo alteran.
+            if (e.ListChangedType is not ListChangedType.ItemChanged
+                || property is nameof(Song.Estatus) or nameof(Song.Crop))
+            {
+                QueueSummaryRefresh();
+            }
+
+            if (e.ListChangedType == ListChangedType.ItemChanged
+                && property == nameof(Song.Estatus)
+                && e.NewIndex >= 0 && e.NewIndex < dataGrid.Rows.Count)
+            {
+                dataGrid.InvalidateRow(e.NewIndex);
+            }
         }
 
         private bool IsBusy => _analysisCts is not null || _trimCts is not null || _cleanCts is not null || _normalizeCts is not null;
@@ -247,11 +261,10 @@ namespace EchoCut
                 ? "1 carpeta"
                 : $"{_sourceDirectories.Count} carpetas";
 
-            lblStatus.Text = scan.SkippedCount == 0
+            SetStatus(scan.SkippedCount == 0
                 ? $"{_songs.Count} archivo(s) encontrados en {folderSummary}."
-                : $"{_songs.Count} archivo(s) encontrados en {folderSummary}; {scan.SkippedCount} ilegible(s) omitido(s).";
+                : $"{_songs.Count} archivo(s) encontrados en {folderSummary}; {scan.SkippedCount} ilegible(s) omitido(s).");
 
-            progressBar.Value = 0;
             UpdateButtons();
         }
 
@@ -315,11 +328,10 @@ namespace EchoCut
                 ? $"de la carpeta «{Path.GetFileName(_sourceDirectories[0])}»"
                 : $"de {_sourceDirectories.Count} carpetas";
 
-            lblStatus.Text = scan.SkippedCount == 0
+            SetStatus(scan.SkippedCount == 0
                 ? $"{_songs.Count} archivo(s) cargados {originSummary}."
-                : $"{_songs.Count} archivo(s) cargados {originSummary}; {scan.SkippedCount} ilegible(s) o no compatible(s) omitido(s).";
+                : $"{_songs.Count} archivo(s) cargados {originSummary}; {scan.SkippedCount} ilegible(s) o no compatible(s) omitido(s).");
 
-            progressBar.Value = 0;
             UpdateButtons();
         }
 
@@ -786,7 +798,7 @@ namespace EchoCut
                     CsvExporter.Build(_songs.Select(x => x.ToRecord())),
                     CsvExporter.Encoding);
 
-                lblStatus.Text = $"Resultados exportados a {Path.GetFileName(saveFileDialog.FileName)}.";
+                SetStatus($"Resultados exportados a {Path.GetFileName(saveFileDialog.FileName)}.");
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
@@ -803,7 +815,7 @@ namespace EchoCut
             {
                 _settings.Silence = dialog.Result;
                 _settings.Save();
-                lblStatus.Text = "Parámetros avanzados actualizados.";
+                SetStatus("Parámetros avanzados actualizados.");
 
                 // Activar o desactivar el principio, o cambiar sus mínimos, debe reflejarse ya en
                 // las pistas analizadas en lugar de esperar a un nuevo análisis.
@@ -894,7 +906,7 @@ namespace EchoCut
                 }
                 catch (Exception exception)
                 {
-                    lblStatus.Text = $"Error al actualizar la interfaz: {exception.Message}";
+                    SetStatus($"Error al actualizar la interfaz: {exception.Message}");
                 }
             });
 
@@ -939,18 +951,6 @@ namespace EchoCut
             return true;
         }
 
-        private void StartProgress(int total, string message)
-        {
-            progressBar.Maximum = Math.Max(1, total);
-            progressBar.Value = 0;
-            lblStatus.Text = message;
-        }
-
-        private void AdvanceProgress(int completed) =>
-            progressBar.Value = Math.Min(completed, progressBar.Maximum);
-
-        private void EndProgress() => progressBar.Value = progressBar.Maximum;
-
         private void UpdateButtons()
         {
             bool analyzing = _analysisCts is not null;
@@ -973,14 +973,6 @@ namespace EchoCut
             mnuDeleteSong.Enabled = !IsBusy && hasSongs;
         }
 
-        private void SetStatus(string message)
-        {
-            if (IsAlive)
-            {
-                lblStatus.Text = message;
-            }
-        }
-
         private void ShowError(string message, Exception exception)
         {
             if (!IsAlive)
@@ -988,7 +980,7 @@ namespace EchoCut
                 return;
             }
 
-            lblStatus.Text = message;
+            SetStatus(message);
             MessageBox.Show(
                 this,
                 $"{message}\n\n{exception.Message}",

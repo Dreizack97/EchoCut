@@ -46,8 +46,6 @@ namespace EchoCut
             label3 = new Label();
             label4 = new Label();
             numericThreads = new NumericUpDown();
-            progressBar = new ProgressBar();
-            lblStatus = new Label();
             saveFileDialog = new SaveFileDialog();
             openFileDialog = new OpenFileDialog();
             toolStrip = new ToolStrip();
@@ -63,11 +61,20 @@ namespace EchoCut
             mnuNormalize = new ToolStripMenuItem();
             btnExport = new ToolStripButton();
             btnAdvanced = new ToolStripButton();
+            statusStrip = new StatusStrip();
+            lblStatus = new ToolStripStatusLabel();
+            progressBar = new ToolStripProgressBar();
+            lblProgress = new ToolStripStatusLabel();
+            lblTotal = new ToolStripStatusLabel();
+            lblTrimmable = new ToolStripStatusLabel();
+            lblTrimmed = new ToolStripStatusLabel();
+            lblErrors = new ToolStripStatusLabel();
             ((System.ComponentModel.ISupportInitialize)dataGrid).BeginInit();
             contextMenuStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numericTolerance).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numericThreads).BeginInit();
             toolStrip.SuspendLayout();
+            statusStrip.SuspendLayout();
             SuspendLayout();
             // 
             // label1
@@ -102,13 +109,13 @@ namespace EchoCut
             dataGrid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
             dataGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             dataGrid.ContextMenuStrip = contextMenuStrip;
-            dataGrid.Location = new Point(12, 134);
+            dataGrid.Location = new Point(12, 100);
             dataGrid.Name = "dataGrid";
             dataGrid.ReadOnly = true;
             dataGrid.RowHeadersVisible = false;
             dataGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dataGrid.Size = new Size(1076, 428);
-            dataGrid.TabIndex = 9;
+            dataGrid.Size = new Size(1076, 477);
+            dataGrid.TabIndex = 8;
             dataGrid.CellContentClick += dataGrid_CellContentClick;
             dataGrid.CellDoubleClick += dataGrid_CellDoubleClick;
             dataGrid.CellFormatting += dataGrid_CellFormatting;
@@ -210,25 +217,6 @@ namespace EchoCut
             numericThreads.Size = new Size(50, 25);
             numericThreads.TabIndex = 7;
             numericThreads.Value = new decimal(new int[] { 8, 0, 0, 0 });
-            // 
-            // progressBar
-            // 
-            progressBar.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            progressBar.Location = new Point(12, 574);
-            progressBar.Name = "progressBar";
-            progressBar.Size = new Size(1076, 22);
-            progressBar.TabIndex = 10;
-            // 
-            // lblStatus
-            // 
-            lblStatus.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            lblStatus.AutoEllipsis = true;
-            lblStatus.Location = new Point(456, 68);
-            lblStatus.Name = "lblStatus";
-            lblStatus.Size = new Size(632, 19);
-            lblStatus.TabIndex = 8;
-            lblStatus.Text = "Listo.";
-            lblStatus.TextAlign = ContentAlignment.MiddleRight;
             // 
             // saveFileDialog
             // 
@@ -344,15 +332,82 @@ namespace EchoCut
             btnAdvanced.Text = "⚙ Avanzado";
             btnAdvanced.Click += btnAdvanced_Click;
             // 
+            // statusStrip
+            // 
+            statusStrip.Font = new Font("Segoe UI", 9F);
+            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, progressBar, lblProgress, lblTotal, lblTrimmable, lblTrimmed, lblErrors });
+            statusStrip.Location = new Point(0, 587);
+            statusStrip.Name = "statusStrip";
+            statusStrip.ShowItemToolTips = true;
+            statusStrip.Size = new Size(1100, 24);
+            statusStrip.TabIndex = 9;
+            // 
+            // lblStatus
+            // 
+            lblStatus.Name = "lblStatus";
+            lblStatus.Size = new Size(756, 19);
+            lblStatus.Spring = true;
+            lblStatus.Text = "Listo.";
+            lblStatus.TextAlign = ContentAlignment.MiddleLeft;
+            // 
+            // progressBar
+            // 
+            progressBar.Name = "progressBar";
+            progressBar.Size = new Size(180, 18);
+            progressBar.Visible = false;
+            // 
+            // lblProgress
+            // 
+            lblProgress.Name = "lblProgress";
+            lblProgress.Size = new Size(36, 19);
+            lblProgress.Text = "0 / 0";
+            lblProgress.Visible = false;
+            // 
+            // lblTotal
+            // 
+            lblTotal.BorderSides = ToolStripStatusLabelBorderSides.Left;
+            lblTotal.BorderStyle = Border3DStyle.Etched;
+            lblTotal.Name = "lblTotal";
+            lblTotal.Size = new Size(54, 19);
+            lblTotal.Text = "0 pistas";
+            lblTotal.ToolTipText = "Pistas cargadas en la lista";
+            // 
+            // lblTrimmable
+            // 
+            lblTrimmable.BorderSides = ToolStripStatusLabelBorderSides.Left;
+            lblTrimmable.BorderStyle = Border3DStyle.Etched;
+            lblTrimmable.Name = "lblTrimmable";
+            lblTrimmable.Size = new Size(96, 19);
+            lblTrimmable.Text = "✂ 0 recortables";
+            lblTrimmable.ToolTipText = "Pistas con silencio recortable que aún no se han recortado";
+            // 
+            // lblTrimmed
+            // 
+            lblTrimmed.BorderSides = ToolStripStatusLabelBorderSides.Left;
+            lblTrimmed.BorderStyle = Border3DStyle.Etched;
+            lblTrimmed.Name = "lblTrimmed";
+            lblTrimmed.Size = new Size(95, 19);
+            lblTrimmed.Text = "✔ 0 recortadas";
+            lblTrimmed.ToolTipText = "Pistas ya recortadas en esta sesión";
+            // 
+            // lblErrors
+            // 
+            lblErrors.BorderSides = ToolStripStatusLabelBorderSides.Left;
+            lblErrors.BorderStyle = Border3DStyle.Etched;
+            lblErrors.Name = "lblErrors";
+            lblErrors.Size = new Size(74, 19);
+            lblErrors.Text = "⚠ 0 errores";
+            lblErrors.ToolTipText = "Pistas cuyo análisis o recorte falló; el detalle va en el CSV exportado";
+            lblErrors.Visible = false;
+            // 
             // Main
             // 
             AllowDrop = true;
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1100, 611);
+            Controls.Add(statusStrip);
             Controls.Add(toolStrip);
-            Controls.Add(lblStatus);
-            Controls.Add(progressBar);
             Controls.Add(numericThreads);
             Controls.Add(label4);
             Controls.Add(label3);
@@ -375,6 +430,8 @@ namespace EchoCut
             ((System.ComponentModel.ISupportInitialize)numericThreads).EndInit();
             toolStrip.ResumeLayout(false);
             toolStrip.PerformLayout();
+            statusStrip.ResumeLayout(false);
+            statusStrip.PerformLayout();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -390,8 +447,6 @@ namespace EchoCut
         private Label label3;
         private Label label4;
         private NumericUpDown numericThreads;
-        private ProgressBar progressBar;
-        private Label lblStatus;
         private SaveFileDialog saveFileDialog;
         private ContextMenuStrip contextMenuStrip;
         private ToolStripMenuItem mnuOpenFolder;
@@ -413,5 +468,13 @@ namespace EchoCut
         private ToolStripButton btnAdvanced;
         private ToolStripMenuItem mnuCleanMetadata;
         private ToolStripMenuItem mnuNormalize;
+        private StatusStrip statusStrip;
+        private ToolStripStatusLabel lblStatus;
+        private ToolStripProgressBar progressBar;
+        private ToolStripStatusLabel lblProgress;
+        private ToolStripStatusLabel lblTotal;
+        private ToolStripStatusLabel lblTrimmable;
+        private ToolStripStatusLabel lblTrimmed;
+        private ToolStripStatusLabel lblErrors;
     }
 }
