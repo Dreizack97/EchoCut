@@ -11,7 +11,7 @@ namespace EchoCut.Playback;
 /// </summary>
 /// <remarks>
 /// <para>
-/// FFmpeg decodifica el tramo a PCM estéreo de 16 bits directamente en memoria y NAudio lo envía
+/// FFmpeg decodifica el tramo a PCM estéreo directamente en memoria y NAudio lo envía
 /// a la tarjeta con <see cref="WaveOut"/>. A diferencia de reproducir un WAV temporal, el
 /// dispositivo informa de cuántos bytes ha sonado ya, que es lo que permite dibujar un cursor
 /// sincronizado con lo que se oye, y avisa cuando termina en vez de obligar a adivinarlo con un
@@ -37,8 +37,16 @@ public sealed class AudioPreviewPlayer : IDisposable
     private readonly string _ffmpegPath;
     private readonly SynchronizationContext? _context;
 
+    /// <summary>
+    /// Reproductor que está sonando en toda la aplicación. Con varios editores abiertos y la rejilla,
+    /// dos tramos superpuestos no dejarían juzgar ninguno: empezar uno interrumpe al anterior.
+    /// </summary>
+    private static AudioPreviewPlayer? s_active;
+
     private WaveOut? _output;
     private PreviewWindow _window;
+    private DeletedRegions _deletions = DeletedRegions.Empty;
+    private double _keptSeconds;
     private int _generation;
     private bool _disposed;
 
@@ -52,8 +60,9 @@ public sealed class AudioPreviewPlayer : IDisposable
     }
 
     /// <summary>
-    /// Se produce cuando el tramo termina de sonar por sí solo. No se produce al detenerlo con
-    /// <see cref="Stop"/> ni al sustituirlo por otro: en esos casos quien lo pidió ya lo sabe.
+    /// Se produce cuando el tramo deja de sonar sin que su dueño lo pidiera: porque llegó al final o
+    /// porque otro reproductor de la aplicación empezó a sonar. No se produce al detenerlo con
+    /// <see cref="Stop"/> ni al sustituirlo por otro tramo: en esos casos quien lo pidió ya lo sabe.
     /// </summary>
     public event EventHandler? PlaybackCompleted;
 
@@ -62,7 +71,8 @@ public sealed class AudioPreviewPlayer : IDisposable
 
     /// <value>
     /// Instante del archivo que está sonando, en segundos, o <c>null</c> si no suena nada. Lo da el
-    /// propio dispositivo, así que incluye la latencia de salida: es lo que de verdad se oye.
+    /// propio dispositivo, así que incluye la latencia de salida: es lo que de verdad se oye. Lo
+    /// borrado se salta, de modo que el cursor recorre el original igual que la copia.
     /// </value>
     public double? PositionSeconds
     {
@@ -74,16 +84,16 @@ public sealed class AudioPreviewPlayer : IDisposable
             }
 
             double played = output.GetPosition() / (double)PlaybackFormat.AverageBytesPerSecond;
-            return _window.StartSeconds + Math.Min(played, _window.DurationSeconds);
+            return _deletions.SourceSecondsAt(_window.StartSeconds, Math.Min(played, _keptSeconds));
         }
     }
 
     /// <summary>Decodifica el tramo indicado y empieza a reproducirlo, sustituyendo al que sonara.</summary>
     /// <param name="filePath">Ruta del archivo de audio a previsualizar.</param>
     /// <param name="window">Tramo del archivo a reproducir.</param>
-    /// <param name="fades">
-    /// Fundidos que llevará la copia, para que el tramo suene como sonará ella; <c>null</c> si no
-    /// lleva ninguno.
+    /// <param name="edits">
+    /// Fundidos y borrados que llevará la copia, para que el tramo suene como sonará ella; <c>null</c>
+    /// si no lleva ninguno.
     /// </param>
     /// <param name="cancellationToken">
     /// Token de cancelación para la decodificación con FFmpeg. Una vez iniciada la reproducción, no
@@ -91,15 +101,21 @@ public sealed class AudioPreviewPlayer : IDisposable
     /// </param>
     /// <returns>Una tarea que termina cuando el tramo empieza a sonar.</returns>
     /// <remarks>
+    /// <para>
     /// Si se pide otro tramo mientras este se decodifica, gana el último: el anterior se descarta sin
     /// llegar a sonar, para que dos clics seguidos nunca dejen dos reproducciones superpuestas.
+    /// </para>
+    /// <para>
+    /// FFmpeg entrega flotantes para que las ediciones pasen por <see cref="PcmEditor"/>, el mismo
+    /// código que escribe la copia; después se convierten a los 16 bits del dispositivo.
+    /// </para>
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Se lanza si el reproductor ya se liberó con <see cref="Dispose"/>.</exception>
     /// <exception cref="FFmpegException">
     /// Se lanza si <paramref name="window"/> tiene duración no positiva, o si FFmpeg falla al
     /// decodificar el tramo.
     /// </exception>
-    public async Task PlayAsync(string filePath, PreviewWindow window, TrackFades? fades, CancellationToken cancellationToken)
+    public async Task PlayAsync(string filePath, PreviewWindow window, AudioEdits? edits, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -120,11 +136,11 @@ public sealed class AudioPreviewPlayer : IDisposable
             "-vn",
             "-ac", PlaybackFormat.Channels.ToString(CultureInfo.InvariantCulture),
             "-ar", PlaybackFormat.SampleRate.ToString(CultureInfo.InvariantCulture),
-            "-f", "s16le",
+            "-f", "f32le",
             "-",
         ];
 
-        byte[] pcm = await FFmpegRunner.ReadOutputAsync(_ffmpegPath, arguments, cancellationToken).ConfigureAwait(true);
+        byte[] decoded = await FFmpegRunner.ReadOutputAsync(_ffmpegPath, arguments, cancellationToken).ConfigureAwait(true);
 
         cancellationToken.ThrowIfCancellationRequested();
         if (_disposed || generation != _generation)
@@ -132,10 +148,20 @@ public sealed class AudioPreviewPlayer : IDisposable
             return;
         }
 
-        if (fades is not null)
+        byte[] pcm = ToPlaybackPcm(decoded, edits, window);
+        if (pcm.Length == 0)
         {
-            ApplyFades(pcm, fades, window);
+            throw new FFmpegException("El tramo está borrado por completo: no queda nada que escuchar.");
         }
+
+        if (s_active is { } other && !ReferenceEquals(other, this))
+        {
+            other.Interrupt();
+        }
+
+        s_active = this;
+        _deletions = edits?.Deletions ?? DeletedRegions.Empty;
+        _keptSeconds = pcm.Length / (double)PlaybackFormat.AverageBytesPerSecond;
 
         WaveOut output = new() { BufferMilliseconds = BufferMilliseconds };
         output.PlaybackStopped += (_, _) => OnStopped(output);
@@ -146,31 +172,43 @@ public sealed class AudioPreviewPlayer : IDisposable
         output.Play();
     }
 
-    /// <summary>Atenúa el PCM decodificado con la misma envolvente que se aplicará a la copia.</summary>
+    /// <summary>Aplica las ediciones al PCM flotante decodificado y lo convierte a 16 bits.</summary>
     /// <remarks>
-    /// Se trabaja sobre las muestras de 16 bits ya decodificadas: la ventana mide segundos y atenuar
-    /// aquí ahorra pedir a FFmpeg flotantes solo para convertirlos después.
+    /// La conversión satura en lugar de desbordar: un pico que FFmpeg entregue apenas por encima de
+    /// 1.0 sonaría como un chasquido si diera la vuelta al rango de 16 bits.
     /// </remarks>
-    private static void ApplyFades(byte[] pcm, TrackFades fades, PreviewWindow window)
+    private static byte[] ToPlaybackPcm(byte[] decoded, AudioEdits? edits, PreviewWindow window)
     {
-        FadeEnvelope envelope = new(fades, PlaybackFormat.SampleRate, window.StartSeconds);
-        Span<short> samples = MemoryMarshal.Cast<byte, short>(pcm.AsSpan());
         int channels = PlaybackFormat.Channels;
+        int usable = decoded.Length - (decoded.Length % (channels * sizeof(float)));
+        Span<float> samples = MemoryMarshal.Cast<byte, float>(decoded.AsSpan(0, usable));
 
-        for (int frame = 0; frame < samples.Length / channels; frame++)
+        int frames = samples.Length / channels;
+        if (edits is not null)
         {
-            double gain = envelope.GainAt(frame);
-            if (gain >= 1.0)
-            {
-                continue;
-            }
-
-            Span<short> frameSamples = samples.Slice(frame * channels, channels);
-            for (int channel = 0; channel < channels; channel++)
-            {
-                frameSamples[channel] = (short)Math.Round(frameSamples[channel] * gain);
-            }
+            frames = new PcmEditor(edits, PlaybackFormat.SampleRate, window.StartSeconds, channels).Process(samples, 0);
         }
+
+        byte[] pcm = new byte[frames * channels * sizeof(short)];
+        Span<short> output = MemoryMarshal.Cast<byte, short>(pcm.AsSpan());
+        for (int i = 0; i < output.Length; i++)
+        {
+            output[i] = (short)Math.Clamp(Math.Round(samples[i] * short.MaxValue), short.MinValue, short.MaxValue);
+        }
+
+        return pcm;
+    }
+
+    /// <summary>Calla este reproductor porque otro empezó a sonar, y se lo hace saber a su dueño.</summary>
+    private void Interrupt()
+    {
+        if (_output is null)
+        {
+            return;
+        }
+
+        Stop();
+        PlaybackCompleted?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Detiene la reproducción en curso, si la hay, sin producir <see cref="PlaybackCompleted"/>.</summary>
@@ -182,6 +220,11 @@ public sealed class AudioPreviewPlayer : IDisposable
         // como la reproducción en curso y no se confunde con un final natural.
         WaveOut? output = _output;
         _output = null;
+
+        if (ReferenceEquals(s_active, this))
+        {
+            s_active = null;
+        }
 
         if (output is not null)
         {
@@ -216,6 +259,11 @@ public sealed class AudioPreviewPlayer : IDisposable
 
             _output = null;
             output.Dispose();
+            if (ReferenceEquals(s_active, this))
+            {
+                s_active = null;
+            }
+
             PlaybackCompleted?.Invoke(this, EventArgs.Empty);
         }
 

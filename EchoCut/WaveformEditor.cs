@@ -463,7 +463,7 @@ namespace EchoCut
             try
             {
                 _player ??= CreatePlayer();
-                await _player.PlayAsync(_track.FilePath, window, CurrentFades, _closing.Token).ConfigureAwait(true);
+                await _player.PlayAsync(_track.FilePath, window, AudioEdits.From(CurrentFades, null), _closing.Token).ConfigureAwait(true);
 
                 if (IsDisposed || request != _playRequest || !_player.IsPlaying)
                 {
