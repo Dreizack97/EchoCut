@@ -30,9 +30,10 @@ namespace EchoCut
             string WarningIntro);
 
         /// <summary>
-        /// Aplica <paramref name="edit"/> a cada pista del listado y sustituye su fila por la pista
+        /// Aplica <paramref name="edit"/> a cada pista indicada y sustituye su fila por la pista
         /// que devuelve.
         /// </summary>
+        /// <param name="songs">Pistas a procesar; normalmente, todo el listado.</param>
         /// <param name="batch">Textos de la operación.</param>
         /// <param name="edit">
         /// Operación sobre el archivo, a partir de su ruta. Corre en un hilo de trabajo y devuelve la
@@ -49,13 +50,13 @@ namespace EchoCut
         /// <see cref="IsAlive"/>, porque pueden llegar con la ventana ya cerrándose.
         /// </remarks>
         private async Task RunLibraryBatchAsync(
+            IReadOnlyList<Song> songs,
             LibraryBatch batch,
             Func<string, TrackInfo> edit,
             Action<CancellationTokenSource?> track)
         {
             StopPreview();
 
-            List<Song> songs = [.. _songs];
             using CancellationTokenSource cts = new();
             track(cts);
             UpdateButtons();
@@ -86,19 +87,7 @@ namespace EchoCut
                             string oldPath = song.FilePath;
                             TrackInfo updated = edit(oldPath);
 
-                            PostToUi(() =>
-                            {
-                                // La fila se localiza por ruta: si la operación renombró el
-                                // archivo, los avisos posteriores deben encontrarla con la nueva.
-                                string newPath = updated.FilePath;
-                                if (!string.Equals(oldPath, newPath, StringComparison.Ordinal))
-                                {
-                                    _rows.Remove(oldPath);
-                                    _rows[newPath] = song;
-                                }
-
-                                song.UpdateTrack(updated);
-                            });
+                            PostToUi(() => ReplaceTrack(song, oldPath, updated));
 
                             Interlocked.Increment(ref successCount);
                         }
@@ -162,6 +151,26 @@ namespace EchoCut
             }
         }
 
+        /// <summary>Sustituye la pista de una fila por la releída tras modificar su archivo.</summary>
+        /// <param name="song">Fila a actualizar.</param>
+        /// <param name="oldPath">Ruta del archivo antes de la operación.</param>
+        /// <param name="updated">Pista releída, quizá con otra ruta si se renombró.</param>
+        /// <remarks>
+        /// La fila se localiza por ruta: si la operación renombró el archivo, los avisos
+        /// posteriores deben encontrarla con la nueva.
+        /// </remarks>
+        private void ReplaceTrack(Song song, string oldPath, TrackInfo updated)
+        {
+            string newPath = updated.FilePath;
+            if (!string.Equals(oldPath, newPath, StringComparison.Ordinal))
+            {
+                _rows.Remove(oldPath);
+                _rows[newPath] = song;
+            }
+
+            song.UpdateTrack(updated);
+        }
+
         /// <summary>
         /// Encola una acción en el hilo de la interfaz desde un hilo de trabajo, si la ventana sigue viva.
         /// </summary>
@@ -219,6 +228,7 @@ namespace EchoCut
             }
 
             await RunLibraryBatchAsync(
+                [.. _songs],
                 new LibraryBatch(
                     "Limpiando metadatos…",
                     (success, total) => success == 1
@@ -287,6 +297,7 @@ namespace EchoCut
             }
 
             await RunLibraryBatchAsync(
+                [.. _songs],
                 new LibraryBatch(
                     "Aplicando metadatos…",
                     (success, total) => success == 1 && total == 1
@@ -363,6 +374,7 @@ namespace EchoCut
             }
 
             await RunLibraryBatchAsync(
+                [.. _songs],
                 new LibraryBatch(
                     "Normalizando información de canciones…",
                     (success, total) => success == 1
