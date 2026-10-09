@@ -46,9 +46,20 @@ namespace EchoCut
                 new(Keys.Control | Keys.R, btnCropAll),
                 new(Keys.Escape, btnStop),
                 new(Keys.Control | Keys.E, btnExport),
+                new(Keys.Control | Keys.M, mnuAddMetadata),
+                new(Keys.Control | Keys.N, mnuNormalize),
+                new(Keys.Control | Keys.Shift | Keys.C, mnuAddSequence),
+                new(Keys.Control | Keys.Shift | Keys.Q, mnuRemoveLeading),
 
+                // Entrar abre la opción en negrita del menú contextual, como el verbo por defecto
+                // en el Explorador, y Alt+Entrar las propiedades, como allí.
+                new(Keys.Enter, mnuWaveform, ShortcutScope.Grid),
                 new(Keys.F2, mnuRenameSong, ShortcutScope.Grid),
+                new(Keys.Alt | Keys.Enter, mnuEditSong, ShortcutScope.Grid),
+                new(Keys.Control | Keys.Shift | Keys.E, mnuOpenFolder, ShortcutScope.Grid),
                 new(Keys.Delete, mnuDeleteSong, ShortcutScope.Grid),
+
+                new(Keys.Control | Keys.Oemcomma, btnAdvanced),
             ];
 
             foreach (ShortcutBinding shortcut in _shortcuts)
