@@ -72,7 +72,6 @@ namespace EchoCut
                 _settings.ThreadCount > 0 ? _settings.ThreadCount : AppSettings.DefaultThreadCount);
 
             dataGrid.DefaultCellStyle.SelectionBackColor = SongPresentation.Selection;
-            dataGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dataGrid.DataSource = _songs;
 
             _songs.ListChanged += Songs_ListChanged;
@@ -287,6 +286,7 @@ namespace EchoCut
 
             // Cargar otra selección de carpetas no debe dejar la cabecera marcada con un orden obsoleto.
             _songs.ReapplySort();
+            AutoSizeColumns();
 
             string folderSummary = _sourceDirectories.Count == 1
                 ? "1 carpeta"
@@ -354,6 +354,7 @@ namespace EchoCut
 
             // Cargar nueva lista de pistas no debe dejar la cabecera marcada con un orden obsoleto.
             _songs.ReapplySort();
+            AutoSizeColumns();
 
             string originSummary = _sourceDirectories.Count == 1
                 ? $"de la carpeta «{Path.GetFileName(_sourceDirectories[0])}»"
@@ -1492,6 +1493,9 @@ namespace EchoCut
                 {
                     _songs.ReapplySort();
 
+                    // Los metadatos reescritos cambian el ancho que necesitan sus columnas.
+                    AutoSizeColumns();
+
                     if (successCount == 1)
                     {
                         SetStatus("Metadatos eliminados correctamente para 1 canción.");
@@ -1654,6 +1658,9 @@ namespace EchoCut
                 if (IsAlive)
                 {
                     _songs.ReapplySort();
+
+                    // Los metadatos reescritos cambian el ancho que necesitan sus columnas.
+                    AutoSizeColumns();
 
                     if (successCount == 1)
                     {

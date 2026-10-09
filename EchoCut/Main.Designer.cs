@@ -125,11 +125,13 @@ namespace EchoCut
             dataGrid.CellDoubleClick += dataGrid_CellDoubleClick;
             dataGrid.CellFormatting += dataGrid_CellFormatting;
             dataGrid.CellMouseDown += dataGrid_CellMouseDown;
+            dataGrid.ColumnWidthChanged += dataGrid_ColumnWidthChanged;
             dataGrid.DataBindingComplete += dataGrid_DataBindingComplete;
             dataGrid.DragDrop += Main_DragDrop;
             dataGrid.DragEnter += Main_DragEnter;
             dataGrid.DragLeave += Main_DragLeave;
             dataGrid.Paint += dataGrid_Paint;
+            dataGrid.SizeChanged += dataGrid_SizeChanged;
             dataGrid.KeyDown += dataGrid_KeyDown;
             // 
             // contextMenuStrip

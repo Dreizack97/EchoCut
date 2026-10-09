@@ -241,55 +241,192 @@ namespace EchoCut
         }
 
         /// <summary>
-        /// Proporciones, mínimos y alineación de cada columna, portados del proyecto de referencia.
+        /// Fracción del ancho visible que, como mucho, recibe una columna de texto libre al
+        /// ajustarse a su contenido.
         /// </summary>
         /// <remarks>
-        /// La rejilla reparte el ancho disponible entre las columnas según su peso, en vez de dar
-        /// 100 px a cada una. Con trece columnas, asignarles anchos fijos las hace sumar bastante más
-        /// de lo que cabe en la ventana, así que aparecería barra horizontal desde el primer momento
-        /// y las últimas —«Recorte» y «Estado», justo las que se consultan— quedarían fuera de vista.
-        /// Repartiendo por peso, todas caben y las proporciones se conservan al redimensionar.
-        /// El usuario puede seguir arrastrando los separadores; el reparto solo fija el punto de
-        /// partida y qué columna cede espacio a cuál.
+        /// Un solo nombre desmesurado no debe empujar el resto de columnas fuera de la vista. Lo que
+        /// quede recortado se lee en el tooltip de la celda, y el usuario puede ensanchar la columna.
+        /// </remarks>
+        private const double MaxTextColumnRatio = 0.4;
+
+        /// <summary>Columnas de texto libre, las únicas cuyo contenido no tiene un ancho acotado.</summary>
+        private static readonly string[] TextColumns =
+            [nameof(Song.Name), nameof(Song.Title), nameof(Song.Artist), nameof(Song.Album)];
+
+        /// <summary>Todos los valores que puede mostrar la columna «Estado».</summary>
+        private static readonly string[] StatusTexts =
+        [
+            Song.StatusPending, Song.StatusAnalyzing, Song.StatusAnalyzed, Song.StatusNoSilence,
+            Song.StatusAdjusted, Song.StatusTrimming, Song.StatusTrimmed, Song.StatusCancelled,
+            Song.StatusError,
+        ];
+
+        /// <summary>Si las columnas ya recibieron su primer ajuste al contenido.</summary>
+        private bool _columnsAutoSized;
+
+        /// <summary>
+        /// Ancho que pedía su contenido, por columna de texto que el tope dejó más estrecha.
+        /// </summary>
+        /// <remarks>
+        /// El tope es una fracción del ancho visible, así que al ensanchar la ventana se recalcula
+        /// para devolverles el espacio que les falta. Una columna sale de aquí en cuanto el usuario
+        /// la ajusta a mano: a partir de ahí su ancho es decisión suya.
+        /// </remarks>
+        private readonly Dictionary<string, int> _cappedColumns = [];
+
+        /// <summary>Si los anchos los está cambiando el propio ajuste, y no el usuario.</summary>
+        private bool _sizingColumns;
+
+        /// <summary>Alineación del contenido de cada columna.</summary>
+        /// <remarks>
+        /// Solo decide cómo se presenta el contenido, no el ancho: se aplica en cada reenlace, y
+        /// los anchos se fijan aparte en <see cref="AutoSizeColumns"/> para no deshacer los que el
+        /// usuario haya ajustado a mano cada vez que ordena.
         /// </remarks>
         private void ApplyColumnLayout()
         {
-            // Los mínimos no son estéticos: por debajo de ellos se corta el propio título de la
-            // columna, y una cabecera que pone «Silencio» donde debería poner «Silencio (s)» hace
-            // dudar de en qué unidad está el número.
-            SetColumnLayout(nameof(Song.Name), 200, 90);
-            SetColumnLayout(nameof(Song.Title), 150, 70);
-            SetColumnLayout(nameof(Song.Artist), 120, 70);
-            SetColumnLayout(nameof(Song.Album), 120, 70);
-            SetColumnLayout(nameof(Song.Duration), 75, 74, DataGridViewContentAlignment.MiddleRight);
-            SetColumnLayout(nameof(Song.Extension), 55, 50, DataGridViewContentAlignment.MiddleCenter);
-            SetColumnLayout(nameof(Song.Bitrate), 80, 64, DataGridViewContentAlignment.MiddleRight);
-            SetColumnLayout(nameof(Song.Size), 80, 70, DataGridViewContentAlignment.MiddleRight);
-            SetColumnLayout(nameof(Song.LeadingSilence), 130, 127);
-            SetColumnLayout(nameof(Song.Silence), 120, 119);
-            SetColumnLayout(nameof(Song.Crop), 90, 88);
-            SetColumnLayout(nameof(Song.Estatus), 120, 72);
+            SetColumnAlignment(nameof(Song.Duration), DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(nameof(Song.Extension), DataGridViewContentAlignment.MiddleCenter);
+            SetColumnAlignment(nameof(Song.Bitrate), DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(nameof(Song.Size), DataGridViewContentAlignment.MiddleRight);
+
+            if (!_columnsAutoSized)
+            {
+                AutoSizeColumns();
+            }
         }
 
-        private void SetColumnLayout(
-            string columnName,
-            int weight,
-            int minimumWidth,
-            DataGridViewContentAlignment? alignment = null)
+        private void SetColumnAlignment(string columnName, DataGridViewContentAlignment alignment)
         {
-            if (dataGrid.Columns[columnName] is not { } column)
+            if (dataGrid.Columns[columnName] is { } column)
+            {
+                column.DefaultCellStyle.Alignment = alignment;
+            }
+        }
+
+        /// <summary>
+        /// Ajusta cada columna al ancho de su contenido, con su título como mínimo.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Sustituye al reparto por peso (<c>Fill</c>): repartir el ancho de la ventana por
+        /// proporciones fijas recortaba los nombres aunque sobrara sitio en columnas de contenido
+        /// corto como «Ext.». Y <see cref="DataGridView.AutoResizeColumns()"/> no sirve sobre
+        /// columnas en <c>Fill</c>: no falla, pero el reparto vuelve a imponer su ancho.
+        /// </para>
+        /// <para>
+        /// Se mide con todas las filas y no solo con las visibles: con <c>DisplayedCells</c> los
+        /// nombres largos que aparecen al desplazarse quedarían cortados. Se hace al cargar y tras
+        /// los lotes que reescriben metadatos, nunca al ordenar o filtrar, porque deshacería el
+        /// ancho que el usuario haya dado a mano a una columna.
+        /// </para>
+        /// <para>
+        /// El título fija el mínimo al que se puede estrechar una columna: una cabecera que pone
+        /// «Silencio» donde debería poner «Silencio (s)» hace dudar de la unidad. «Estado» toma el
+        /// espacio sobrante para que la rejilla no termine en un hueco, y nunca baja de su valor más
+        /// largo, porque cambia durante los lotes y sin ese mínimo «Recortando…» quedaría cortado.
+        /// </para>
+        /// </remarks>
+        private void AutoSizeColumns()
+        {
+            if (!IsAlive || dataGrid.Columns.Count == 0)
             {
                 return;
             }
 
-            column.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            column.FillWeight = weight;
-            column.MinimumWidth = minimumWidth;
+            _columnsAutoSized = true;
+            _sizingColumns = true;
+            _cappedColumns.Clear();
 
-            if (alignment is { } value)
+            try
             {
-                column.DefaultCellStyle.Alignment = value;
+                DataGridViewColumn? status = dataGrid.Columns[nameof(Song.Estatus)];
+                int maxTextWidth = MaxTextColumnWidth;
+
+                foreach (DataGridViewColumn column in dataGrid.Columns)
+                {
+                    // Las columnas de acción tienen un ancho fijo pensado para un único glifo.
+                    if (column is DataGridViewButtonColumn)
+                    {
+                        continue;
+                    }
+
+                    column.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                    column.MinimumWidth = column.GetPreferredWidth(DataGridViewAutoSizeColumnMode.ColumnHeader, fixedHeight: true);
+
+                    dataGrid.AutoResizeColumn(column.Index, DataGridViewAutoSizeColumnMode.AllCells);
+
+                    if (TextColumns.Contains(column.Name) && column.Width > maxTextWidth)
+                    {
+                        _cappedColumns[column.Name] = column.Width;
+                        column.Width = Math.Max(column.MinimumWidth, maxTextWidth);
+                    }
+                }
+
+                if (status is not null)
+                {
+                    status.MinimumWidth = Math.Max(status.MinimumWidth, LongestStatusWidth(status));
+                    status.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                }
             }
+            finally
+            {
+                _sizingColumns = false;
+            }
+        }
+
+        /// <summary>Tope de ancho de una columna de texto para el ancho visible actual.</summary>
+        private int MaxTextColumnWidth => Math.Max(150, (int)(dataGrid.ClientSize.Width * MaxTextColumnRatio));
+
+        /// <summary>
+        /// Recalcula el tope de las columnas recortadas cuando cambia el ancho de la rejilla, para
+        /// que al maximizar el espacio vaya a los nombres que no cabían y no solo a «Estado».
+        /// </summary>
+        private void dataGrid_SizeChanged(object? sender, EventArgs e)
+        {
+            if (_cappedColumns.Count == 0 || !IsAlive)
+            {
+                return;
+            }
+
+            int maxTextWidth = MaxTextColumnWidth;
+            _sizingColumns = true;
+
+            try
+            {
+                foreach ((string name, int preferred) in _cappedColumns)
+                {
+                    if (dataGrid.Columns[name] is { } column)
+                    {
+                        column.Width = Math.Max(column.MinimumWidth, Math.Min(preferred, maxTextWidth));
+                    }
+                }
+            }
+            finally
+            {
+                _sizingColumns = false;
+            }
+        }
+
+        /// <summary>Deja de gobernar el ancho de una columna que el usuario ajusta a mano.</summary>
+        private void dataGrid_ColumnWidthChanged(object? sender, DataGridViewColumnEventArgs e)
+        {
+            if (!_sizingColumns)
+            {
+                _cappedColumns.Remove(e.Column.Name);
+            }
+        }
+
+        /// <summary>Ancho que necesita la celda de estado para el valor más largo que puede tomar.</summary>
+        private int LongestStatusWidth(DataGridViewColumn status)
+        {
+            DataGridViewCellStyle? style = status.InheritedStyle;
+            Font font = style?.Font ?? dataGrid.Font;
+            int text = StatusTexts.Max(value => TextRenderer.MeasureText(value, font).Width);
+
+            // Relleno de la celda más el margen que la propia rejilla deja al pintar el texto.
+            return text + (style?.Padding.Horizontal ?? 0) + 8;
         }
 
         /// <summary>
