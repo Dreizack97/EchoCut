@@ -60,7 +60,9 @@ namespace EchoCut
             btnStop = new ToolStripButton();
             sepProcess = new ToolStripSeparator();
             ddbUtilities = new ToolStripDropDownButton();
+            mnuMetadata = new ToolStripMenuItem();
             mnuCleanMetadata = new ToolStripMenuItem();
+            mnuAddMetadata = new ToolStripMenuItem();
             mnuNormalize = new ToolStripMenuItem();
             btnExport = new ToolStripButton();
             btnAdvanced = new ToolStripButton();
@@ -339,18 +341,32 @@ namespace EchoCut
             // ddbUtilities
             // 
             ddbUtilities.DisplayStyle = ToolStripItemDisplayStyle.Text;
-            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuCleanMetadata, mnuNormalize });
+            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize });
             ddbUtilities.Name = "ddbUtilities";
             ddbUtilities.Size = new Size(82, 23);
             ddbUtilities.Text = "Utilidades";
             ddbUtilities.ToolTipText = "Operaciones que modifican los archivos originales";
             // 
+            // mnuMetadata
+            // 
+            mnuMetadata.DropDownItems.AddRange(new ToolStripItem[] { mnuCleanMetadata, mnuAddMetadata });
+            mnuMetadata.Name = "mnuMetadata";
+            mnuMetadata.Size = new Size(192, 24);
+            mnuMetadata.Text = "Metadatos";
+            // 
             // mnuCleanMetadata
             // 
             mnuCleanMetadata.Name = "mnuCleanMetadata";
-            mnuCleanMetadata.Size = new Size(192, 24);
-            mnuCleanMetadata.Text = "Limpiar metadatos";
+            mnuCleanMetadata.Size = new Size(212, 24);
+            mnuCleanMetadata.Text = "Eliminar metadatos";
             mnuCleanMetadata.Click += mnuCleanMetadata_Click;
+            // 
+            // mnuAddMetadata
+            // 
+            mnuAddMetadata.Name = "mnuAddMetadata";
+            mnuAddMetadata.Size = new Size(212, 24);
+            mnuAddMetadata.Text = "Agregar metadatos…";
+            mnuAddMetadata.Click += mnuAddMetadata_Click;
             // 
             // mnuNormalize
             // 
@@ -530,7 +546,9 @@ namespace EchoCut
         private ToolStripDropDownButton ddbUtilities;
         private ToolStripButton btnExport;
         private ToolStripButton btnAdvanced;
+        private ToolStripMenuItem mnuMetadata;
         private ToolStripMenuItem mnuCleanMetadata;
+        private ToolStripMenuItem mnuAddMetadata;
         private ToolStripMenuItem mnuNormalize;
         private StatusStrip statusStrip;
         private ToolStripStatusLabel lblStatus;

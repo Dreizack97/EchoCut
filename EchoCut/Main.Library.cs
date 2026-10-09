@@ -232,6 +232,74 @@ namespace EchoCut
                 cts => _cleanCts = cts).ConfigureAwait(true);
         }
 
+        // ------------------------------------------------------------------- Agregar metadatos
+
+        /// <summary>
+        /// Pide las etiquetas a aplicar y confirma antes de escribirlas en todas las pistas.
+        /// </summary>
+        /// <param name="count">Pistas a las que afectará el lote.</param>
+        /// <returns>El parche a aplicar, o <c>null</c> si el usuario canceló en cualquiera de los dos pasos.</returns>
+        /// <remarks>
+        /// La confirmación repite los valores escritos porque reemplazan los de todo el listado: es
+        /// el último momento para ver una errata antes de que se copie en cientos de archivos.
+        /// </remarks>
+        private TagPatch? ChooseTagPatch(int count)
+        {
+            using AddMetadataDialog dialog = new(count);
+            if (dialog.ShowDialog(this) != DialogResult.OK || dialog.Patch.IsEmpty)
+            {
+                return null;
+            }
+
+            TagPatch patch = dialog.Patch;
+
+            string target = count == 1
+                ? $"«{_songs[0].Name}»"
+                : $"las {count} canciones cargadas en la lista";
+
+            string changes = string.Join(
+                Environment.NewLine,
+                AddMetadataDialog.Describe(patch).Select(line => $" • {line}"));
+
+            DialogResult confirmation = MessageBox.Show(
+                this,
+                $"¿Aplicar estos metadatos a {target}?\n\n{changes}\n\n"
+                + "Reemplazarán los valores que ya tengan; las propiedades que dejaste en blanco no se modifican. "
+                + "Los archivos originales se modifican directamente y el cambio no se puede deshacer.",
+                "Confirmar metadatos",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button2);
+
+            return confirmation == DialogResult.Yes ? patch : null;
+        }
+
+        private async void mnuAddMetadata_Click(object sender, EventArgs e)
+        {
+            if (IsBusy || _songs.Count == 0)
+            {
+                return;
+            }
+
+            if (ChooseTagPatch(_songs.Count) is not { } patch)
+            {
+                return;
+            }
+
+            await RunLibraryBatchAsync(
+                new LibraryBatch(
+                    "Aplicando metadatos…",
+                    (success, total) => success == 1 && total == 1
+                        ? "Metadatos aplicados a 1 canción."
+                        : $"Metadatos aplicados a {success} de {total} canciones.",
+                    "Aplicación de metadatos cancelada.",
+                    "No se pudieron aplicar los metadatos.",
+                    "Aviso de metadatos",
+                    "No se pudieron aplicar los metadatos a algunos archivos:"),
+                path => TrackEditor.ApplyTags(path, patch),
+                cts => _tagCts = cts).ConfigureAwait(true);
+        }
+
         // -------------------------------------------------------------------------- Normalizar
 
         /// <summary>

@@ -35,6 +35,7 @@ namespace EchoCut
         private CancellationTokenSource? _trimCts;
         private CancellationTokenSource? _cleanCts;
         private CancellationTokenSource? _normalizeCts;
+        private CancellationTokenSource? _tagCts;
 
         /// <summary>Reproducción de previsualización, creada al primer uso porque necesita FFmpeg.</summary>
         private AudioPreviewPlayer? _preview;
@@ -126,7 +127,7 @@ namespace EchoCut
             }
         }
 
-        private bool IsBusy => _analysisCts is not null || _trimCts is not null || _cleanCts is not null || _normalizeCts is not null;
+        private bool IsBusy => _analysisCts is not null || _trimCts is not null || _cleanCts is not null || _normalizeCts is not null || _tagCts is not null;
 
         /// <summary>
         /// Si la ventana sigue viva. Un lote que ya había terminado hace que la espera del cierre
@@ -461,6 +462,7 @@ namespace EchoCut
             _trimCts?.Cancel();
             _cleanCts?.Cancel();
             _normalizeCts?.Cancel();
+            _tagCts?.Cancel();
         }
 
         // ------------------------------------------------------------------ Acciones de fila
@@ -993,13 +995,14 @@ namespace EchoCut
             bool trimming = _trimCts is not null;
             bool cleaning = _cleanCts is not null;
             bool normalizing = _normalizeCts is not null;
+            bool tagging = _tagCts is not null;
             bool hasSongs = _songs.Count > 0;
 
             btnPath.Enabled = !IsBusy;
             btnFile.Enabled = !IsBusy;
             btnAnalyze.Enabled = !IsBusy && hasSongs;
             btnCropAll.Enabled = !IsBusy && hasSongs;
-            btnStop.Enabled = analyzing || cleaning || normalizing || trimming;
+            btnStop.Enabled = analyzing || cleaning || normalizing || tagging || trimming;
             btnExport.Enabled = !IsBusy && hasSongs;
             ddbUtilities.Enabled = !IsBusy && hasSongs;
             btnAdvanced.Enabled = !IsBusy;
@@ -1048,6 +1051,7 @@ namespace EchoCut
             _trimCts?.Cancel();
             _cleanCts?.Cancel();
             _normalizeCts?.Cancel();
+            _tagCts?.Cancel();
             SetStatus("Cerrando: esperando a que terminen las tareas en curso…");
 
             try
