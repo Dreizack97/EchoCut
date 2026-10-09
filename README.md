@@ -266,12 +266,17 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
      - *Abrir ubicación*: Revela los archivos en el Explorador de Windows con las canciones seleccionadas.
      - *Abrir en Audacity*: Abre simultáneamente todas las pistas seleccionadas en una sesión de Audacity (o haz doble clic sobre cualquier fila para abrirla de inmediato).
      - *Editar propiedades*: Abre la ventana modal nativa de propiedades para consultar o editar metadatos ID3/Vorbis (título, artistas, año, álbum, etc.) o renombrar el archivo físico en disco.
+     - *Renombrar* (`F2`): Edita el nombre del archivo directamente sobre la celda «Nombre», como en el Explorador; `Entrar` o pulsar fuera confirma y `Esc` descarta. Si el nombre no es válido o ya existe, se avisa y se reabre la edición para corregirlo.
      - *Eliminar archivo(s)*: Elimina permanentemente los archivos seleccionados del disco tras confirmar la operación (también disponible pulsando la tecla **Suprimir** en la cuadrícula).
    - **Metadatos (`Utilidades › Metadatos`)**: Opera sobre las etiquetas de todas las pistas cargadas, tras confirmar la operación. Modifica los archivos originales.
      - *Eliminar metadatos*: Elimina todas las etiquetas (título, artistas, portada, etc.).
      - *Agregar metadatos…*: Aplica a todo el listado el artista, título, álbum, género y comentarios que se escriban, reemplazando los valores existentes; los campos en blanco no se modifican. El título puede tomarse del nombre del archivo de cada canción, y varios artistas o géneros se separan con «;». Solo se reescriben los archivos que realmente cambian.
    - **Normalizar (`Utilidades › Normalizar…`)**: Quita los acentos (conservando la «ñ») y pone en mayúscula la inicial de cada palabra en las propiedades que elijas de las pistas cargadas: nombre del archivo, título, subtítulo, intérpretes, artistas del álbum, álbum, géneros, compositores, comentario y derechos de autor. La selección se recuerda entre sesiones y la operación se confirma antes de empezar. Solo se reescriben las etiquetas elegidas y los archivos que realmente cambian; si se incluye el nombre del archivo, este se renombra en disco.
+   - **Renombrar (`Utilidades › Renombrar`)**: Renombra en lote las canciones seleccionadas o, si hay una o ninguna seleccionada, todo el listado, en el orden de la rejilla. Una vista previa muestra cada nombre antes y después y no deja continuar si alguno no es válido, se repite o ya existe.
+     - *Agregar consecutivo…*: Antepone un número con ceros a la izquierda, por ejemplo `0001 - Artista - Nombre.mp3`; se eligen el número inicial, los dígitos y el separador.
+     - *Quitar caracteres iniciales…*: Elimina una cantidad de caracteres del principio del nombre y, opcionalmente, los espacios y separadores que queden delante.
    - **Exportar (`Exportar`)**: Genera un archivo CSV codificado en UTF-8 con BOM y separador regional, listo para abrirse en Microsoft Excel con todas las métricas acústicas de cada pista.
+   - **Integrar con el Explorador de Windows (`Utilidades`)**: Agrega o quita «Abrir con EchoCut» en el menú contextual de los archivos de audio y las carpetas, sin permisos de administrador. En Windows 11 aparece en «Mostrar más opciones». Lo abierto desde el Explorador se suma al listado de la ventana ya abierta; si se mueve la carpeta de EchoCut, basta con volver a activar la opción.
 
 ---
 
