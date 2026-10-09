@@ -71,16 +71,7 @@ public static class TrackEditor
             throw new FileNotFoundException("El archivo de audio no existe en disco.", properties.FilePath);
         }
 
-        string cleanName = properties.FileName.Trim();
-        if (string.IsNullOrWhiteSpace(cleanName))
-        {
-            throw new ArgumentException("El nombre del archivo no puede estar vacío.", nameof(properties));
-        }
-
-        if (cleanName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-        {
-            throw new ArgumentException("El nombre del archivo contiene caracteres no válidos.", nameof(properties));
-        }
+        string cleanName = ValidFileName(properties.FileName, nameof(properties));
 
         string currentPath = properties.FilePath;
 
@@ -116,6 +107,38 @@ public static class TrackEditor
         // 3. Volver a leer la pista actualizada desde el disco
         return TrackScanner.Read(currentPath);
     }
+
+    /// <summary>
+    /// Renombra el archivo de una pista dentro de su carpeta, conservando la extensión y sin tocar
+    /// sus etiquetas.
+    /// </summary>
+    /// <param name="filePath">Ruta absoluta del archivo de audio.</param>
+    /// <param name="newBaseName">Nombre nuevo, sin extensión; se recortan los espacios de los extremos.</param>
+    /// <returns>La información de pista releída desde la ruta nueva.</returns>
+    /// <exception cref="ArgumentException">Si el nombre nuevo está vacío, contiene caracteres no válidos o termina en punto.</exception>
+    /// <exception cref="FileNotFoundException">Si el archivo no existe en disco.</exception>
+    /// <exception cref="IOException">Si ya existe otro archivo con el nombre nuevo en la carpeta.</exception>
+    public static TrackInfo RenameTrack(string filePath, string newBaseName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        if (!File.Exists(filePath))
+        {
+            throw new FileNotFoundException("El archivo de audio no existe en disco.", filePath);
+        }
+
+        string cleanName = ValidFileName(newBaseName, nameof(newBaseName));
+        return TrackScanner.Read(Rename(filePath, cleanName));
+    }
+
+    /// <summary>Recorta y valida un nombre de archivo sin extensión con <see cref="TrackNaming.GetProblem"/>.</summary>
+    /// <param name="name">Nombre propuesto.</param>
+    /// <param name="paramName">Parámetro del llamador al que atribuir el error.</param>
+    /// <returns>El nombre sin espacios en los extremos.</returns>
+    /// <exception cref="ArgumentException">Si el nombre no es válido.</exception>
+    private static string ValidFileName(string? name, string paramName) =>
+        TrackNaming.GetProblem(name) is { } problem
+            ? throw new ArgumentException(problem, paramName)
+            : name!.Trim();
 
     /// <summary>
     /// Renombra un archivo dentro de su misma carpeta, conservando la extensión.
