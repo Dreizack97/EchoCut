@@ -166,6 +166,79 @@ public sealed class DeletedRegions
         return time + remaining;
     }
 
+    /// <summary>Instante de la copia que corresponde a un instante del original.</summary>
+    /// <param name="sourceSeconds">Instante del original, en segundos.</param>
+    /// <returns>
+    /// El instante en la línea de tiempo del resultado, es decir, el del original menos todo lo
+    /// borrado antes de él; dentro de un fragmento borrado, el punto del empalme.
+    /// </returns>
+    public double OutputSecondsAt(double sourceSeconds)
+    {
+        double removed = 0.0;
+        foreach (TimeRegion existing in _regions)
+        {
+            if (existing.StartSeconds >= sourceSeconds)
+            {
+                break;
+            }
+
+            removed += Math.Min(existing.EndSeconds, sourceSeconds) - existing.StartSeconds;
+        }
+
+        return sourceSeconds - removed;
+    }
+
+    /// <summary>Tramos del original que suenan en un tramo del resultado.</summary>
+    /// <param name="outputFromSeconds">Comienzo del tramo, en la línea de tiempo del resultado.</param>
+    /// <param name="outputToSeconds">Final del tramo, en la línea de tiempo del resultado.</param>
+    /// <returns>
+    /// Los tramos del original, en orden, cuya unión es lo que suena en ese tramo del resultado: uno
+    /// solo, salvo que el tramo cruce un empalme.
+    /// </returns>
+    /// <remarks>Sirve para dibujar la onda del resultado a partir del resumen del original, sin volver a decodificar.</remarks>
+    public List<TimeRegion> SourceSpans(double outputFromSeconds, double outputToSeconds)
+    {
+        List<TimeRegion> spans = [];
+        double remaining = outputToSeconds - outputFromSeconds;
+        double time = SourceSecondsAt(0.0, outputFromSeconds);
+
+        foreach (TimeRegion existing in _regions)
+        {
+            if (remaining <= 0.0)
+            {
+                return spans;
+            }
+
+            if (existing.EndSeconds <= time)
+            {
+                continue;
+            }
+
+            if (existing.StartSeconds <= time)
+            {
+                time = existing.EndSeconds;
+                continue;
+            }
+
+            double gap = existing.StartSeconds - time;
+            if (remaining <= gap)
+            {
+                break;
+            }
+
+            spans.Add(new TimeRegion(time, existing.StartSeconds));
+            remaining -= gap;
+            time = existing.EndSeconds;
+        }
+
+        if (remaining > 0.0)
+        {
+            spans.Add(new TimeRegion(time, time + remaining));
+        }
+
+        return spans;
+    }
+
     /// <summary>
     /// Tramos de un bloque de PCM que se conservan, en tramas relativas al propio bloque.
     /// </summary>

@@ -38,6 +38,18 @@ public sealed record AudioEdits(TrackFades? Fades, DeletedRegions Deletions)
     /// <returns>La duración del tramo menos lo borrado dentro de él.</returns>
     public double KeptSeconds(TrimRange range) => range.DurationSeconds - Deletions.Within(range).TotalSeconds;
 
+    /// <summary>Compara dos conjuntos de ediciones por su contenido.</summary>
+    /// <param name="other">Ediciones con las que comparar, o <c>null</c>.</param>
+    /// <returns><c>true</c> si tienen los mismos fundidos y los mismos fragmentos borrados.</returns>
+    /// <remarks>
+    /// La igualdad del registro compararía <see cref="DeletedRegions"/> por referencia, y dos
+    /// conjuntos iguales construidos por caminos distintos se tomarían por distintos.
+    /// </remarks>
+    public bool SameAs(AudioEdits? other) =>
+        other is not null
+        && Equals(Fades, other.Fades)
+        && Deletions.Regions.SequenceEqual(other.Deletions.Regions);
+
     /// <summary>Comprueba que todas las ediciones sean válidas.</summary>
     /// <exception cref="ArgumentNullException">Se lanza si <see cref="Deletions"/> es <c>null</c>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Se lanza si algún fundido no es válido.</exception>
