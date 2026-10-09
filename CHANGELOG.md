@@ -10,6 +10,11 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 ## [Sin publicar]
 
 ### Añadido
+#### Conversión a MP3 y Duplicados por Audio
+* **Convertir a MP3** (`Utilidades`, `Ctrl+Shift+M`): Copia en MP3 de las canciones cargadas en la subcarpeta `MP3/` junto a cada original, con etiquetas y carátula; calidad VBR V0, VBR V2, CBR 320 o CBR 192, recordada en `AppSettings.Mp3Quality`. Las que ya son MP3 se omiten. `Mp3Converter`, `Mp3Quality` y `ConversionService` en el motor.
+* **Buscar duplicados por audio** (`Utilidades`, `Ctrl+Shift+D`): Huella acústica propia según Haitsma y Kalker —33 bandas logarítmicas entre 300 y 2000 Hz, 32 bits por trama de 23 ms— en `EchoCut.Fingerprints` (`FftPlan`, `FingerprintBuilder`, `AudioFingerprint`), con búsqueda de candidatas por índice invertido y verificación por tasa de bits distintos tras alinear (`DuplicateDetector`). Reconoce la misma grabación en otro formato, tasa de bits o volumen y con silencios distintos; exige que coincida el 80 % de lo que suena en ambas para no confundir una mezcla con la canción que contiene.
+* **Ventana de duplicados**: Grupos con parecido, duración, formato, bitrate, tamaño y carpeta; propone conservar la copia de mejor calidad (`DuplicateFinder`), permite escuchar, abrir la ubicación y cambiar las marcas, y envía las marcadas a la Papelera de reciclaje tras confirmarlo, retirando sus filas del listado.
+
 #### Resultado Editado y Detección de Silencios Posteriores
 * **Onda con las ediciones aplicadas**: `WaveformRenderer` pinta cada columna con la ganancia de los fundidos y, en la línea de tiempo del resultado, juntando los tramos del original que suenan en ella; se dibuja a partir del resumen ya cargado, sin volver a decodificar.
 * **«Ver resultado»** (`Ctrl+R`): Las tres vistas pasan a la línea de tiempo de la copia, sin lo borrado y con los empalmes marcados en morado; el detalle del final usa la pista completa para poder juntar lo que queda a ambos lados de un borrado.
