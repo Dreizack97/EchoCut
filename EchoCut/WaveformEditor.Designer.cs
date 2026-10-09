@@ -659,7 +659,6 @@ namespace EchoCut
             // 
             btnAccept.Anchor = AnchorStyles.Right;
             btnAccept.AutoSize = true;
-            btnAccept.DialogResult = DialogResult.OK;
             btnAccept.Location = new Point(946, 11);
             btnAccept.MinimumSize = new Size(105, 29);
             btnAccept.Name = "btnAccept";
@@ -667,12 +666,12 @@ namespace EchoCut
             btnAccept.TabIndex = 3;
             btnAccept.Text = "Aceptar";
             btnAccept.UseVisualStyleBackColor = true;
+            btnAccept.Click += btnAccept_Click;
             // 
             // btnCancel
             // 
             btnCancel.Anchor = AnchorStyles.Right;
             btnCancel.AutoSize = true;
-            btnCancel.DialogResult = DialogResult.Cancel;
             btnCancel.Location = new Point(1057, 11);
             btnCancel.MinimumSize = new Size(105, 29);
             btnCancel.Name = "btnCancel";
@@ -680,6 +679,7 @@ namespace EchoCut
             btnCancel.TabIndex = 4;
             btnCancel.Text = "Cancelar";
             btnCancel.UseVisualStyleBackColor = true;
+            btnCancel.Click += btnCancel_Click;
             // 
             // playheadTimer
             // 
@@ -696,12 +696,9 @@ namespace EchoCut
             Controls.Add(tableMain);
             Font = new Font("Segoe UI", 10F);
             Icon = (Icon)resources.GetObject("$this.Icon");
-            MinimizeBox = false;
             MinimumSize = new Size(1000, 640);
             Name = "WaveformEditor";
-            ShowIcon = false;
-            ShowInTaskbar = false;
-            StartPosition = FormStartPosition.CenterParent;
+            StartPosition = FormStartPosition.WindowsDefaultLocation;
             Text = "Forma de onda, recorte y fundidos";
             FormClosing += WaveformEditor_FormClosing;
             FormClosed += WaveformEditor_FormClosed;

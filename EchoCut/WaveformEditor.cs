@@ -3,6 +3,7 @@ using EchoCut.Controls;
 using EchoCut.Objects;
 using EchoCut.Processing;
 using EchoCut.Waveforms;
+using System.ComponentModel;
 
 namespace EchoCut
 {
@@ -13,9 +14,10 @@ namespace EchoCut
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Solo devuelve decisiones: el tramo ajustado en <see cref="ManualRange"/> y los fundidos y
-    /// borrados en <see cref="Edits"/>. Aplicarlos a la fila es cosa de quien la abre, igual que con
-    /// el diálogo de propiedades.
+    /// Es una ventana sin modo: se pueden tener varias abiertas, una por pista, y seguir usando la
+    /// ventana principal. Por eso no toca la fila por su cuenta: avisa con <see cref="Applied"/> y
+    /// expone sus decisiones en <see cref="ManualRange"/> y <see cref="Edits"/>, y quien la abre las
+    /// aplica, igual que con el diálogo de propiedades.
     /// </para>
     /// <para>
     /// Las ediciones siguen el modelo de Audacity: se selecciona un tramo en cualquier vista y
@@ -51,6 +53,9 @@ namespace EchoCut
         private bool _manual;
         private bool _syncing;
 
+        /// <summary>Si hay cambios que todavía no se llevaron a la fila.</summary>
+        private bool _dirty;
+
         /// <summary>Prepara la ventana para una pista, partiendo de lo que ya tenga decidido su fila.</summary>
         /// <param name="song">Fila de la pista a mostrar.</param>
         /// <param name="service">Servicio que carga las formas de onda.</param>
@@ -78,7 +83,8 @@ namespace EchoCut
             _fadeOut = song.Edits?.Fades?.FadeOut;
             _deletions = song.Edits?.Deletions ?? DeletedRegions.Empty;
 
-            lblTrack.Text = song.Name;
+            ShowTrackName();
+            song.PropertyChanged += Song_PropertyChanged;
             btnReset.Text = _analysisRange is null ? "Quitar ajuste" : "Restablecer análisis";
 
             foreach (NumericUpDown field in (NumericUpDown[])[numStart, numEnd, numFadeInStart, numFadeInEnd, numFadeOutStart, numFadeOutEnd])
@@ -112,7 +118,11 @@ namespace EchoCut
             ApplyFades();
             ApplyDeletions();
             ApplySelection(null);
+            _dirty = false;
         }
+
+        /// <summary>Se produce cuando el usuario pide llevar sus decisiones a la fila, al aceptar.</summary>
+        public event EventHandler? Applied;
 
         /// <value>Fila de la pista que se edita.</value>
         public Song Song { get; }
@@ -132,6 +142,14 @@ namespace EchoCut
 
         /// <summary>Tramo que conservará la copia; nunca vacío, aunque las marcas lleguen a tocarse.</summary>
         private TrimRange KeptRange => new(_startSeconds, Math.Max(_endSeconds, _startSeconds + WaveformView.MinimumGapSeconds));
+
+        /// <summary>Cierra la ventana descartando los cambios sin preguntar.</summary>
+        /// <remarks>Para cuando la fila deja de existir: preguntar si aplicar a algo que ya no está no tiene sentido.</remarks>
+        public void Discard()
+        {
+            _dirty = false;
+            Close();
+        }
 
         /// <inheritdoc/>
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -208,6 +226,22 @@ namespace EchoCut
             }
         }
 
+        /// <summary>El nombre de la pista va también en el título: con varias ventanas abiertas, es lo que las distingue en la barra de tareas.</summary>
+        private void ShowTrackName()
+        {
+            lblTrack.Text = Song.Name;
+            Text = $"{Song.Name} — Forma de onda, recorte y fundidos";
+        }
+
+        /// <summary>La fila puede renombrarse mientras la ventana sigue abierta.</summary>
+        private void Song_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(Song.Name) && !IsDisposed)
+            {
+                ShowTrackName();
+            }
+        }
+
         private void View_MarkersChanged(object? sender, EventArgs e)
         {
             if (sender is WaveformView view)
@@ -259,8 +293,27 @@ namespace EchoCut
             MarkDirty();
         }
 
-        /// <summary>Refleja en el resumen un cambio hecho por el usuario.</summary>
-        private void MarkDirty() => UpdateSummary();
+        private void btnAccept_Click(object? sender, EventArgs e)
+        {
+            Apply();
+            Close();
+        }
+
+        private void btnCancel_Click(object? sender, EventArgs e) => Close();
+
+        /// <summary>Avisa a quien abrió la ventana para que lleve las decisiones a la fila.</summary>
+        internal void Apply()
+        {
+            Applied?.Invoke(this, EventArgs.Empty);
+            _dirty = false;
+        }
+
+        /// <summary>Anota que hay cambios sin llevar a la fila.</summary>
+        private void MarkDirty()
+        {
+            _dirty = true;
+            UpdateSummary();
+        }
 
         /// <summary>Lleva el tramo a todas las vistas, a los campos numéricos y al resumen.</summary>
         private void ApplyRange(double startSeconds, double endSeconds)
@@ -302,14 +355,38 @@ namespace EchoCut
             lblSummary.Text = string.Join(Environment.NewLine, lines.Where(line => line.Length > 0));
         }
 
+        /// <summary>Si hay cambios sin aplicar, pregunta qué hacer con ellos antes de cerrar.</summary>
         private void WaveformEditor_FormClosing(object? sender, FormClosingEventArgs e)
         {
+            if (_dirty)
+            {
+                DialogResult answer = MessageBox.Show(
+                    this,
+                    $"¿Aplicar a «{Song.Name}» los cambios hechos en esta ventana?",
+                    "Cambios sin aplicar",
+                    MessageBoxButtons.YesNoCancel,
+                    MessageBoxIcon.Question);
+
+                if (answer == DialogResult.Cancel)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
+                if (answer == DialogResult.Yes)
+                {
+                    Apply();
+                }
+            }
+
             _closing.Cancel();
             StopPlayback();
         }
 
         private void WaveformEditor_FormClosed(object? sender, FormClosedEventArgs e)
         {
+            Song.PropertyChanged -= Song_PropertyChanged;
+
             foreach (WaveformView view in Views)
             {
                 view.Waveform = null;

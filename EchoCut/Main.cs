@@ -38,6 +38,12 @@ namespace EchoCut
         private CancellationTokenSource? _tagCts;
         private CancellationTokenSource? _renameCts;
 
+        /// <summary>
+        /// Editores de forma de onda abiertos, uno por fila: volver a abrir una pista trae al frente
+        /// su ventana en lugar de abrir otra que compita con ella por las mismas decisiones.
+        /// </summary>
+        private readonly Dictionary<Song, WaveformEditor> _editors = [];
+
         /// <summary>Reproducción de previsualización, creada al primer uso porque necesita FFmpeg.</summary>
         private AudioPreviewPlayer? _preview;
         private CancellationTokenSource? _previewCts;
@@ -352,6 +358,7 @@ namespace EchoCut
 
             if (replace)
             {
+                DiscardEditors();
                 _songs.Clear();
                 _rows.Clear();
             }
@@ -1041,6 +1048,19 @@ namespace EchoCut
 
         private async void Main_FormClosing(object sender, FormClosingEventArgs e)
         {
+            // Cada editor pregunta qué hacer con sus cambios; si alguno se queda abierto, el usuario
+            // decidió seguir trabajando y la aplicación no se cierra.
+            foreach (WaveformEditor editor in _editors.Values.ToList())
+            {
+                editor.Close();
+            }
+
+            if (_editors.Count > 0)
+            {
+                e.Cancel = true;
+                return;
+            }
+
             StopPreview();
             _preview?.Dispose();
             _preview = null;
@@ -1202,32 +1222,66 @@ namespace EchoCut
         /// recorte a mano, añadir fundidos y borrar fragmentos.
         /// </summary>
         /// <remarks>
-        /// Funciona también con pistas sin analizar: el tramo parte de la pista completa y el ajuste
-        /// manual basta para recortarla.
+        /// <para>
+        /// La ventana no tiene modo: se pueden abrir varias, una por pista, sin dejar de usar esta. Si
+        /// la pista ya tiene la suya, se trae al frente.
+        /// </para>
+        /// <para>
+        /// Funciona también con pistas sin analizar y mientras corre un lote: hasta que el usuario
+        /// acepta, el editor no toca la fila.
+        /// </para>
         /// </remarks>
         private void mnuWaveform_Click(object? sender, EventArgs e)
         {
-            if (IsBusy || GetSelectedSong() is not { } song || !EnsureFFmpeg())
+            if (GetSelectedSong() is not { } song || !EnsureFFmpeg())
             {
                 return;
             }
 
-            StopPreview();
-
-            using WaveformEditor dialog = new(song, _waveforms, _locator.Require().FFmpeg, _settings.Silence.PreviewSeconds);
-            if (dialog.ShowDialog(this) != DialogResult.OK)
+            if (_editors.TryGetValue(song, out WaveformEditor? open))
             {
+                if (open.WindowState == FormWindowState.Minimized)
+                {
+                    open.WindowState = FormWindowState.Normal;
+                }
+
+                open.Activate();
                 return;
             }
 
-            song.AdjustManually(dialog.ManualRange);
-            song.ApplyEdits(dialog.Edits);
+            WaveformEditor editor = new(song, _waveforms, _locator.Require().FFmpeg, _settings.Silence.PreviewSeconds);
+            editor.Applied += (_, _) => ApplyEditorDecisions(editor);
+            editor.FormClosed += (_, _) => _editors.Remove(song);
+            _editors[song] = editor;
+            editor.Show();
+        }
 
-            string trim = dialog.ManualRange is null
+        /// <summary>Lleva a la fila lo decidido en su editor: el tramo, los fundidos y los borrados.</summary>
+        private void ApplyEditorDecisions(WaveformEditor editor)
+        {
+            Song song = editor.Song;
+            song.AdjustManually(editor.ManualRange);
+            song.ApplyEdits(editor.Edits);
+
+            string trim = editor.ManualRange is null
                 ? "se usa el recorte del análisis"
                 : $"recorte ajustado a mano, {song.Crop:0.00} s a eliminar";
             string edits = song.Edits is null ? string.Empty : "; la copia llevará ediciones y se volverá a codificar";
             SetStatus($"{song.Name}: {trim}{edits}.");
+        }
+
+        /// <summary>Cierra sin preguntar los editores de filas que dejan de existir.</summary>
+        /// <param name="songs">Filas que se van; todas si es <c>null</c>.</param>
+        private void DiscardEditors(IEnumerable<Song>? songs = null)
+        {
+            List<WaveformEditor> closing = songs is null
+                ? [.. _editors.Values]
+                : [.. songs.Where(_editors.ContainsKey).Select(song => _editors[song])];
+
+            foreach (WaveformEditor editor in closing)
+            {
+                editor.Discard();
+            }
         }
 
         private void mnuEditSong_Click(object? sender, EventArgs e)
@@ -1331,6 +1385,7 @@ namespace EchoCut
                 }
             }
 
+            DiscardEditors(successfullyDeleted);
             foreach (Song song in successfullyDeleted)
             {
                 _rows.Remove(song.FilePath);
