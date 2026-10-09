@@ -257,7 +257,7 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
 2. **Ajustar Tolerancia e Hilos**:
    - **Tolerancia**: Los segundos de silencio que deseas conservar al final (0.3 s por defecto es el estándar musical ideal).
    - **Hilos**: Grado de paralelismo (EchoCut calibra automáticamente entre 1 y 8 hilos según tu procesador).
-3. **Analizar (`Analizar`)**: EchoCut procesará el principio y el final de las canciones en paralelo, mostrando el progreso y coloreando las filas recortables en ámbar oscuro.
+3. **Analizar (`Analizar`)**: EchoCut procesará el principio y el final de las canciones en paralelo, mostrando el progreso y coloreando las filas recortables en ámbar oscuro. Las canciones con fundidos o fragmentos borrados se analizan sobre su **resultado editado**, que es lo que quedará en la copia, para que sus silencios y su recorte lo reflejen.
 4. **Previsualizar de Oído (`▶` / `⏹`)**: Pulsa el botón de reproducción en cualquier fila. Sonará de inmediato la música previa al punto de corte (3.0 s por defecto, personalizable en **Avanzado**) más la tolerancia conservada, permitiéndote comprobar auditivamente que el corte no interrumpe la frase musical.
 5. **Recortar**:
    - Pulsa **`Recortar todo`** para procesar en lote todas las pistas válidas.
@@ -273,6 +273,8 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
        - **Borrar** (`Supr`): Quita de la copia el audio seleccionado y une lo anterior con lo posterior, como el *Borrar* de Audacity: la canción se acorta y el empalme queda en seco, exacto a la muestra. Lo borrado se ve gris y rayado, y la escucha y el cursor lo saltan. *Restaurar* (`Ctrl+Shift+R`) devuelve lo borrado que caiga dentro de la selección.
        - **Deshacer y rehacer** (`Ctrl+Z` / `Ctrl+Y`): Cualquier cambio —marcas, fundidos, curvas, borrados y restauraciones— se puede deshacer; un arrastre cuenta como un solo cambio.
        - **Escuchar** (`Espacio`): Suena la selección o, sin ella, desde el punto marcado con un clic (o desde el comienzo de la copia), hasta 30 s, con los fundidos y los borrados ya aplicados; volver a pulsar detiene. Solo suena una cosa a la vez en toda la aplicación.
+       - **Ver el resultado** (`⇄ Ver resultado`, `Ctrl+R`): Sobre el original la onda ya se dibuja con los fundidos aplicados, y lo borrado sigue rayado para poder restaurarlo. *Ver resultado* cambia las tres vistas a la línea de tiempo de la copia: lo borrado desaparece, lo anterior y lo posterior se juntan y cada empalme queda marcado en morado. Ahí puedes **ajustar el recorte con precisión** sobre lo que de verdad sonará: arrastra las marcas de inicio y final, muévelas con ← y → o escribe el instante en la sección *Copia*, que pasa a mostrar los tiempos del resultado; EchoCut los traduce al original. Un clic marca desde dónde escuchar y `Ctrl+Z` sigue deshaciendo. Fundidos y borrados se editan en el original: vuelve a pulsar *Ver resultado*.
+       - **Detectar silencios** (`⌕ Detectar silencios`, `F5`): Analiza el resultado editado con el mismo algoritmo que la ventana principal y propone el comienzo y el final de la copia. Sirve para recortar silencios que solo aparecen al editar: borrar una pista oculta deja el final en silencio, o una desaparición deja la cola por debajo del umbral. Se puede deshacer con `Ctrl+Z`, y al aceptar o guardar la fila adopta ese análisis.
        - **Zoom**: La rueda desplaza cada vista y `Ctrl`+rueda acerca o aleja bajo el puntero. Los botones y atajos (`Ctrl++`, `Ctrl+−`, *Ver selección* `Ctrl+E`, *Ver todo* `Ctrl+F`) actúan sobre la última vista tocada. *Escala en dB* agranda las colas de fundido y el hiss que en escala lineal parecen una línea plana.
        - **Guardar** (`💾 Guardar`, `Ctrl+S`): Aplica los ajustes a la fila y escribe la copia en `Recortados/`, sin tocar el original y sin cerrar la ventana; la fila pasa a *Recortado*. *Aceptar* (`Ctrl+Entrar`) aplica los ajustes y cierra; *Cancelar* cierra y, si hay cambios sin aplicar, pregunta qué hacer con ellos. Una copia con fundidos o borrados se recodifica (ver *Formatos de Audio Compatibles*).
      - *Abrir ubicación*: Revela los archivos en el Explorador de Windows con las canciones seleccionadas.
@@ -315,6 +317,7 @@ El botón **⌨ Atajos** de la barra de herramientas, o `F1`, muestra la lista c
 | Forma de onda | Aparición / Desaparición desde la selección | `Ctrl+Shift+A` / `Ctrl+Shift+D` |
 | Forma de onda | Borrar la selección / quitarla / restaurar lo borrado | `Supr` / `Esc` / `Ctrl+Shift+R` |
 | Forma de onda | Deshacer / Rehacer | `Ctrl+Z` / `Ctrl+Y` |
+| Forma de onda | Detectar silencios del resultado / Ver resultado | `F5` / `Ctrl+R` |
 | Forma de onda | Acercar / Alejar / Ver selección / Ver todo | `Ctrl++` / `Ctrl+−` / `Ctrl+E` / `Ctrl+F` |
 | Forma de onda | Guardar / Aceptar / Atajos | `Ctrl+S` / `Ctrl+Entrar` / `F1` |
 | Opciones | Parámetros avanzados / Atajos de teclado | `Ctrl+,` / `F1` |
