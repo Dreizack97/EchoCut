@@ -170,5 +170,78 @@ namespace EchoCut
             // y a la vez garantizar un alto contraste con el fondo oscuro de la selección.
             e.CellStyle.SelectionForeColor = SongPresentation.SelectionForeColorFor(song.Estatus);
         }
+
+        /// <summary>Margen entre el borde de la rejilla y el recuadro de la zona de arrastre.</summary>
+        private const int DropZoneMargin = 24;
+
+        /// <summary>
+        /// Pinta, con la lista vacía, la guía de qué hacer a continuación.
+        /// </summary>
+        /// <remarks>
+        /// Una rejilla vacía con trece cabeceras no dice por dónde empezar, y arrastrar carpetas a la
+        /// ventana —el camino más rápido— no se descubre si nadie lo anuncia. El recuadro discontinuo
+        /// se resalta mientras se arrastra algo aceptable encima, para confirmar que soltar ahí sirve.
+        /// </remarks>
+        private void dataGrid_Paint(object? sender, PaintEventArgs e)
+        {
+            if (_songs.Count > 0)
+            {
+                return;
+            }
+
+            int top = dataGrid.ColumnHeadersVisible ? dataGrid.ColumnHeadersHeight : 0;
+            Rectangle zone = Rectangle.FromLTRB(
+                DropZoneMargin,
+                top + DropZoneMargin,
+                dataGrid.ClientSize.Width - DropZoneMargin,
+                dataGrid.ClientSize.Height - DropZoneMargin);
+
+            if (zone.Width <= 0 || zone.Height <= 0)
+            {
+                return;
+            }
+
+            Color accent = _dropHighlighted ? SystemColors.Highlight : SystemColors.ControlDark;
+
+            if (_dropHighlighted)
+            {
+                using SolidBrush fill = new(Color.FromArgb(24, SystemColors.Highlight));
+                e.Graphics.FillRectangle(fill, zone);
+            }
+
+            using (Pen border = new(accent, _dropHighlighted ? 2f : 1f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash })
+            {
+                e.Graphics.DrawRectangle(border, zone);
+            }
+
+            const string title = "Arrastra aquí carpetas o archivos de audio";
+            const string hint = "o usa «Abrir carpeta(s)» y «Abrir archivo(s)» en la barra de herramientas.\n"
+                + "Los originales nunca se modifican al recortar: las copias van a la subcarpeta «Recortados».";
+
+            const TextFormatFlags flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix;
+
+            Font titleFont = _dropZoneTitleFont ??= new Font(dataGrid.Font.FontFamily, dataGrid.Font.Size * 1.3f, FontStyle.Bold);
+            Rectangle textBounds = Rectangle.Inflate(zone, -DropZoneMargin, -DropZoneMargin);
+
+            Size titleSize = TextRenderer.MeasureText(e.Graphics, title, titleFont, textBounds.Size, flags);
+            Size hintSize = TextRenderer.MeasureText(e.Graphics, hint, dataGrid.Font, textBounds.Size, flags);
+            int y = textBounds.Top + ((textBounds.Height - titleSize.Height - hintSize.Height - 8) / 2);
+
+            TextRenderer.DrawText(
+                e.Graphics,
+                title,
+                titleFont,
+                new Rectangle(textBounds.Left, y, textBounds.Width, titleSize.Height),
+                _dropHighlighted ? SystemColors.Highlight : SystemColors.ControlText,
+                flags);
+
+            TextRenderer.DrawText(
+                e.Graphics,
+                hint,
+                dataGrid.Font,
+                new Rectangle(textBounds.Left, y + titleSize.Height + 8, textBounds.Width, hintSize.Height),
+                SongPresentation.Inconclusive,
+                flags);
+        }
     }
 }

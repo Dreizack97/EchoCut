@@ -105,6 +105,7 @@ namespace EchoCut
             dataGrid.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
             dataGrid.AllowDrop = true;
             dataGrid.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            dataGrid.BackgroundColor = SystemColors.Window;
             dataGrid.BorderStyle = BorderStyle.None;
             dataGrid.CellBorderStyle = DataGridViewCellBorderStyle.None;
             dataGrid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
@@ -124,6 +125,8 @@ namespace EchoCut
             dataGrid.DataBindingComplete += dataGrid_DataBindingComplete;
             dataGrid.DragDrop += Main_DragDrop;
             dataGrid.DragEnter += Main_DragEnter;
+            dataGrid.DragLeave += Main_DragLeave;
+            dataGrid.Paint += dataGrid_Paint;
             dataGrid.KeyDown += dataGrid_KeyDown;
             // 
             // contextMenuStrip
@@ -427,6 +430,7 @@ namespace EchoCut
             FormClosing += Main_FormClosing;
             DragDrop += Main_DragDrop;
             DragEnter += Main_DragEnter;
+            DragLeave += Main_DragLeave;
             ((System.ComponentModel.ISupportInitialize)dataGrid).EndInit();
             contextMenuStrip.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)numericTolerance).EndInit();

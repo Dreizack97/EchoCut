@@ -45,6 +45,12 @@ namespace EchoCut
         private readonly List<string> _sourceDirectories = [];
         private readonly ToolTip _pathToolTip = new();
 
+        /// <summary>Si se está arrastrando encima algo que se puede soltar; resalta la zona de arrastre.</summary>
+        private bool _dropHighlighted;
+
+        /// <summary>Fuente del título de la zona de arrastre, creada al primer repintado de la lista vacía.</summary>
+        private Font? _dropZoneTitleFont;
+
         /// <summary>
         /// Lote en curso. Cerrar la ventana debe esperarlo: cancelar sin esperar deja procesos de
         /// ffmpeg.exe huérfanos y acciones ya encoladas que se ejecutarían sobre controles destruidos.
@@ -71,6 +77,7 @@ namespace EchoCut
             dataGrid.DataSource = _songs;
 
             _songs.ListChanged += Songs_ListChanged;
+            Disposed += (_, _) => _dropZoneTitleFont?.Dispose();
 
             UpdateButtons();
             RefreshSummary();
@@ -169,18 +176,32 @@ namespace EchoCut
         /// </remarks>
         private void Main_DragEnter(object? sender, DragEventArgs e)
         {
-            if (!IsBusy && e.Data?.GetDataPresent(DataFormats.FileDrop) == true)
+            bool accepted = !IsBusy && e.Data?.GetDataPresent(DataFormats.FileDrop) == true;
+            e.Effect = accepted ? DragDropEffects.Copy : DragDropEffects.None;
+            SetDropHighlight(accepted);
+        }
+
+        private void Main_DragLeave(object? sender, EventArgs e) => SetDropHighlight(false);
+
+        private void SetDropHighlight(bool highlighted)
+        {
+            if (_dropHighlighted == highlighted)
             {
-                e.Effect = DragDropEffects.Copy;
+                return;
             }
-            else
+
+            _dropHighlighted = highlighted;
+
+            if (_songs.Count == 0)
             {
-                e.Effect = DragDropEffects.None;
+                dataGrid.Invalidate();
             }
         }
 
         private void Main_DragDrop(object? sender, DragEventArgs e)
         {
+            SetDropHighlight(false);
+
             if (IsBusy || e.Data?.GetData(DataFormats.FileDrop) is not string[] dropped || dropped.Length == 0)
             {
                 return;

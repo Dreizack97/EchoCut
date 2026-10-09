@@ -143,6 +143,13 @@ namespace EchoCut
             lblErrors.Text = $"⚠ {failed} {(failed == 1 ? "error" : "errores")}";
             lblErrors.ForeColor = SongPresentation.Failed;
             lblErrors.Visible = failed > 0;
+
+            // La guía de lista vacía se pinta sobre la rejilla, que no se repinta sola al quitar la
+            // última fila.
+            if (total == 0)
+            {
+                dataGrid.Invalidate();
+            }
         }
     }
 }
