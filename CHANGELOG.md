@@ -7,6 +7,22 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 
 ---
 
+## [Sin publicar]
+
+### Añadido
+#### Fundidos de Aparición y Desaparición
+* **`Fade`, `TrackFades` y `FadeShape`** (`EchoCut.Core/Audio`): Modelo inmutable del fundido sobre la selección del usuario (tiempo absoluto del original) y curvas portadas de los preajustes de «Adjustable fade» de Audacity: lineal, curva S, coseno, redondeada, logarítmica (−3 dB a mitad) y exponencial (desde −60 dB).
+* **`FadeEnvelope`**: Aplicación muestra a muestra con la indexación del `FadeEffectBase` de Audacity (`n/N` al aparecer, `(N−1−n)/N` al desaparecer), misma ganancia en todos los canales y bloques fuera del fundido sin recorrer.
+* **`AudioFader`**: Copia con fundido mediante dos procesos de FFmpeg unidos por tubería (decodificación `f32le` exacta a la muestra → envolvente → codificación), sin materializar el audio y borrando la salida a medias si falla o se cancela.
+* **`AudioStreamInfo` y `AudioEncoding`**: Sondeo del formato con ffprobe y recodificación al mismo códec, tasa de bits y resolución del original (MP3, AAC, Vorbis, Opus, WMA, FLAC, ALAC, WavPack y PCM).
+* **`TrackEditor.CopyTags`**: Copia de etiquetas y carátula del original a la copia recodificada con TagLibSharp.
+* **Editor de forma de onda**: Selección del tramo de aparición y desaparición arrastrando sobre el detalle de cada borde (con imán a las marcas de recorte y bordes ajustables), casilla, campos numéricos y curva por fundido, envolvente ámbar en las tres vistas y escucha con el fundido aplicado.
+
+### Cambiado
+* **`TrimService`**: Las pistas sin fundido que llegue a la copia siguen recortándose con `-c copy`; solo las que lo llevan se recodifican.
+* **`Song`**: Los fundidos (`Fades`) duran la sesión, hacen recortable la pista aunque no se elimine silencio y la marcan como «Ajustado».
+* **`FFmpegRunner.Start`**: Puede redirigir la entrada estándar.
+
 ## [1.2.0] - 2026-10-02
 
 ### Añadido
