@@ -36,11 +36,11 @@ public sealed class AudioTrimmer
     /// instantánea. A cambio, cada extremo se alinea a un límite de paquete comprimido, y lo hace de
     /// forma distinta según el códec (medido con FFmpeg 8.1):
     /// <list type="bullet">
-    ///   <item>WAV y M4A/AAC: inicio exacto; MP3: a medio paquete del pedido (±13 ms).</item>
+    ///   <item>WAV y M4A/AAC: inicio exacto; MP3 y MP2: a medio paquete del pedido (±13 ms).</item>
     ///   <item>FLAC y Vorbis: el inicio retrocede al bloque o página anterior (hasta ~93 ms y ~0.9 s).</item>
     ///   <item>
-    ///     MP3, AAC y Opus: los primeros milisegundos de la copia no coinciden con el original
-    ///     (~8 ms en MP3 y AAC, ~110 ms atenuados en Opus) porque el decodificador arranca sin el
+    ///     MP3, MP2, AAC y Opus: los primeros milisegundos de la copia no coinciden con el original
+    ///     (~8 ms en MP3, MP2 y AAC, ~110 ms atenuados en Opus) porque el decodificador arranca sin el
     ///     estado de los paquetes previos.
     ///   </item>
     /// </list>
