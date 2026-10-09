@@ -63,6 +63,10 @@ public sealed class FadeAdjustedEventArgs(FadeDirection direction, double startS
 /// las marcas de recorte y a los bordes de lo borrado cercanos.
 /// </para>
 /// <para>
+/// Zoom: la rueda desplaza la vista y Ctrl+rueda acerca o aleja alrededor del puntero, siempre
+/// dentro de los límites fijados con <see cref="SetScrollLimits"/>, que son los del audio cargado.
+/// </para>
+/// <para>
 /// La envolvente de <see cref="Fades"/> se dibuja en ámbar con la misma escala vertical que la
 /// onda; lo borrado, con la paleta de lo eliminado y un rayado que lo distingue del recorte.
 /// </para>
@@ -91,6 +95,18 @@ public sealed class WaveformView : Control
     /// <summary>Rayado de lo borrado: la forma, y no solo el gris, lo distingue de lo que quita el recorte.</summary>
     private static readonly Color DeletedHatchColor = Color.FromArgb(150, 0x40, 0x40, 0x40);
 
+    /// <summary>
+    /// Tramo visible más corto: unos cuantos bloques del resumen de la onda. Por debajo, la imagen
+    /// no tiene más detalle que mostrar.
+    /// </summary>
+    public const double MinimumSpanSeconds = 0.05;
+
+    /// <summary>Cuánto acerca o aleja cada paso de la rueda con Ctrl.</summary>
+    private const double WheelZoomFactor = 1.25;
+
+    /// <summary>Fracción de la vista que desplaza cada paso de la rueda.</summary>
+    private const double WheelScrollFraction = 0.1;
+
     /// <summary>Recorrido mínimo, en píxeles lógicos, para que un clic se tome por selección y no por un clic suelto.</summary>
     private const int SelectionThreshold = 3;
 
@@ -110,6 +126,8 @@ public sealed class WaveformView : Control
     private double _durationSeconds = 1.0;
     private double _viewStartSeconds;
     private double _viewEndSeconds = 1.0;
+    private double _scrollMinSeconds;
+    private double _scrollMaxSeconds = 1.0;
     private double _startMarkerSeconds;
     private double _endMarkerSeconds = 1.0;
     private bool _showStartMarker = true;
@@ -166,6 +184,11 @@ public sealed class WaveformView : Control
     [Category("Forma de onda")]
     [Description("Se produce mientras el usuario arrastra un borde de un fundido.")]
     public event EventHandler<FadeAdjustedEventArgs>? FadeAdjusted;
+
+    /// <summary>Se produce cuando cambia el tramo visible, por zoom o desplazamiento.</summary>
+    [Category("Forma de onda")]
+    [Description("Se produce cuando cambia el tramo visible.")]
+    public event EventHandler? ViewChanged;
 
     /// <summary>Fundidos que se dibujan sobre la onda.</summary>
     /// <value>Los fundidos de la pista, o <c>null</c> si no hay ninguno.</value>
@@ -364,12 +387,60 @@ public sealed class WaveformView : Control
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(endSeconds, startSeconds);
 
         _durationSeconds = durationSeconds;
+        _scrollMinSeconds = 0.0;
+        _scrollMaxSeconds = durationSeconds;
         _viewStartSeconds = startSeconds;
         _viewEndSeconds = endSeconds;
         _imagesStale = true;
         Invalidate();
     }
 
+    /// <summary>Limita hasta dónde se puede desplazar o alejar la vista.</summary>
+    /// <param name="minSeconds">Instante más temprano que se puede mostrar.</param>
+    /// <param name="maxSeconds">Instante más tardío que se puede mostrar.</param>
+    /// <remarks>
+    /// La vista del final solo tiene cargada la cola de la pista: más allá no hay onda que pintar,
+    /// así que no se deja llegar.
+    /// </remarks>
+    public void SetScrollLimits(double minSeconds, double maxSeconds)
+    {
+        _scrollMinSeconds = Math.Max(0.0, minSeconds);
+        _scrollMaxSeconds = Math.Max(_scrollMinSeconds + MinimumSpanSeconds, maxSeconds);
+        ShowRange(_viewStartSeconds, _viewEndSeconds);
+    }
+
+    /// <summary>Muestra un tramo, ajustado a los límites y al zoom máximo, y avisa si cambió.</summary>
+    /// <param name="startSeconds">Instante deseado en el borde izquierdo.</param>
+    /// <param name="endSeconds">Instante deseado en el borde derecho.</param>
+    public void ShowRange(double startSeconds, double endSeconds)
+    {
+        double limit = _scrollMaxSeconds - _scrollMinSeconds;
+        double span = Math.Clamp(endSeconds - startSeconds, MinimumSpanSeconds, limit);
+        double start = Math.Clamp(startSeconds, _scrollMinSeconds, _scrollMaxSeconds - span);
+
+        if (start == _viewStartSeconds && start + span == _viewEndSeconds)
+        {
+            return;
+        }
+
+        _viewStartSeconds = start;
+        _viewEndSeconds = start + span;
+        _imagesStale = true;
+        Invalidate();
+        ViewChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Acerca o aleja la vista manteniendo un instante en el mismo sitio de la pantalla.</summary>
+    /// <param name="factor">Mayor que 1 acerca; menor que 1 aleja.</param>
+    /// <param name="anchorSeconds">Instante que no se mueve; el centro de la vista si es <c>null</c>.</param>
+    public void ZoomBy(double factor, double? anchorSeconds = null)
+    {
+        double anchor = anchorSeconds ?? (_viewStartSeconds + _viewEndSeconds) / 2.0;
+        double span = _viewEndSeconds - _viewStartSeconds;
+        double fraction = (anchor - _viewStartSeconds) / span;
+        double newSpan = span / factor;
+        ShowRange(anchor - (fraction * newSpan), anchor + ((1.0 - fraction) * newSpan));
+    }
     /// <summary>Fija las marcas desde código, sin producir <see cref="MarkersChanged"/>.</summary>
     /// <param name="startSeconds">Instante de inicio de la copia.</param>
     /// <param name="endSeconds">Instante de final de la copia.</param>
@@ -575,6 +646,28 @@ public sealed class WaveformView : Control
         EndDrag();
         Capture = false;
         base.OnMouseUp(e);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+        double notches = e.Delta / (double)SystemInformation.MouseWheelScrollDelta;
+        if ((ModifierKeys & Keys.Control) != 0)
+        {
+            ZoomBy(Math.Pow(WheelZoomFactor, notches), SecondsAt(e.X));
+        }
+        else
+        {
+            double shift = -notches * WheelScrollFraction * (_viewEndSeconds - _viewStartSeconds);
+            ShowRange(_viewStartSeconds + shift, _viewEndSeconds + shift);
+        }
+
+        if (e is HandledMouseEventArgs handled)
+        {
+            handled.Handled = true;
+        }
+
+        base.OnMouseWheel(e);
     }
 
     /// <inheritdoc/>
