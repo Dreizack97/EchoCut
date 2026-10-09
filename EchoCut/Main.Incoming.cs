@@ -1,10 +1,11 @@
 using EchoCut.Library;
+using EchoCut.Shell;
 
 namespace EchoCut
 {
     /// <summary>
-    /// La parte de <see cref="Main"/> que recibe pistas desde fuera de la ventana: por línea de
-    /// comandos o desde otra instancia de la aplicación.
+    /// La parte de <see cref="Main"/> que recibe pistas desde fuera de la ventana —la línea de
+    /// comandos y el menú contextual del Explorador— y gestiona esa integración.
     /// </summary>
     public partial class Main
     {
@@ -174,6 +175,67 @@ namespace EchoCut
             }
 
             Activate();
+        }
+
+        // ------------------------------------------------------------- Integración con el Explorador
+
+        /// <summary>Refleja en el menú si la integración está activa cada vez que se despliega.</summary>
+        /// <remarks>
+        /// Se comprueba al abrir y no una sola vez al arrancar: otra copia de EchoCut, o el usuario
+        /// desde el registro, puede haberla cambiado mientras la ventana seguía abierta.
+        /// </remarks>
+        private void ddbUtilities_DropDownOpening(object? sender, EventArgs e)
+        {
+            ExplorerIntegrationState state = ExplorerIntegration.GetState();
+            mnuExplorer.Checked = state == ExplorerIntegrationState.Registered;
+            mnuExplorer.Text = state == ExplorerIntegrationState.Outdated
+                ? "Integrar con el Explorador de Windows (actualizar ubicación)"
+                : "Integrar con el Explorador de Windows";
+        }
+
+        private void mnuExplorer_Click(object? sender, EventArgs e)
+        {
+            ExplorerIntegrationState state = ExplorerIntegration.GetState();
+
+            try
+            {
+                if (state == ExplorerIntegrationState.Registered)
+                {
+                    if (MessageBox.Show(
+                            this,
+                            "¿Quitar «Abrir con EchoCut» del menú contextual del Explorador?",
+                            "Integración con el Explorador",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Question) != DialogResult.Yes)
+                    {
+                        return;
+                    }
+
+                    ExplorerIntegration.Unregister();
+                    SetStatus("«Abrir con EchoCut» se quitó del menú contextual del Explorador.");
+                    return;
+                }
+
+                ExplorerIntegration.Register();
+
+                string message = state == ExplorerIntegrationState.Outdated
+                    ? "La opción apuntaba a otra ubicación de EchoCut y ahora abre esta."
+                    : "Al hacer clic derecho sobre archivos de audio o carpetas aparecerá «Abrir con EchoCut»; las canciones se agregan a la lista de la ventana abierta.";
+
+                MessageBox.Show(
+                    this,
+                    $"{message}\n\nEn Windows 11 la opción está dentro de «Mostrar más opciones». "
+                    + "Si mueves la carpeta de EchoCut, vuelve a activar esta opción para que apunte a la nueva ubicación.",
+                    "Integración con el Explorador",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                SetStatus("«Abrir con EchoCut» se agregó al menú contextual del Explorador.");
+            }
+            catch (Exception exception) when (exception is UnauthorizedAccessException or IOException or System.Security.SecurityException)
+            {
+                ShowError("No se pudo cambiar la integración con el Explorador.", exception);
+            }
         }
     }
 }

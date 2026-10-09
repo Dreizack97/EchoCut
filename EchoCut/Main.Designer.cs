@@ -68,6 +68,8 @@ namespace EchoCut
             mnuRename = new ToolStripMenuItem();
             mnuAddSequence = new ToolStripMenuItem();
             mnuRemoveLeading = new ToolStripMenuItem();
+            sepExplorer = new ToolStripSeparator();
+            mnuExplorer = new ToolStripMenuItem();
             btnExport = new ToolStripButton();
             btnAdvanced = new ToolStripButton();
             statusStrip = new StatusStrip();
@@ -353,10 +355,11 @@ namespace EchoCut
             // ddbUtilities
             // 
             ddbUtilities.DisplayStyle = ToolStripItemDisplayStyle.Text;
-            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize, mnuRename });
+            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize, mnuRename, sepExplorer, mnuExplorer });
             ddbUtilities.Name = "ddbUtilities";
             ddbUtilities.Size = new Size(82, 23);
             ddbUtilities.Text = "Utilidades";
+            ddbUtilities.DropDownOpening += ddbUtilities_DropDownOpening;
             ddbUtilities.ToolTipText = "Operaciones que modifican los archivos originales";
             // 
             // mnuMetadata
@@ -407,6 +410,19 @@ namespace EchoCut
             mnuRemoveLeading.Size = new Size(260, 24);
             mnuRemoveLeading.Text = "Quitar caracteres iniciales…";
             mnuRemoveLeading.Click += mnuRemoveLeading_Click;
+            // 
+            // sepExplorer
+            // 
+            sepExplorer.Name = "sepExplorer";
+            sepExplorer.Size = new Size(189, 6);
+            // 
+            // mnuExplorer
+            // 
+            mnuExplorer.Name = "mnuExplorer";
+            mnuExplorer.Size = new Size(380, 24);
+            mnuExplorer.Text = "Integrar con el Explorador de Windows";
+            mnuExplorer.ToolTipText = "Agrega «Abrir con EchoCut» al menú contextual de los archivos de audio y las carpetas";
+            mnuExplorer.Click += mnuExplorer_Click;
             // 
             // btnExport
             // 
@@ -587,6 +603,8 @@ namespace EchoCut
         private ToolStripMenuItem mnuRename;
         private ToolStripMenuItem mnuAddSequence;
         private ToolStripMenuItem mnuRemoveLeading;
+        private ToolStripSeparator sepExplorer;
+        private ToolStripMenuItem mnuExplorer;
         private StatusStrip statusStrip;
         private ToolStripStatusLabel lblStatus;
         private ToolStripProgressBar progressBar;

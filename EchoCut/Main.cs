@@ -1010,7 +1010,10 @@ namespace EchoCut
             btnCropAll.Enabled = !IsBusy && hasSongs;
             btnStop.Enabled = analyzing || cleaning || normalizing || tagging || renaming || trimming;
             btnExport.Enabled = !IsBusy && hasSongs;
-            ddbUtilities.Enabled = !IsBusy && hasSongs;
+            ddbUtilities.Enabled = !IsBusy;
+            mnuMetadata.Enabled = hasSongs;
+            mnuNormalize.Enabled = hasSongs;
+            mnuRename.Enabled = hasSongs;
             btnAdvanced.Enabled = !IsBusy;
             numericThreads.Enabled = !IsBusy;
             numericTolerance.Enabled = !IsBusy;
