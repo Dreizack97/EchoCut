@@ -24,6 +24,7 @@ public static class AudioEncoding
     private static readonly Dictionary<string, string> LossyEncoders = new(StringComparer.OrdinalIgnoreCase)
     {
         ["mp3"] = "libmp3lame",
+        ["mp2"] = "mp2",
         ["aac"] = "aac",
         ["vorbis"] = "libvorbis",
         ["opus"] = "libopus",
@@ -46,7 +47,8 @@ public static class AudioEncoding
         List<string> arguments = ["-c:a", .. EncoderFor(source)];
 
         // Mismas etiquetas ID3 que escribe el recorte por copia, para que ambas salidas se lean igual.
-        if (string.Equals(extension, ".mp3", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(extension, ".mp3", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".mp2", StringComparison.OrdinalIgnoreCase))
         {
             arguments.AddRange(["-id3v2_version", "3"]);
         }
