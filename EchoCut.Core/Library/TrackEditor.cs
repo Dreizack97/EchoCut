@@ -83,7 +83,6 @@ public static class TrackEditor
         }
 
         string currentPath = properties.FilePath;
-        string currentDir = properties.Directory;
 
         // 1. Guardar etiquetas en el archivo
         using (TagLib.File tagFile = TagLib.File.Create(currentPath))
@@ -106,17 +105,9 @@ public static class TrackEditor
         }
 
         // 2. Renombrar archivo si el nombre cambió
-        string newFileNameWithExt = cleanName + properties.Extension;
-        string newFilePath = Path.Combine(currentDir, newFileNameWithExt);
-
+        string newFilePath = Rename(currentPath, cleanName);
         if (!string.Equals(currentPath, newFilePath, StringComparison.Ordinal))
         {
-            if (!string.Equals(currentPath, newFilePath, StringComparison.OrdinalIgnoreCase) && File.Exists(newFilePath))
-            {
-                throw new IOException($"Ya existe un archivo llamado «{newFileNameWithExt}» en la misma carpeta.");
-            }
-
-            File.Move(currentPath, newFilePath);
             currentPath = newFilePath;
             properties.FilePath = newFilePath;
             properties.FileName = cleanName;
@@ -124,6 +115,37 @@ public static class TrackEditor
 
         // 3. Volver a leer la pista actualizada desde el disco
         return TrackScanner.Read(currentPath);
+    }
+
+    /// <summary>
+    /// Renombra un archivo dentro de su misma carpeta, conservando la extensión.
+    /// </summary>
+    /// <param name="currentPath">Ruta actual del archivo.</param>
+    /// <param name="newBaseName">Nombre nuevo, sin extensión.</param>
+    /// <returns>La ruta resultante; la misma si el nombre no cambia.</returns>
+    /// <exception cref="IOException">Si ya existe otro archivo con el nombre nuevo.</exception>
+    /// <remarks>
+    /// Un cambio que solo afecta a mayúsculas se permite aunque <see cref="File.Exists"/> dé por
+    /// existente el destino: en NTFS ambos nombres son el mismo archivo, y normalizar a TitleCase
+    /// produce justo ese tipo de cambio.
+    /// </remarks>
+    private static string Rename(string currentPath, string newBaseName)
+    {
+        string newFileName = newBaseName + Path.GetExtension(currentPath);
+        string newPath = Path.Combine(Path.GetDirectoryName(currentPath) ?? string.Empty, newFileName);
+
+        if (string.Equals(currentPath, newPath, StringComparison.Ordinal))
+        {
+            return currentPath;
+        }
+
+        if (!string.Equals(currentPath, newPath, StringComparison.OrdinalIgnoreCase) && File.Exists(newPath))
+        {
+            throw new IOException($"Ya existe un archivo llamado «{newFileName}» en la misma carpeta.");
+        }
+
+        File.Move(currentPath, newPath);
+        return newPath;
     }
 
     private static string[] SplitList(string? text)
