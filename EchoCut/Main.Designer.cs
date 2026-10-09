@@ -72,6 +72,7 @@ namespace EchoCut
             mnuExplorer = new ToolStripMenuItem();
             btnExport = new ToolStripButton();
             btnAdvanced = new ToolStripButton();
+            btnShortcuts = new ToolStripButton();
             statusStrip = new StatusStrip();
             lblStatus = new ToolStripStatusLabel();
             progressBar = new ToolStripProgressBar();
@@ -292,7 +293,7 @@ namespace EchoCut
             // 
             toolStrip.Font = new Font("Segoe UI", 10F);
             toolStrip.GripStyle = ToolStripGripStyle.Hidden;
-            toolStrip.Items.AddRange(new ToolStripItem[] { btnPath, btnFile, sepSource, btnAnalyze, btnCropAll, btnStop, sepProcess, ddbUtilities, btnExport, btnAdvanced });
+            toolStrip.Items.AddRange(new ToolStripItem[] { btnPath, btnFile, sepSource, btnAnalyze, btnCropAll, btnStop, sepProcess, ddbUtilities, btnExport, btnAdvanced, btnShortcuts });
             toolStrip.Location = new Point(0, 0);
             toolStrip.Name = "toolStrip";
             toolStrip.Size = new Size(1100, 26);
@@ -455,6 +456,16 @@ namespace EchoCut
             btnAdvanced.ToolTipText = "Parámetros avanzados de detección de silencio";
             btnAdvanced.Click += btnAdvanced_Click;
             // 
+            // btnShortcuts
+            // 
+            btnShortcuts.Alignment = ToolStripItemAlignment.Right;
+            btnShortcuts.DisplayStyle = ToolStripItemDisplayStyle.Text;
+            btnShortcuts.Name = "btnShortcuts";
+            btnShortcuts.Size = new Size(76, 23);
+            btnShortcuts.Text = "⌨ Atajos";
+            btnShortcuts.ToolTipText = "Ver todos los atajos de teclado";
+            btnShortcuts.Click += btnShortcuts_Click;
+            // 
             // statusStrip
             // 
             statusStrip.Font = new Font("Segoe UI", 9F);
@@ -607,6 +618,7 @@ namespace EchoCut
         private ToolStripDropDownButton ddbUtilities;
         private ToolStripButton btnExport;
         private ToolStripButton btnAdvanced;
+        private ToolStripButton btnShortcuts;
         private ToolStripMenuItem mnuMetadata;
         private ToolStripMenuItem mnuCleanMetadata;
         private ToolStripMenuItem mnuAddMetadata;

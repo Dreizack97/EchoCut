@@ -2,7 +2,7 @@ namespace EchoCut
 {
     /// <summary>
     /// La parte de <see cref="Main"/> que define los atajos de teclado y los da a conocer: en los
-    /// menús, en los tooltips y en la barra de estado.
+    /// menús, en los tooltips, en la barra de estado y en la ventana «Atajos de teclado».
     /// </summary>
     /// <remarks>
     /// Todos salen de una sola tabla, <see cref="_shortcuts"/>: lo que se anuncia y lo que funciona
@@ -11,6 +11,18 @@ namespace EchoCut
     /// </remarks>
     public partial class Main
     {
+        private const string GroupOpen = "Abrir canciones";
+        private const string GroupProcess = "Procesar";
+        private const string GroupUtilities = "Utilidades";
+        private const string GroupGrid = "Rejilla (con la lista seleccionada)";
+        private const string GroupFilter = "Filtro";
+        private const string GroupWaveform = "Ventana de forma de onda";
+        private const string GroupHelp = "Ayuda y opciones";
+
+        /// <summary>Orden en que se presentan los grupos en la ventana de atajos.</summary>
+        private static readonly string[] GroupOrder =
+            [GroupOpen, GroupProcess, GroupUtilities, GroupGrid, GroupFilter, GroupWaveform, GroupHelp];
+
         /// <summary>Dónde funciona un atajo.</summary>
         private enum ShortcutScope
         {
@@ -24,8 +36,9 @@ namespace EchoCut
         /// <summary>Atajo que dispara una opción de la barra o de un menú.</summary>
         /// <param name="Keys">Tecla con sus modificadores.</param>
         /// <param name="Item">Botón u opción de menú que ejecuta.</param>
+        /// <param name="Group">Grupo con el que se presenta.</param>
         /// <param name="Scope">Dónde funciona.</param>
-        private sealed record ShortcutBinding(Keys Keys, ToolStripItem Item, ShortcutScope Scope = ShortcutScope.Window);
+        private sealed record ShortcutBinding(Keys Keys, ToolStripItem Item, string Group, ShortcutScope Scope = ShortcutScope.Window);
 
         private IReadOnlyList<ShortcutBinding> _shortcuts = [];
 
@@ -49,26 +62,27 @@ namespace EchoCut
         {
             _shortcuts =
             [
-                new(Keys.Control | Keys.O, btnFile),
-                new(Keys.Control | Keys.Shift | Keys.O, btnPath),
-                new(Keys.F5, btnAnalyze),
-                new(Keys.Control | Keys.R, btnCropAll),
-                new(Keys.Escape, btnStop),
-                new(Keys.Control | Keys.E, btnExport),
-                new(Keys.Control | Keys.M, mnuAddMetadata),
-                new(Keys.Control | Keys.N, mnuNormalize),
-                new(Keys.Control | Keys.Shift | Keys.C, mnuAddSequence),
-                new(Keys.Control | Keys.Shift | Keys.Q, mnuRemoveLeading),
+                new(Keys.Control | Keys.O, btnFile, GroupOpen),
+                new(Keys.Control | Keys.Shift | Keys.O, btnPath, GroupOpen),
+                new(Keys.F5, btnAnalyze, GroupProcess),
+                new(Keys.Control | Keys.R, btnCropAll, GroupProcess),
+                new(Keys.Escape, btnStop, GroupProcess),
+                new(Keys.Control | Keys.E, btnExport, GroupProcess),
+                new(Keys.Control | Keys.M, mnuAddMetadata, GroupUtilities),
+                new(Keys.Control | Keys.N, mnuNormalize, GroupUtilities),
+                new(Keys.Control | Keys.Shift | Keys.C, mnuAddSequence, GroupUtilities),
+                new(Keys.Control | Keys.Shift | Keys.Q, mnuRemoveLeading, GroupUtilities),
 
                 // Entrar abre la opción en negrita del menú contextual, como el verbo por defecto
                 // en el Explorador, y Alt+Entrar las propiedades, como allí.
-                new(Keys.Enter, mnuWaveform, ShortcutScope.Grid),
-                new(Keys.F2, mnuRenameSong, ShortcutScope.Grid),
-                new(Keys.Alt | Keys.Enter, mnuEditSong, ShortcutScope.Grid),
-                new(Keys.Control | Keys.Shift | Keys.E, mnuOpenFolder, ShortcutScope.Grid),
-                new(Keys.Delete, mnuDeleteSong, ShortcutScope.Grid),
+                new(Keys.Enter, mnuWaveform, GroupGrid, ShortcutScope.Grid),
+                new(Keys.F2, mnuRenameSong, GroupGrid, ShortcutScope.Grid),
+                new(Keys.Alt | Keys.Enter, mnuEditSong, GroupGrid, ShortcutScope.Grid),
+                new(Keys.Control | Keys.Shift | Keys.E, mnuOpenFolder, GroupGrid, ShortcutScope.Grid),
+                new(Keys.Delete, mnuDeleteSong, GroupGrid, ShortcutScope.Grid),
 
-                new(Keys.Control | Keys.Oemcomma, btnAdvanced),
+                new(Keys.Control | Keys.Oemcomma, btnAdvanced, GroupHelp),
+                new(Keys.F1, btnShortcuts, GroupHelp),
             ];
 
             // Las descripciones se toman antes de añadir el atajo a los tooltips.
@@ -220,6 +234,40 @@ namespace EchoCut
 
             _statusBeforeHint = null;
             lblStatus.Text = previous;
+        }
+
+        // ----------------------------------------------------------------- Ventana de atajos
+
+        private void btnShortcuts_Click(object? sender, EventArgs e)
+        {
+            using ShortcutsDialog dialog = new(DescribeShortcuts());
+            dialog.ShowDialog(this);
+        }
+
+        /// <summary>Todos los atajos de la aplicación, agrupados y en orden de presentación.</summary>
+        /// <remarks>
+        /// A los de la tabla se suman los que no disparan una opción de menú —el doble clic, las
+        /// teclas del filtro, del cuadro de renombrar y de la forma de onda— para que la ventana
+        /// sea la referencia completa.
+        /// </remarks>
+        private IReadOnlyList<ShortcutEntry> DescribeShortcuts()
+        {
+            List<ShortcutEntry> entries =
+            [
+                .. _shortcuts.Select(shortcut => new ShortcutEntry(shortcut.Group, ActionName(shortcut.Item), ShortcutText.Of(shortcut.Keys))),
+                new(GroupGrid, "Abrir en Audacity", "Doble clic"),
+                new(GroupGrid, "Confirmar o descartar el nombre al renombrar", "Entrar / Esc"),
+                new(GroupFilter, "Ir al filtro por nombre", ShortcutText.Of(Keys.Control | Keys.F)),
+                new(GroupFilter, "Vaciar el filtro", "Esc"),
+                new(GroupWaveform, "Elegir la marca de inicio o la de fin", "Inicio / Fin"),
+                new(GroupWaveform, "Mover la marca elegida 0,01 s", "← / →"),
+                new(GroupWaveform, "Mover la marca elegida 0,1 s", "Shift+← / →"),
+                new(GroupWaveform, "Mover la marca elegida 1 s", "Ctrl+← / →"),
+                new(GroupWaveform, "Aceptar o cancelar el ajuste", "Entrar / Esc"),
+            ];
+
+            // OrderBy es estable: dentro de cada grupo se conserva el orden de la lista.
+            return [.. entries.OrderBy(entry => Array.IndexOf(GroupOrder, entry.Group))];
         }
 
         /// <summary>Nombre de una opción sin glifos decorativos ni puntos suspensivos.</summary>
