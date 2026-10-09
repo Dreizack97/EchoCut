@@ -76,6 +76,9 @@ public sealed class WaveformClickEventArgs(double seconds) : EventArgs
 /// dentro de los límites fijados con <see cref="SetScrollLimits"/>, que son los del audio cargado.
 /// </para>
 /// <para>
+/// Con <see cref="RenderEdits"/> la onda se pinta con los fundidos aplicados: se ve lo que sonará.
+/// </para>
+/// <para>
 /// La envolvente de <see cref="Fades"/> se dibuja en ámbar con la misma escala vertical que la
 /// onda; lo borrado, con la paleta de lo eliminado y un rayado que lo distingue del recorte.
 /// </para>
@@ -141,6 +144,7 @@ public sealed class WaveformView : Control
     private double _scrollMinSeconds;
     private double _scrollMaxSeconds = 1.0;
     private double? _cursorSeconds;
+    private AudioEdits? _renderEdits;
     private double _startMarkerSeconds;
     private double _endMarkerSeconds = 1.0;
     private bool _showStartMarker = true;
@@ -207,6 +211,24 @@ public sealed class WaveformView : Control
     [Category("Forma de onda")]
     [Description("Se produce cuando cambia el tramo visible.")]
     public event EventHandler? ViewChanged;
+
+    /// <summary>Ediciones con las que se pinta la onda.</summary>
+    /// <value>
+    /// Los fundidos que se aplican al pintar, o <c>null</c> para pintar el original tal cual. Distinto
+    /// de <see cref="Fades"/>, que solo dibuja la envolvente encima.
+    /// </value>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public AudioEdits? RenderEdits
+    {
+        get => _renderEdits;
+        set
+        {
+            _renderEdits = value;
+            _imagesStale = true;
+            Invalidate();
+        }
+    }
 
     /// <summary>Punto desde el que sonará la reproducción si no hay selección.</summary>
     /// <value>Segundos del archivo, o <c>null</c> si no se fijó.</value>
@@ -888,7 +910,8 @@ public sealed class WaveformView : Control
             _viewStartSeconds,
             _viewEndSeconds,
             _amplitudeScale,
-            palette);
+            palette,
+            _renderEdits);
         return image;
     }
 

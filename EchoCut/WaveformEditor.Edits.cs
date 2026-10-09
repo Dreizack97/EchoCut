@@ -261,9 +261,12 @@ namespace EchoCut
         private void ApplyFades()
         {
             TrackFades? fades = CurrentFades;
+            AudioEdits? edits = Edits;
             foreach (WaveformView view in Views)
             {
+                // La onda se pinta con los fundidos aplicados, además de la envolvente encima.
                 view.Fades = fades;
+                view.RenderEdits = edits;
             }
 
             if (_inspected is InspectorTarget.FadeIn or InspectorTarget.FadeOut)
