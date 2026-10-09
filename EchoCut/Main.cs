@@ -570,7 +570,7 @@ namespace EchoCut
                 SetStatus($"Preparando el final de {song.Name}…");
 
                 await _preview
-                    .PlayAsync(song.FilePath, window, AudioEdits.From(song.Fades, null), cts.Token)
+                    .PlayAsync(song.FilePath, window, song.Edits, cts.Token)
                     .ConfigureAwait(true);
 
                 if (!IsAlive || cts.IsCancellationRequested)
@@ -643,7 +643,7 @@ namespace EchoCut
 
             List<TrimRequest> targets = _songs
                 .Where(x => x.ShouldTrim && x.TrimRange is not null)
-                .Select(x => new TrimRequest(x.Track, x.TrimRange!.Value, AudioEdits.From(x.Fades, null)))
+                .Select(x => new TrimRequest(x.Track, x.TrimRange!.Value, x.Edits))
                 .ToList();
 
             if (targets.Count == 0)
@@ -787,7 +787,7 @@ namespace EchoCut
             try
             {
                 Task<TrimOutcome> trim = _trimmer.TrimOneAsync(
-                    new TrimRequest(song.Track, range, AudioEdits.From(song.Fades, null)),
+                    new TrimRequest(song.Track, range, song.Edits),
                     outputDirectory,
                     cts.Token);
 
@@ -1221,7 +1221,7 @@ namespace EchoCut
                 song.TrimRange ?? new TrimRange(0.0, duration),
                 song.Analysis?.Range,
                 song.ManualRange is not null,
-                song.Fades,
+                song.Edits?.Fades,
                 _waveforms,
                 _locator.Require().FFmpeg,
                 _settings.Silence.PreviewSeconds);
@@ -1232,12 +1232,12 @@ namespace EchoCut
             }
 
             song.AdjustManually(dialog.ManualRange);
-            song.ApplyFades(dialog.Fades);
+            song.ApplyEdits(AudioEdits.From(dialog.Fades, song.Edits?.Deletions));
 
             string trim = dialog.ManualRange is null
                 ? "se usa el recorte del análisis"
                 : $"recorte ajustado a mano, {song.Crop:0.00} s a eliminar";
-            string fades = song.Fades is null ? string.Empty : "; la copia llevará fundidos y se volverá a codificar";
+            string fades = song.Edits?.Fades is null ? string.Empty : "; la copia llevará fundidos y se volverá a codificar";
             SetStatus($"{song.Name}: {trim}{fades}.");
         }
 

@@ -36,7 +36,7 @@ public sealed class Song : INotifyPropertyChanged
     /// <summary>El análisis terminó y no hay silencio final que recortar.</summary>
     public const string StatusNoSilence = "Sin silencio";
 
-    /// <summary>El tramo a conservar se ajustó a mano y recorta algo, o la pista lleva fundidos.</summary>
+    /// <summary>El tramo a conservar se ajustó a mano y recorta algo, o la pista lleva fundidos o borrados.</summary>
     public const string StatusAdjusted = "Ajustado";
 
     /// <summary>El recorte está en curso.</summary>
@@ -64,7 +64,7 @@ public sealed class Song : INotifyPropertyChanged
 
     private TrackAnalysis? _analysis;
     private TrimRange? _manualRange;
-    private TrackFades? _fades;
+    private AudioEdits? _edits;
     private string _estatus = StatusPending;
     private string _errorMessage = string.Empty;
 
@@ -133,12 +133,15 @@ public sealed class Song : INotifyPropertyChanged
     /// <summary>Segundos que se eliminarían al recortar.</summary>
     /// <value>
     /// Segundos que se ahorrarían al recortar según el ajuste manual o, si no lo hay, según el
-    /// análisis; <c>null</c> si no hay ninguno de los dos.
+    /// análisis, sumando lo borrado a mano dentro de lo que se conserva; <c>null</c> si no hay
+    /// tramo que conservar.
     /// </value>
     [DisplayName("Recorte (s)")]
-    public double? Crop => _manualRange is { } manual
-        ? Math.Round(DurationSeconds - manual.DurationSeconds, 2)
-        : _analysis?.CropSeconds;
+    public double? Crop => _manualRange is null && _edits is null
+        ? _analysis?.CropSeconds
+        : TrimRange is { } range
+            ? Math.Round(DurationSeconds - (_edits?.KeptSeconds(range) ?? range.DurationSeconds), 2)
+            : null;
 
     /// <summary>Estado actual de la fila, tal como se muestra en la columna «Estado».</summary>
     /// <value>Uno de los valores <c>Status*</c> definidos en esta clase.</value>
@@ -224,12 +227,12 @@ public sealed class Song : INotifyPropertyChanged
     /// ninguno. Es el único punto del que el recorte y la previsualización toman sus extremos.
     /// </value>
     /// <remarks>
-    /// Una pista con fundidos pero sin análisis ni ajuste se conserva completa: el fundido basta para
-    /// que haya una copia que escribir.
+    /// Una pista con ediciones pero sin análisis ni ajuste se conserva completa: un fundido o un
+    /// borrado bastan para que haya una copia que escribir.
     /// </remarks>
     [Browsable(false)]
     public TrimRange? TrimRange =>
-        _manualRange ?? _analysis?.Range ?? (_fades is not null ? new TrimRange(0.0, DurationSeconds) : null);
+        _manualRange ?? _analysis?.Range ?? (_edits is not null ? new TrimRange(0.0, DurationSeconds) : null);
 
     /// <summary>Tramo ajustado a mano desde el espectrograma.</summary>
     /// <value>
@@ -240,26 +243,26 @@ public sealed class Song : INotifyPropertyChanged
     [Browsable(false)]
     public TrimRange? ManualRange => _manualRange;
 
-    /// <summary>Fundidos que se aplicarán a la copia, elegidos en el editor de forma de onda.</summary>
+    /// <summary>Fundidos y borrados que se aplicarán a la copia, elegidos en el editor de forma de onda.</summary>
     /// <value>
-    /// Los fundidos de la pista, o <c>null</c> si no lleva ninguno. Como el ajuste manual, duran lo
+    /// Las ediciones de la pista, o <c>null</c> si no lleva ninguna. Como el ajuste manual, duran lo
     /// que la sesión y sobreviven a un nuevo análisis.
     /// </value>
     [Browsable(false)]
-    public TrackFades? Fades => _fades;
+    public AudioEdits? Edits => _edits;
 
     /// <summary>Si procede escribir una copia recortada.</summary>
     /// <value>
-    /// Siempre que algún fundido llegue a la copia; si no, con ajuste manual, si este descarta algo
-    /// del principio o del final, y sin él, la decisión del análisis.
+    /// Siempre que algún fundido o borrado llegue a la copia; si no, con ajuste manual, si este
+    /// descarta algo del principio o del final, y sin él, la decisión del análisis.
     /// </value>
     [Browsable(false)]
-    public bool ShouldTrim => HasEffectiveFades || (_manualRange is { } manual
+    public bool ShouldTrim => HasEffectiveEdits || (_manualRange is { } manual
         ? manual.StartSeconds > EdgeEpsilonSeconds || manual.EndSeconds < DurationSeconds - EdgeEpsilonSeconds
         : _analysis?.ShouldTrim ?? false);
 
-    /// <value><c>true</c> si algún fundido afecta al tramo que conserva la copia.</value>
-    private bool HasEffectiveFades => _fades is not null && TrimRange is { } range && _fades.Within(range) is not null;
+    /// <value><c>true</c> si algún fundido o borrado afecta al tramo que conserva la copia.</value>
+    private bool HasEffectiveEdits => _edits is not null && TrimRange is { } range && _edits.Within(range) is not null;
 
     /// <summary>Detalle del último error, para el CSV y el tooltip de la fila.</summary>
     /// <value>Mensaje de error, o cadena vacía si no hay ninguno.</value>
@@ -309,21 +312,22 @@ public sealed class Song : INotifyPropertyChanged
         Estatus = DecisionStatus();
     }
 
-    /// <summary>Fija o retira los fundidos de la copia.</summary>
-    /// <param name="fades">Fundidos elegidos, o <c>null</c> (o sin ninguno) para quitarlos.</param>
+    /// <summary>Fija o retira los fundidos y borrados de la copia.</summary>
+    /// <param name="edits">Ediciones elegidas, o <c>null</c> (o vacías) para quitarlas.</param>
     /// <exception cref="ArgumentOutOfRangeException">Se lanza si algún fundido no es válido.</exception>
-    public void ApplyFades(TrackFades? fades)
+    public void ApplyEdits(AudioEdits? edits)
     {
-        fades?.ThrowIfInvalid();
+        edits?.ThrowIfInvalid();
 
-        _fades = fades is { HasAny: true } ? fades : null;
-        OnPropertyChanged(nameof(Fades));
+        _edits = edits is { HasAny: true } ? edits : null;
+        OnPropertyChanged(nameof(Edits));
+        OnPropertyChanged(nameof(Crop));
         Estatus = DecisionStatus();
     }
 
     private string DecisionStatus() => (_manualRange, _analysis) switch
     {
-        _ when HasEffectiveFades => StatusAdjusted,
+        _ when HasEffectiveEdits => StatusAdjusted,
         (null, null) => StatusPending,
         _ when !ShouldTrim => StatusNoSilence,
         (null, _) => StatusAnalyzed,
