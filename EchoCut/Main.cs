@@ -570,7 +570,7 @@ namespace EchoCut
                 SetStatus($"Preparando el final de {song.Name}…");
 
                 await _preview
-                    .PlayAsync(song.FilePath, window, cts.Token)
+                    .PlayAsync(song.FilePath, window, song.Fades, cts.Token)
                     .ConfigureAwait(true);
 
                 if (!IsAlive || cts.IsCancellationRequested)

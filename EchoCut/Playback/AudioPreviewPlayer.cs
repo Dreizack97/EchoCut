@@ -1,6 +1,7 @@
 using EchoCut.Audio;
 using NAudio.Wave;
 using System.Globalization;
+using System.Runtime.InteropServices;
 
 namespace EchoCut.Playback;
 
@@ -80,6 +81,10 @@ public sealed class AudioPreviewPlayer : IDisposable
     /// <summary>Decodifica el tramo indicado y empieza a reproducirlo, sustituyendo al que sonara.</summary>
     /// <param name="filePath">Ruta del archivo de audio a previsualizar.</param>
     /// <param name="window">Tramo del archivo a reproducir.</param>
+    /// <param name="fades">
+    /// Fundidos que llevará la copia, para que el tramo suene como sonará ella; <c>null</c> si no
+    /// lleva ninguno.
+    /// </param>
     /// <param name="cancellationToken">
     /// Token de cancelación para la decodificación con FFmpeg. Una vez iniciada la reproducción, no
     /// afecta al sonido ya en curso: para eso está <see cref="Stop"/>.
@@ -94,7 +99,7 @@ public sealed class AudioPreviewPlayer : IDisposable
     /// Se lanza si <paramref name="window"/> tiene duración no positiva, o si FFmpeg falla al
     /// decodificar el tramo.
     /// </exception>
-    public async Task PlayAsync(string filePath, PreviewWindow window, CancellationToken cancellationToken)
+    public async Task PlayAsync(string filePath, PreviewWindow window, TrackFades? fades, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -127,6 +132,11 @@ public sealed class AudioPreviewPlayer : IDisposable
             return;
         }
 
+        if (fades is not null)
+        {
+            ApplyFades(pcm, fades, window);
+        }
+
         WaveOut output = new() { BufferMilliseconds = BufferMilliseconds };
         output.PlaybackStopped += (_, _) => OnStopped(output);
         output.Init(new RawSourceWaveStream(pcm, 0, pcm.Length, PlaybackFormat));
@@ -134,6 +144,33 @@ public sealed class AudioPreviewPlayer : IDisposable
         _output = output;
         _window = window;
         output.Play();
+    }
+
+    /// <summary>Atenúa el PCM decodificado con la misma envolvente que se aplicará a la copia.</summary>
+    /// <remarks>
+    /// Se trabaja sobre las muestras de 16 bits ya decodificadas: la ventana mide segundos y atenuar
+    /// aquí ahorra pedir a FFmpeg flotantes solo para convertirlos después.
+    /// </remarks>
+    private static void ApplyFades(byte[] pcm, TrackFades fades, PreviewWindow window)
+    {
+        FadeEnvelope envelope = new(fades, PlaybackFormat.SampleRate, window.StartSeconds);
+        Span<short> samples = MemoryMarshal.Cast<byte, short>(pcm.AsSpan());
+        int channels = PlaybackFormat.Channels;
+
+        for (int frame = 0; frame < samples.Length / channels; frame++)
+        {
+            double gain = envelope.GainAt(frame);
+            if (gain >= 1.0)
+            {
+                continue;
+            }
+
+            Span<short> frameSamples = samples.Slice(frame * channels, channels);
+            for (int channel = 0; channel < channels; channel++)
+            {
+                frameSamples[channel] = (short)Math.Round(frameSamples[channel] * gain);
+            }
+        }
     }
 
     /// <summary>Detiene la reproducción en curso, si la hay, sin producir <see cref="PlaybackCompleted"/>.</summary>
