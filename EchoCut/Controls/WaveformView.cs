@@ -22,13 +22,13 @@ public enum TrimMarker
     End,
 }
 
-/// <summary>Tramo que el usuario seleccionó para un fundido.</summary>
-/// <param name="direction">Fundido al que corresponde la selección.</param>
+/// <summary>Tramo al que el usuario llevó un fundido arrastrando uno de sus bordes.</summary>
+/// <param name="direction">Fundido ajustado.</param>
 /// <param name="startSeconds">Comienzo del tramo, en segundos del archivo.</param>
 /// <param name="endSeconds">Final del tramo, en segundos del archivo.</param>
-public sealed class FadeSelectionEventArgs(FadeDirection direction, double startSeconds, double endSeconds) : EventArgs
+public sealed class FadeAdjustedEventArgs(FadeDirection direction, double startSeconds, double endSeconds) : EventArgs
 {
-    /// <value>Fundido al que corresponde la selección.</value>
+    /// <value>Fundido ajustado.</value>
     public FadeDirection Direction { get; } = direction;
 
     /// <value>Comienzo del tramo, en segundos del archivo.</value>
@@ -56,10 +56,15 @@ public sealed class FadeSelectionEventArgs(FadeDirection direction, double start
 /// la marca activa. El valor de las marcas se expone a los lectores de pantalla.
 /// </para>
 /// <para>
-/// Fundidos: con <see cref="SelectionTarget"/> asignado, arrastrar fuera de las marcas selecciona el
-/// tramo de ese fundido, como una selección de Audacity, y arrastrar uno de sus bordes lo ajusta.
-/// Los extremos se adhieren a las marcas de recorte cercanas. La envolvente de <see cref="Fades"/>
-/// se dibuja sobre la onda en ámbar, con la misma escala vertical que ella.
+/// Selección: como en Audacity, arrastrar fuera de las marcas selecciona un tramo, y lo que se haga
+/// con él —un fundido, borrarlo— lo decide quien contiene la vista. Un clic suelto quita la
+/// selección, salvo sobre un fragmento borrado, que lo selecciona entero para poder restaurarlo.
+/// Los bordes de la selección y de los fundidos se pueden arrastrar, y los extremos se adhieren a
+/// las marcas de recorte y a los bordes de lo borrado cercanos.
+/// </para>
+/// <para>
+/// La envolvente de <see cref="Fades"/> se dibuja en ámbar con la misma escala vertical que la
+/// onda; lo borrado, con la paleta de lo eliminado y un rayado que lo distingue del recorte.
 /// </para>
 /// </remarks>
 [DefaultEvent(nameof(MarkersChanged))]
@@ -76,6 +81,15 @@ public sealed class WaveformView : Control
 
     /// <summary>Velo ámbar translúcido sobre el tramo con fundido; la onda se sigue viendo debajo.</summary>
     private static readonly Color FadeTintColor = Color.FromArgb(56, 0xE6, 0x9F, 0x00);
+
+    /// <summary>Azul translúcido de la selección: tiñe sin ocultar la onda, como en Audacity.</summary>
+    private static readonly Color SelectionTintColor = Color.FromArgb(64, 0x1F, 0x4E, 0x99);
+
+    /// <summary>Azul de los bordes de la selección: contrasta 8.1:1 con el fondo blanco.</summary>
+    private static readonly Color SelectionLineColor = Color.FromArgb(0x1F, 0x4E, 0x99);
+
+    /// <summary>Rayado de lo borrado: la forma, y no solo el gris, lo distingue de lo que quita el recorte.</summary>
+    private static readonly Color DeletedHatchColor = Color.FromArgb(150, 0x40, 0x40, 0x40);
 
     /// <summary>Recorrido mínimo, en píxeles lógicos, para que un clic se tome por selección y no por un clic suelto.</summary>
     private const int SelectionThreshold = 3;
@@ -106,10 +120,12 @@ public sealed class WaveformView : Control
     private TrimMarker _activeMarker;
     private TrimMarker _dragging;
     private TrackFades? _fades;
-    private FadeDirection? _selectionTarget;
-    private double? _selectionAnchor;
-    private int _selectionOriginX;
-    private bool _selectionStarted;
+    private TimeRegion? _selection;
+    private DeletedRegions _deletions = DeletedRegions.Empty;
+    private DragTarget _dragTarget;
+    private double _dragAnchor;
+    private int _dragOriginX;
+    private bool _dragStarted;
 
     private PinnedBitmap? _normalImage;
     private PinnedBitmap? _removedImage;
@@ -133,15 +149,23 @@ public sealed class WaveformView : Control
     [Description("Se produce cuando el usuario mueve una marca de recorte.")]
     public event EventHandler? MarkersChanged;
 
-    /// <summary>Se produce mientras el usuario selecciona, o ajusta, el tramo de un fundido con el ratón.</summary>
+    /// <summary>Se produce mientras el usuario selecciona un tramo con el ratón, o cuando la quita.</summary>
     /// <remarks>
-    /// Se produce en cada movimiento, no solo al soltar, para que quien escucha actualice en vivo las
-    /// demás vistas y los campos numéricos. La vista no cambia <see cref="Fades"/> por su cuenta: es
-    /// quien escucha quien decide si el tramo vale.
+    /// Se produce en cada movimiento, no solo al soltar, para que quien escucha lleve la selección en
+    /// vivo a las demás vistas. No se produce al fijarla desde código con <see cref="Selection"/>.
     /// </remarks>
     [Category("Forma de onda")]
-    [Description("Se produce mientras el usuario selecciona el tramo de un fundido.")]
-    public event EventHandler<FadeSelectionEventArgs>? FadeSelected;
+    [Description("Se produce mientras el usuario selecciona un tramo.")]
+    public event EventHandler? SelectionChanged;
+
+    /// <summary>Se produce mientras el usuario arrastra un borde de un fundido.</summary>
+    /// <remarks>
+    /// La vista no cambia <see cref="Fades"/> por su cuenta: es quien escucha quien decide si el
+    /// tramo vale y lo devuelve a todas las vistas.
+    /// </remarks>
+    [Category("Forma de onda")]
+    [Description("Se produce mientras el usuario arrastra un borde de un fundido.")]
+    public event EventHandler<FadeAdjustedEventArgs>? FadeAdjusted;
 
     /// <summary>Fundidos que se dibujan sobre la onda.</summary>
     /// <value>Los fundidos de la pista, o <c>null</c> si no hay ninguno.</value>
@@ -158,14 +182,34 @@ public sealed class WaveformView : Control
         }
     }
 
-    /// <summary>Fundido que se selecciona al arrastrar sobre la onda.</summary>
-    /// <value>El sentido del fundido, o <c>null</c> si en esta vista no se seleccionan fundidos.</value>
+    /// <summary>Tramo seleccionado.</summary>
+    /// <value>La selección, o <c>null</c> si no hay ninguna.</value>
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-    public FadeDirection? SelectionTarget
+    public TimeRegion? Selection
     {
-        get => _selectionTarget;
-        set => _selectionTarget = value;
+        get => _selection;
+        set
+        {
+            _selection = value;
+            Invalidate();
+            AccessibilityNotifyClients(AccessibleEvents.ValueChange, -1);
+        }
+    }
+
+    /// <summary>Fragmentos borrados que se dibujan sobre la onda.</summary>
+    /// <value>Lo borrado; <see cref="DeletedRegions.Empty"/> si no hay nada.</value>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public DeletedRegions Deletions
+    {
+        get => _deletions;
+        set
+        {
+            _deletions = value ?? DeletedRegions.Empty;
+            Invalidate();
+            AccessibilityNotifyClients(AccessibleEvents.ValueChange, -1);
+        }
     }
 
     /// <summary>Escala vertical de la forma de onda.</summary>
@@ -369,9 +413,11 @@ public sealed class WaveformView : Control
             g.DrawImageUnscaled(_normalImage!.Bitmap, 0, 0);
             DrawRemoved(g, image, _viewStartSeconds, _startMarkerSeconds);
             DrawRemoved(g, image, _endMarkerSeconds, _viewEndSeconds);
+            DrawDeletions(g, image);
         }
 
         DrawFades(g, image);
+        DrawSelection(g, image);
 
         if (_showStartMarker)
         {
@@ -466,19 +512,20 @@ public sealed class WaveformView : Control
             ActiveMarker = marker;
             Capture = true;
         }
-        else if (e.Button == MouseButtons.Left && _selectionTarget is not null && _waveform is not null)
+        else if (e.Button == MouseButtons.Left && _waveform is not null)
         {
-            // Sobre un borde del fundido se arrastra ese borde: el ancla es el borde contrario. En
-            // cualquier otro punto empieza una selección nueva anclada donde se pulsó.
-            FadeEdge edge = FadeEdgeAt(e.X);
-            _selectionAnchor = edge switch
+            // Sobre un borde de la selección o de un fundido se arrastra ese borde: el ancla es el
+            // borde contrario. En cualquier otro punto empieza una selección nueva donde se pulsó.
+            _dragTarget = EdgeAt(e.X, out double anchor);
+            _dragStarted = _dragTarget != DragTarget.None;
+            if (_dragTarget == DragTarget.None)
             {
-                FadeEdge.Start => TargetFade!.Value.EndSeconds,
-                FadeEdge.End => TargetFade!.Value.StartSeconds,
-                _ => Snap(SecondsAt(e.X)),
-            };
-            _selectionStarted = edge != FadeEdge.None;
-            _selectionOriginX = e.X;
+                _dragTarget = DragTarget.Selection;
+                anchor = Snap(SecondsAt(e.X));
+            }
+
+            _dragAnchor = anchor;
+            _dragOriginX = e.X;
             Capture = true;
         }
 
@@ -492,22 +539,22 @@ public sealed class WaveformView : Control
         {
             MoveMarker(_dragging, SecondsAt(e.X));
         }
-        else if (_selectionAnchor is { } anchor)
+        else if (_dragTarget != DragTarget.None)
         {
-            _selectionStarted |= Math.Abs(e.X - _selectionOriginX) >= LogicalToDeviceUnits(SelectionThreshold);
-            if (_selectionStarted)
+            _dragStarted |= Math.Abs(e.X - _dragOriginX) >= LogicalToDeviceUnits(SelectionThreshold);
+            if (_dragStarted)
             {
                 double current = Snap(SecondsAt(e.X));
-                double start = Math.Clamp(Math.Min(anchor, current), 0.0, _durationSeconds);
-                double end = Math.Clamp(Math.Max(anchor, current), 0.0, _durationSeconds);
-                FadeSelected?.Invoke(this, new FadeSelectionEventArgs(_selectionTarget!.Value, start, end));
+                double start = Math.Clamp(Math.Min(_dragAnchor, current), 0.0, _durationSeconds);
+                double end = Math.Clamp(Math.Max(_dragAnchor, current), 0.0, _durationSeconds);
+                ApplyDrag(start, end);
             }
         }
         else
         {
-            Cursor = HitTest(e.X) != TrimMarker.None || FadeEdgeAt(e.X) != FadeEdge.None
+            Cursor = HitTest(e.X) != TrimMarker.None || EdgeAt(e.X, out _) != DragTarget.None
                 ? Cursors.SizeWE
-                : _selectionTarget is not null && _waveform is not null ? Cursors.IBeam : Cursors.Default;
+                : _waveform is not null ? Cursors.IBeam : Cursors.Default;
         }
 
         base.OnMouseMove(e);
@@ -516,8 +563,16 @@ public sealed class WaveformView : Control
     /// <inheritdoc/>
     protected override void OnMouseUp(MouseEventArgs e)
     {
-        _dragging = TrimMarker.None;
-        _selectionAnchor = null;
+        // Un clic que no llegó a arrastrar quita la selección, como en Audacity; sobre lo borrado,
+        // lo selecciona entero, que es lo que hace falta para restaurarlo.
+        if (_dragTarget == DragTarget.Selection && !_dragStarted)
+        {
+            _selection = _deletions.RegionAt(SecondsAt(e.X));
+            Invalidate();
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        EndDrag();
         Capture = false;
         base.OnMouseUp(e);
     }
@@ -525,8 +580,7 @@ public sealed class WaveformView : Control
     /// <inheritdoc/>
     protected override void OnMouseCaptureChanged(EventArgs e)
     {
-        _dragging = TrimMarker.None;
-        _selectionAnchor = null;
+        EndDrag();
         base.OnMouseCaptureChanged(e);
     }
 
@@ -582,46 +636,77 @@ public sealed class WaveformView : Control
         return best;
     }
 
-    /// <summary>Fundido que se edita en esta vista, si existe.</summary>
-    private Fade? TargetFade => _selectionTarget switch
+    private void EndDrag()
     {
-        FadeDirection.In => _fades?.FadeIn,
-        FadeDirection.Out => _fades?.FadeOut,
-        _ => null,
-    };
+        _dragging = TrimMarker.None;
+        _dragTarget = DragTarget.None;
+        _dragStarted = false;
+    }
 
-    /// <summary>Borde del fundido editable que queda bajo el puntero.</summary>
-    private FadeEdge FadeEdgeAt(int x)
+    /// <summary>Lleva el tramo arrastrado a lo que se está arrastrando y avisa.</summary>
+    private void ApplyDrag(double start, double end)
     {
-        if (TargetFade is not { } fade)
+        switch (_dragTarget)
         {
-            return FadeEdge.None;
-        }
+            case DragTarget.Selection:
+                _selection = end > start ? new TimeRegion(start, end) : null;
+                Invalidate();
+                SelectionChanged?.Invoke(this, EventArgs.Empty);
+                break;
 
+            case DragTarget.FadeIn:
+                FadeAdjusted?.Invoke(this, new FadeAdjustedEventArgs(FadeDirection.In, start, end));
+                break;
+
+            case DragTarget.FadeOut:
+                FadeAdjusted?.Invoke(this, new FadeAdjustedEventArgs(FadeDirection.Out, start, end));
+                break;
+        }
+    }
+
+    /// <summary>Borde arrastrable bajo el puntero: primero los de la selección, después los de los fundidos.</summary>
+    /// <param name="x">Posición del puntero.</param>
+    /// <param name="anchor">Borde contrario al encontrado, que queda fijo mientras se arrastra.</param>
+    /// <returns>Qué se arrastraría, o <see cref="DragTarget.None"/> si no hay ningún borde cerca.</returns>
+    private DragTarget EdgeAt(int x, out double anchor)
+    {
+        anchor = 0.0;
         int tolerance = LogicalToDeviceUnits(6);
-        float toStart = Math.Abs(XFor(fade.StartSeconds) - x);
-        float toEnd = Math.Abs(XFor(fade.EndSeconds) - x);
 
-        if (Math.Min(toStart, toEnd) > tolerance)
+        (DragTarget Target, double Start, double End)?[] candidates =
+        [
+            _selection is { } selection ? (DragTarget.Selection, selection.StartSeconds, selection.EndSeconds) : null,
+            _fades?.FadeIn is { } fadeIn ? (DragTarget.FadeIn, fadeIn.StartSeconds, fadeIn.EndSeconds) : null,
+            _fades?.FadeOut is { } fadeOut ? (DragTarget.FadeOut, fadeOut.StartSeconds, fadeOut.EndSeconds) : null,
+        ];
+
+        foreach ((DragTarget target, double start, double end) in candidates.OfType<(DragTarget, double, double)>())
         {
-            return FadeEdge.None;
+            float toStart = Math.Abs(XFor(start) - x);
+            float toEnd = Math.Abs(XFor(end) - x);
+            if (Math.Min(toStart, toEnd) <= tolerance)
+            {
+                anchor = toStart <= toEnd ? end : start;
+                return target;
+            }
         }
 
-        return toStart <= toEnd ? FadeEdge.Start : FadeEdge.End;
+        return DragTarget.None;
     }
 
     /// <summary>
-    /// Adhiere un instante a la marca de recorte más cercana si cae a pocos píxeles de ella: un
-    /// fundido que debe acabar justo en el corte final no tendría que depender del pulso.
+    /// Adhiere un instante a la marca de recorte o al borde de lo borrado más cercano si cae a pocos
+    /// píxeles: un fundido que debe acabar justo en el corte final no tendría que depender del pulso.
     /// </summary>
     private double Snap(double seconds)
     {
         int tolerance = LogicalToDeviceUnits(6);
-        foreach (double marker in (ReadOnlySpan<double>)[_startMarkerSeconds, _endMarkerSeconds])
+        IEnumerable<double> targets = [_startMarkerSeconds, _endMarkerSeconds, .. _deletions.Regions.SelectMany(r => (double[])[r.StartSeconds, r.EndSeconds])];
+        foreach (double target in targets)
         {
-            if (Math.Abs(XFor(marker) - XFor(seconds)) <= tolerance)
+            if (Math.Abs(XFor(target) - XFor(seconds)) <= tolerance)
             {
-                return marker;
+                return target;
             }
         }
 
@@ -699,6 +784,78 @@ public sealed class WaveformView : Control
 
         Rectangle part = new(x0, 0, x1 - x0, image.Height);
         g.DrawImage(_removedImage!.Bitmap, part, part, GraphicsUnit.Pixel);
+    }
+
+    /// <summary>Dibuja lo borrado con la paleta de lo eliminado, rayado y con su etiqueta.</summary>
+    private void DrawDeletions(Graphics g, Rectangle image)
+    {
+        foreach (TimeRegion region in _deletions.Regions)
+        {
+            DrawRemoved(g, image, region.StartSeconds, region.EndSeconds);
+
+            int x0 = Math.Clamp((int)Math.Floor(XFor(region.StartSeconds)), 0, image.Width);
+            int x1 = Math.Clamp((int)Math.Ceiling(XFor(region.EndSeconds)), 0, image.Width);
+            if (x1 <= x0)
+            {
+                continue;
+            }
+
+            using (HatchBrush hatch = new(HatchStyle.WideUpwardDiagonal, DeletedHatchColor, Color.Transparent))
+            {
+                g.FillRectangle(hatch, x0, 0, x1 - x0, image.Height);
+            }
+
+            DrawCenteredLabel(g, "Borrado", x0, x1, image.Height / 2, Color.White);
+        }
+    }
+
+    /// <summary>Dibuja la selección: un velo azul, sus bordes y su duración.</summary>
+    private void DrawSelection(Graphics g, Rectangle image)
+    {
+        if (_selection is not { } selection)
+        {
+            return;
+        }
+
+        int x0 = Math.Clamp((int)Math.Floor(XFor(selection.StartSeconds)), 0, image.Width);
+        int x1 = Math.Clamp((int)Math.Ceiling(XFor(selection.EndSeconds)), 0, image.Width);
+        if (x1 <= x0)
+        {
+            return;
+        }
+
+        using (SolidBrush tint = new(SelectionTintColor))
+        {
+            g.FillRectangle(tint, x0, 0, x1 - x0, image.Height);
+        }
+
+        using (Pen edge = new(SelectionLineColor, LogicalToDeviceUnits(2)))
+        {
+            g.DrawLine(edge, x0, 0, x0, image.Bottom);
+            g.DrawLine(edge, x1, 0, x1, image.Bottom);
+        }
+
+        int top = LogicalToDeviceUnits(6) + Font.Height + LogicalToDeviceUnits(3);
+        DrawCenteredLabel(g, $"Selección {selection.DurationSeconds.ToString("0.000", CultureInfo.CurrentCulture)} s", x0, x1, top, Color.White);
+    }
+
+    /// <summary>Etiqueta centrada en un tramo; si no cabe, se omite para no tapar la onda vecina.</summary>
+    private void DrawCenteredLabel(Graphics g, string label, int x0, int x1, int top, Color background)
+    {
+        Size text = TextRenderer.MeasureText(g, label, Font);
+        if (text.Width + LogicalToDeviceUnits(6) > x1 - x0)
+        {
+            return;
+        }
+
+        Rectangle box = new(x0 + ((x1 - x0 - text.Width) / 2), top, text.Width, text.Height);
+        using (SolidBrush fill = new(background))
+        {
+            g.FillRectangle(fill, box);
+        }
+
+        g.DrawRectangle(Pens.Black, box);
+        TextRenderer.DrawText(g, label, Font, box, Color.Black, TextFormatFlags.NoPadding);
     }
 
     /// <summary>
@@ -997,15 +1154,26 @@ public sealed class WaveformView : Control
             }
         }
 
+        foreach (TimeRegion region in _deletions.Regions)
+        {
+            parts.Add($"borrado de {region.StartSeconds:0.000} a {region.EndSeconds:0.000} s");
+        }
+
+        if (_selection is { } selection)
+        {
+            parts.Add($"selección de {selection.StartSeconds:0.000} a {selection.EndSeconds:0.000} s");
+        }
+
         return string.Join(", ", parts);
     }
 
-    /// <summary>Borde de un fundido.</summary>
-    private enum FadeEdge
+    /// <summary>Lo que se está arrastrando fuera de las marcas de recorte.</summary>
+    private enum DragTarget
     {
         None,
-        Start,
-        End,
+        Selection,
+        FadeIn,
+        FadeOut,
     }
 
     /// <summary>

@@ -1198,8 +1198,8 @@ namespace EchoCut
         }
 
         /// <summary>
-        /// Abre la forma de onda de la pista seleccionada para ver sus silencios y corregir el
-        /// recorte a mano.
+        /// Abre la forma de onda de la pista seleccionada para ver sus silencios, corregir el
+        /// recorte a mano, añadir fundidos y borrar fragmentos.
         /// </summary>
         /// <remarks>
         /// Funciona también con pistas sin analizar: el tramo parte de la pista completa y el ajuste
@@ -1214,31 +1214,20 @@ namespace EchoCut
 
             StopPreview();
 
-            double duration = song.DurationSeconds;
-            using WaveformEditor dialog = new(
-                song.Track,
-                duration,
-                song.TrimRange ?? new TrimRange(0.0, duration),
-                song.Analysis?.Range,
-                song.ManualRange is not null,
-                song.Edits?.Fades,
-                _waveforms,
-                _locator.Require().FFmpeg,
-                _settings.Silence.PreviewSeconds);
-
+            using WaveformEditor dialog = new(song, _waveforms, _locator.Require().FFmpeg, _settings.Silence.PreviewSeconds);
             if (dialog.ShowDialog(this) != DialogResult.OK)
             {
                 return;
             }
 
             song.AdjustManually(dialog.ManualRange);
-            song.ApplyEdits(AudioEdits.From(dialog.Fades, song.Edits?.Deletions));
+            song.ApplyEdits(dialog.Edits);
 
             string trim = dialog.ManualRange is null
                 ? "se usa el recorte del análisis"
                 : $"recorte ajustado a mano, {song.Crop:0.00} s a eliminar";
-            string fades = song.Edits?.Fades is null ? string.Empty : "; la copia llevará fundidos y se volverá a codificar";
-            SetStatus($"{song.Name}: {trim}{fades}.");
+            string edits = song.Edits is null ? string.Empty : "; la copia llevará ediciones y se volverá a codificar";
+            SetStatus($"{song.Name}: {trim}{edits}.");
         }
 
         private void mnuEditSong_Click(object? sender, EventArgs e)

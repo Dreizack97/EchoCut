@@ -263,7 +263,9 @@ namespace EchoCut
                 new(GroupWaveform, "Mover la marca elegida 0,01 s", "← / →"),
                 new(GroupWaveform, "Mover la marca elegida 0,1 s", "Shift+← / →"),
                 new(GroupWaveform, "Mover la marca elegida 1 s", "Ctrl+← / →"),
-                new(GroupWaveform, "Aceptar o cancelar el ajuste", "Entrar / Esc"),
+                new(GroupWaveform, "Borrar la selección", "Supr"),
+                new(GroupWaveform, "Quitar la selección", "Esc"),
+                new(GroupWaveform, "Aceptar o cerrar la ventana (sin selección)", "Entrar / Esc"),
             ];
 
             // OrderBy es estable: dentro de cada grupo se conserva el orden de la lista.
