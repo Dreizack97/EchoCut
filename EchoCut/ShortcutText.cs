@@ -39,6 +39,9 @@ public static class ShortcutText
             Keys.Left => "←",
             Keys.Right => "→",
             Keys.Oemcomma => ",",
+            Keys.Space => "Espacio",
+            Keys.Oemplus or Keys.Add => "+",
+            Keys.OemMinus or Keys.Subtract => "−",
             >= Keys.D0 and <= Keys.D9 and var digit => ((int)(digit - Keys.D0)).ToString(System.Globalization.CultureInfo.InvariantCulture),
             var other => other.ToString(),
         });
