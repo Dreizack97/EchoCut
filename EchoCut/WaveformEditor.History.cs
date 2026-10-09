@@ -1,4 +1,5 @@
 using EchoCut.Audio;
+using EchoCut.Processing;
 
 namespace EchoCut
 {
@@ -96,7 +97,7 @@ namespace EchoCut
         }
 
         /// <summary>Toma la foto de lo que decide el editor ahora mismo.</summary>
-        private EditorState Snapshot() => new(_startSeconds, _endSeconds, _manual, _fadeIn, _fadeOut, _deletions);
+        private EditorState Snapshot() => new(_startSeconds, _endSeconds, _manual, _fadeIn, _fadeOut, _deletions, _analysis);
 
         /// <summary>Vuelve a una foto anterior y lo lleva a toda la ventana.</summary>
         /// <remarks>
@@ -109,6 +110,8 @@ namespace EchoCut
             try
             {
                 _manual = state.Manual;
+                _analysis = state.Analysis;
+                UpdateResetButton();
                 _fadeIn = state.FadeIn;
                 _fadeOut = state.FadeOut;
                 _deletions = state.Deletions;
@@ -137,8 +140,10 @@ namespace EchoCut
 
         private void UpdateHistoryButtons()
         {
-            btnUndo.Enabled = _undo.Count > 0;
-            btnRedo.Enabled = _redo.Count > 0;
+            // En la vista del resultado no se edita, tampoco deshaciendo: lo deshecho podría cambiar
+            // lo borrado bajo una vista que lo muestra ya juntado.
+            btnUndo.Enabled = !_showingResult && _undo.Count > 0;
+            btnRedo.Enabled = !_showingResult && _redo.Count > 0;
         }
 
         /// <summary>Foto de lo que decide el editor.</summary>
@@ -148,10 +153,11 @@ namespace EchoCut
         /// <param name="FadeIn">Aparición, o <c>null</c>.</param>
         /// <param name="FadeOut">Desaparición, o <c>null</c>.</param>
         /// <param name="Deletions">Fragmentos borrados.</param>
-        private sealed record EditorState(double StartSeconds, double EndSeconds, bool Manual, Fade? FadeIn, Fade? FadeOut, DeletedRegions Deletions)
+        /// <param name="Analysis">Análisis del resultado hecho desde el editor, o <c>null</c>.</param>
+        private sealed record EditorState(double StartSeconds, double EndSeconds, bool Manual, Fade? FadeIn, Fade? FadeOut, DeletedRegions Deletions, TrackAnalysis? Analysis)
         {
             /// <value>Estado que no coincide con ningún otro, para antes de la primera foto.</value>
-            public static EditorState Empty { get; } = new(double.NaN, double.NaN, false, null, null, DeletedRegions.Empty);
+            public static EditorState Empty { get; } = new(double.NaN, double.NaN, false, null, null, DeletedRegions.Empty, null);
 
             /// <summary>Compara dos fotos por su contenido, incluidos los fragmentos borrados.</summary>
             /// <remarks>
@@ -164,7 +170,8 @@ namespace EchoCut
                 && Manual == other.Manual
                 && FadeIn == other.FadeIn
                 && FadeOut == other.FadeOut
-                && Deletions.Regions.SequenceEqual(other.Deletions.Regions);
+                && Deletions.Regions.SequenceEqual(other.Deletions.Regions)
+                && ReferenceEquals(Analysis, other.Analysis);
         }
     }
 }

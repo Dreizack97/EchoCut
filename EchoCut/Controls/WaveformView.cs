@@ -76,7 +76,9 @@ public sealed class WaveformClickEventArgs(double seconds) : EventArgs
 /// dentro de los límites fijados con <see cref="SetScrollLimits"/>, que son los del audio cargado.
 /// </para>
 /// <para>
-/// Con <see cref="RenderEdits"/> la onda se pinta con los fundidos aplicados: se ve lo que sonará.
+/// Resultado: con <see cref="RenderEdits"/> la onda se pinta con los fundidos aplicados y, con
+/// <see cref="CollapseDeletions"/>, en la línea de tiempo de la copia, sin lo borrado y con los
+/// empalmes de <see cref="Splices"/> marcados. <see cref="ReadOnly"/> deja mirar sin editar.
 /// </para>
 /// <para>
 /// La envolvente de <see cref="Fades"/> se dibuja en ámbar con la misma escala vertical que la
@@ -106,6 +108,9 @@ public sealed class WaveformView : Control
 
     /// <summary>Rayado de lo borrado: la forma, y no solo el gris, lo distingue de lo que quita el recorte.</summary>
     private static readonly Color DeletedHatchColor = Color.FromArgb(150, 0x40, 0x40, 0x40);
+
+    /// <summary>Morado de los empalmes del resultado: contrasta 7.4:1 con el fondo blanco y no se confunde con las marcas ni con el cursor.</summary>
+    private static readonly Color SpliceColor = Color.FromArgb(0x6B, 0x2F, 0xA0);
 
     /// <summary>Gris oscuro del cursor de reproducción en reposo: contrasta 12.6:1 con el fondo blanco.</summary>
     private static readonly Color CursorColor = Color.FromArgb(0x33, 0x33, 0x33);
@@ -145,6 +150,9 @@ public sealed class WaveformView : Control
     private double _scrollMaxSeconds = 1.0;
     private double? _cursorSeconds;
     private AudioEdits? _renderEdits;
+    private bool _collapseDeletions;
+    private IReadOnlyList<double> _splices = [];
+    private bool _readOnly;
     private double _startMarkerSeconds;
     private double _endMarkerSeconds = 1.0;
     private bool _showStartMarker = true;
@@ -214,8 +222,8 @@ public sealed class WaveformView : Control
 
     /// <summary>Ediciones con las que se pinta la onda.</summary>
     /// <value>
-    /// Los fundidos que se aplican al pintar, o <c>null</c> para pintar el original tal cual. Distinto
-    /// de <see cref="Fades"/>, que solo dibuja la envolvente encima.
+    /// Los fundidos y borrados que se aplican al pintar, o <c>null</c> para pintar el original tal
+    /// cual. Distinto de <see cref="Fades"/>, que solo dibuja la envolvente encima.
     /// </value>
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -226,6 +234,50 @@ public sealed class WaveformView : Control
         {
             _renderEdits = value;
             _imagesStale = true;
+            Invalidate();
+        }
+    }
+
+    /// <summary>Si la vista muestra la línea de tiempo del resultado, sin lo borrado.</summary>
+    /// <value><c>true</c> para juntar lo que queda a ambos lados de cada borrado, como la copia.</value>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public bool CollapseDeletions
+    {
+        get => _collapseDeletions;
+        set
+        {
+            _collapseDeletions = value;
+            _imagesStale = true;
+            Invalidate();
+        }
+    }
+
+    /// <summary>Instantes de la vista en los que se unió lo anterior y lo posterior a un borrado.</summary>
+    /// <value>Empalmes a marcar, en segundos de la línea de tiempo que muestra la vista.</value>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public IReadOnlyList<double> Splices
+    {
+        get => _splices;
+        set
+        {
+            _splices = value ?? [];
+            Invalidate();
+        }
+    }
+
+    /// <summary>Si la vista solo se mira: ni marcas, ni selección, ni fundidos se pueden tocar.</summary>
+    /// <value><c>true</c> para desactivar la edición; la rueda sigue desplazando y acercando.</value>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public bool ReadOnly
+    {
+        get => _readOnly;
+        set
+        {
+            _readOnly = value;
+            EndDrag();
             Invalidate();
         }
     }
@@ -542,6 +594,7 @@ public sealed class WaveformView : Control
         }
 
         DrawFades(g, image);
+        DrawSplices(g, image);
         DrawSelection(g, image);
 
         if (_showStartMarker)
@@ -608,6 +661,12 @@ public sealed class WaveformView : Control
     /// <inheritdoc/>
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        if (_readOnly)
+        {
+            base.OnKeyDown(e);
+            return;
+        }
+
         switch (e.KeyCode)
         {
             case Keys.Home when _showStartMarker:
@@ -635,6 +694,12 @@ public sealed class WaveformView : Control
     protected override void OnMouseDown(MouseEventArgs e)
     {
         Focus();
+
+        if (_readOnly)
+        {
+            base.OnMouseDown(e);
+            return;
+        }
 
         if (e.Button == MouseButtons.Left && HitTest(e.X) is var marker and not TrimMarker.None)
         {
@@ -682,9 +747,9 @@ public sealed class WaveformView : Control
         }
         else
         {
-            Cursor = HitTest(e.X) != TrimMarker.None || EdgeAt(e.X, out _) != DragTarget.None
-                ? Cursors.SizeWE
-                : _waveform is not null ? Cursors.IBeam : Cursors.Default;
+            Cursor = _readOnly || _waveform is null
+                ? Cursors.Default
+                : HitTest(e.X) != TrimMarker.None || EdgeAt(e.X, out _) != DragTarget.None ? Cursors.SizeWE : Cursors.IBeam;
         }
 
         base.OnMouseMove(e);
@@ -911,7 +976,8 @@ public sealed class WaveformView : Control
             _viewEndSeconds,
             _amplitudeScale,
             palette,
-            _renderEdits);
+            _renderEdits,
+            _collapseDeletions);
         return image;
     }
 
@@ -935,6 +1001,37 @@ public sealed class WaveformView : Control
 
         Rectangle part = new(x0, 0, x1 - x0, image.Height);
         g.DrawImage(_removedImage!.Bitmap, part, part, GraphicsUnit.Pixel);
+    }
+
+    /// <summary>
+    /// Marca cada empalme con una línea morada discontinua y un rombo arriba: ahí se juntan lo
+    /// anterior y lo posterior a un borrado, que es donde podría oírse un salto.
+    /// </summary>
+    private void DrawSplices(Graphics g, Rectangle image)
+    {
+        if (_splices.Count == 0)
+        {
+            return;
+        }
+
+        float half = LogicalToDeviceUnits(5);
+        using Pen line = new(SpliceColor, LogicalToDeviceUnits(1)) { DashStyle = DashStyle.Dash };
+        using SolidBrush mark = new(SpliceColor);
+
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        foreach (double seconds in _splices)
+        {
+            float x = XFor(seconds);
+            if (x < 0 || x > image.Width)
+            {
+                continue;
+            }
+
+            g.DrawLine(line, x, 0, x, image.Bottom);
+            g.FillPolygon(mark, [new PointF(x, 0), new PointF(x + half, half), new PointF(x, half * 2), new PointF(x - half, half)]);
+        }
+
+        g.SmoothingMode = SmoothingMode.None;
     }
 
     /// <summary>Dibuja lo borrado con la paleta de lo eliminado, rayado y con su etiqueta.</summary>

@@ -82,6 +82,7 @@ namespace EchoCut
         /// </summary>
         private void View_WaveformClicked(object? sender, WaveformClickEventArgs e)
         {
+
             if (_deletions.RegionAt(e.Seconds) is { } deleted)
             {
                 ApplySelection(deleted);
@@ -204,9 +205,11 @@ namespace EchoCut
         /// <summary>Lleva lo borrado a las vistas y al resumen.</summary>
         private void ApplyDeletions()
         {
+            AudioEdits? edits = Edits;
             foreach (WaveformView view in Views)
             {
-                view.Deletions = _deletions;
+                view.Deletions = _showingResult ? DeletedRegions.Empty : _deletions;
+                view.RenderEdits = edits;
             }
 
             UpdateSummary();
@@ -264,8 +267,9 @@ namespace EchoCut
             AudioEdits? edits = Edits;
             foreach (WaveformView view in Views)
             {
-                // La onda se pinta con los fundidos aplicados, además de la envolvente encima.
-                view.Fades = fades;
+                // La onda se pinta con los fundidos aplicados; en la vista del resultado, además,
+                // sin lo borrado, y sin envolventes encima: la propia onda ya lo enseña.
+                view.Fades = _showingResult ? null : fades;
                 view.RenderEdits = edits;
             }
 

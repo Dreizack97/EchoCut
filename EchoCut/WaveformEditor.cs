@@ -39,11 +39,11 @@ namespace EchoCut
         private const double EdgeContextSeconds = 5.0;
 
         private readonly double _durationSeconds;
-        private readonly TrimRange? _analysisRange;
-        private readonly WaveformService _service;
-        private readonly string _ffmpegPath;
-        private readonly double _previewSeconds;
+        private readonly WaveformEditorServices _services;
         private readonly Func<WaveformEditor, Task<string?>> _save;
+
+        /// <summary>Tramo del análisis que tenía la fila al abrir la ventana, o <c>null</c> si no estaba analizada.</summary>
+        private readonly TrimRange? _initialAnalysisRange;
 
         /// <summary>
         /// Cancela la carga y la reproducción al cerrar. No se libera: los procesos de FFmpeg que lo
@@ -64,29 +64,24 @@ namespace EchoCut
 
         /// <summary>Prepara la ventana para una pista, partiendo de lo que ya tenga decidido su fila.</summary>
         /// <param name="song">Fila de la pista a mostrar.</param>
-        /// <param name="service">Servicio que carga las formas de onda.</param>
-        /// <param name="ffmpegPath">Ruta de FFmpeg para escuchar.</param>
-        /// <param name="previewSeconds">Segundos que se escuchan de cada borde.</param>
+        /// <param name="services">Lo que el editor toma de la ventana principal: carga, análisis y escucha.</param>
         /// <param name="save">
         /// Aplica las decisiones a la fila y escribe la copia; devuelve la ruta escrita, o <c>null</c>
         /// si no se pudo guardar (quien guarda ya habrá explicado por qué).
         /// </param>
         public WaveformEditor(
             Song song,
-            WaveformService service,
-            string ffmpegPath,
-            double previewSeconds,
+            WaveformEditorServices services,
             Func<WaveformEditor, Task<string?>> save)
         {
             ArgumentNullException.ThrowIfNull(song);
+            ArgumentNullException.ThrowIfNull(services);
             InitializeComponent();
 
             Song = song;
             _durationSeconds = song.DurationSeconds;
-            _analysisRange = song.Analysis?.Range;
-            _service = service;
-            _ffmpegPath = ffmpegPath;
-            _previewSeconds = previewSeconds;
+            _initialAnalysisRange = song.Analysis?.Range;
+            _services = services;
             _save = save;
             _manual = song.ManualRange is not null;
 
@@ -99,7 +94,7 @@ namespace EchoCut
 
             ShowTrackName();
             song.PropertyChanged += Song_PropertyChanged;
-            btnReset.Text = _analysisRange is null ? "Quitar ajuste" : "Restablecer análisis";
+            UpdateResetButton();
 
             foreach (NumericUpDown field in (NumericUpDown[])[numStart, numEnd, numFrom, numTo])
             {
@@ -162,8 +157,8 @@ namespace EchoCut
             // carga aparte porque debe situarse con la misma referencia que el corte final, y llega
             // mucho antes que la pista entera.
             await Task.WhenAll(
-                LoadAsync(_service.LoadAsync(filePath, token), viewOverview, viewStart),
-                LoadAsync(_service.LoadTailAsync(filePath, _durationSeconds - viewEnd.ViewStartSeconds, _durationSeconds, token), viewEnd))
+                LoadAsync(_services.Waveforms.LoadAsync(filePath, token), viewOverview, viewStart),
+                LoadAsync(_services.Waveforms.LoadTailAsync(filePath, _durationSeconds - viewEnd.ViewStartSeconds, _durationSeconds, token), viewEnd))
                 .ConfigureAwait(true);
         }
 
@@ -184,9 +179,20 @@ namespace EchoCut
                 }
 
                 _waveforms.Add(waveform);
+                RememberWaveform(waveform, views);
                 foreach (WaveformView view in views)
                 {
-                    view.Waveform = waveform;
+                    // En la vista del resultado, el detalle del final usa la pista completa: su cola
+                    // no basta para juntar lo que queda a ambos lados de un borrado.
+                    if (!(_showingResult && view == viewEnd))
+                    {
+                        view.Waveform = waveform;
+                    }
+                }
+
+                if (_showingResult && views.Contains(viewOverview))
+                {
+                    viewEnd.Waveform = waveform;
                 }
             }
             catch (OperationCanceledException)
@@ -263,11 +269,11 @@ namespace EchoCut
         private void btnReset_Click(object? sender, EventArgs e)
         {
             BeginChange();
-            TrimRange range = _analysisRange ?? new TrimRange(0.0, _durationSeconds);
+            TrimRange range = AnalysisRange ?? new TrimRange(0.0, _durationSeconds);
             _manual = false;
             ApplyRange(range.StartSeconds, range.EndSeconds);
             EndChange();
-            SetStatus(_analysisRange is null ? "Se quitó el ajuste: la copia conserva la pista completa." : "Se restableció el recorte del análisis.");
+            SetStatus(AnalysisRange is null ? "Se quitó el ajuste: la copia conserva la pista completa." : "Se restableció el recorte del análisis.");
         }
 
         /// <summary>Lleva el tramo a todas las vistas, a los campos numéricos y al resumen.</summary>
@@ -281,7 +287,7 @@ namespace EchoCut
             {
                 foreach (WaveformView view in Views)
                 {
-                    view.SetMarkers(_startSeconds, _endSeconds);
+                    view.SetMarkers(ToViewSeconds(_startSeconds), ToViewSeconds(_endSeconds));
                 }
 
                 numStart.Value = Math.Clamp((decimal)Math.Round(_startSeconds, 3), numStart.Minimum, numStart.Maximum);

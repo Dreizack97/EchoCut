@@ -1255,7 +1255,8 @@ namespace EchoCut
                 return;
             }
 
-            WaveformEditor editor = new(song, _waveforms, _locator.Require().FFmpeg, _settings.Silence.PreviewSeconds, SaveFromEditorAsync);
+            WaveformEditorServices services = new(_waveforms, _analysis, _locator.Require().FFmpeg, _settings.Silence.PreviewSeconds, CurrentOptions);
+            WaveformEditor editor = new(song, services, SaveFromEditorAsync);
             editor.Applied += (_, _) => ApplyEditorDecisions(editor);
             editor.FormClosed += (_, _) => _editors.Remove(song);
             _editors[song] = editor;
@@ -1268,6 +1269,13 @@ namespace EchoCut
             Song song = editor.Song;
             song.AdjustManually(editor.ManualRange);
             song.ApplyEdits(editor.Edits);
+
+            // Si en el editor se detectaron los silencios del resultado, ese análisis pasa a ser el de
+            // la fila: sus columnas de silencio describen ya la copia y no el original.
+            if (editor.ResultAnalysis is { } analysis)
+            {
+                song.Complete(analysis);
+            }
 
             string trim = editor.ManualRange is null
                 ? "se usa el recorte del análisis"

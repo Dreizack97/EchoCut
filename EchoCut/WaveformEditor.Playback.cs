@@ -41,7 +41,7 @@ namespace EchoCut
             _cursorSeconds = seconds;
             foreach (WaveformView view in Views)
             {
-                view.CursorSeconds = seconds;
+                view.CursorSeconds = ToViewSeconds(seconds);
             }
         }
 
@@ -63,11 +63,11 @@ namespace EchoCut
         private async void btnPlayStart_Click(object? sender, EventArgs e) =>
             await TogglePlaybackAsync(
                 btnPlayStart,
-                new PreviewWindow(_startSeconds, Math.Min(_previewSeconds, _endSeconds - _startSeconds))).ConfigureAwait(true);
+                new PreviewWindow(_startSeconds, Math.Min(_services.PreviewSeconds, _endSeconds - _startSeconds))).ConfigureAwait(true);
 
         private async void btnPlayEnd_Click(object? sender, EventArgs e)
         {
-            double from = Math.Max(_startSeconds, _endSeconds - _previewSeconds);
+            double from = Math.Max(_startSeconds, _endSeconds - _services.PreviewSeconds);
             await TogglePlaybackAsync(btnPlayEnd, new PreviewWindow(from, _endSeconds - from)).ConfigureAwait(true);
         }
 
@@ -130,7 +130,7 @@ namespace EchoCut
         /// </summary>
         private AudioPreviewPlayer CreatePlayer()
         {
-            AudioPreviewPlayer player = new(_ffmpegPath);
+            AudioPreviewPlayer player = new(_services.FFmpegPath);
             player.PlaybackCompleted += (_, _) => StopPlayback();
             return player;
         }
@@ -157,7 +157,7 @@ namespace EchoCut
         /// <summary>Lleva a las vistas el instante que está sonando, según el propio dispositivo.</summary>
         private void playheadTimer_Tick(object? sender, EventArgs e)
         {
-            double? position = _player?.PositionSeconds;
+            double? position = ToViewSeconds(_player?.PositionSeconds);
             foreach (WaveformView view in Views)
             {
                 view.PlayheadSeconds = position;

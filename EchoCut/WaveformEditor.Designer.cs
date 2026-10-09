@@ -40,6 +40,9 @@ namespace EchoCut
             toolStripSeparator2 = new ToolStripSeparator();
             btnUndo = new ToolStripButton();
             btnRedo = new ToolStripButton();
+            toolStripSeparator4 = new ToolStripSeparator();
+            btnDetect = new ToolStripButton();
+            btnResult = new ToolStripButton();
             toolStripSeparator3 = new ToolStripSeparator();
             btnZoomIn = new ToolStripButton();
             btnZoomOut = new ToolStripButton();
@@ -110,11 +113,11 @@ namespace EchoCut
             // 
             toolStrip.Font = new Font("Segoe UI", 10F);
             toolStrip.GripStyle = ToolStripGripStyle.Hidden;
-            toolStrip.Items.AddRange(new ToolStripItem[] { btnPlay, toolStripSeparator1, btnFadeIn, btnFadeOut, btnDelete, btnRestore, toolStripSeparator2, btnUndo, btnRedo, toolStripSeparator3, btnZoomIn, btnZoomOut, btnZoomSelection, btnZoomFit, btnShortcuts, btnDecibels });
+            toolStrip.Items.AddRange(new ToolStripItem[] { btnPlay, toolStripSeparator1, btnFadeIn, btnFadeOut, btnDelete, btnRestore, toolStripSeparator2, btnUndo, btnRedo, toolStripSeparator4, btnDetect, btnResult, toolStripSeparator3, btnZoomIn, btnZoomOut, btnZoomSelection, btnZoomFit, btnShortcuts, btnDecibels });
             toolStrip.Location = new Point(0, 0);
             toolStrip.Name = "toolStrip";
             toolStrip.Padding = new Padding(6, 2, 6, 2);
-            toolStrip.Size = new Size(1184, 29);
+            toolStrip.Size = new Size(1280, 30);
             toolStrip.TabIndex = 0;
             // 
             // btnPlay
@@ -122,7 +125,7 @@ namespace EchoCut
             btnPlay.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnPlay.Font = new Font("Segoe UI Semibold", 10F, FontStyle.Bold);
             btnPlay.Name = "btnPlay";
-            btnPlay.Size = new Size(97, 22);
+            btnPlay.Size = new Size(99, 23);
             btnPlay.Text = "▶ Reproducir";
             btnPlay.ToolTipText = "Escuchar la selección, o desde el punto marcado con un clic, tal como sonará en la copia";
             btnPlay.Click += btnPlay_Click;
@@ -130,14 +133,14 @@ namespace EchoCut
             // toolStripSeparator1
             // 
             toolStripSeparator1.Name = "toolStripSeparator1";
-            toolStripSeparator1.Size = new Size(6, 25);
+            toolStripSeparator1.Size = new Size(6, 26);
             // 
             // btnFadeIn
             // 
             btnFadeIn.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnFadeIn.Enabled = false;
             btnFadeIn.Name = "btnFadeIn";
-            btnFadeIn.Size = new Size(91, 22);
+            btnFadeIn.Size = new Size(86, 23);
             btnFadeIn.Text = "◢ Aparición";
             btnFadeIn.ToolTipText = "Convertir la selección en el fundido de aparición";
             btnFadeIn.Click += btnFadeIn_Click;
@@ -147,7 +150,7 @@ namespace EchoCut
             btnFadeOut.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnFadeOut.Enabled = false;
             btnFadeOut.Name = "btnFadeOut";
-            btnFadeOut.Size = new Size(112, 22);
+            btnFadeOut.Size = new Size(107, 23);
             btnFadeOut.Text = "◣ Desaparición";
             btnFadeOut.ToolTipText = "Convertir la selección en el fundido de desaparición";
             btnFadeOut.Click += btnFadeOut_Click;
@@ -157,7 +160,7 @@ namespace EchoCut
             btnDelete.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnDelete.Enabled = false;
             btnDelete.Name = "btnDelete";
-            btnDelete.Size = new Size(65, 22);
+            btnDelete.Size = new Size(73, 23);
             btnDelete.Text = "⌫ Borrar";
             btnDelete.ToolTipText = "Quitar de la copia el audio seleccionado y unir lo anterior con lo posterior";
             btnDelete.Click += btnDelete_Click;
@@ -167,7 +170,7 @@ namespace EchoCut
             btnRestore.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnRestore.Enabled = false;
             btnRestore.Name = "btnRestore";
-            btnRestore.Size = new Size(85, 22);
+            btnRestore.Size = new Size(87, 23);
             btnRestore.Text = "↺ Restaurar";
             btnRestore.ToolTipText = "Devolver a la copia el audio borrado que cae dentro de la selección";
             btnRestore.Click += btnRestore_Click;
@@ -175,14 +178,14 @@ namespace EchoCut
             // toolStripSeparator2
             // 
             toolStripSeparator2.Name = "toolStripSeparator2";
-            toolStripSeparator2.Size = new Size(6, 25);
+            toolStripSeparator2.Size = new Size(6, 26);
             // 
             // btnUndo
             // 
             btnUndo.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnUndo.Enabled = false;
             btnUndo.Name = "btnUndo";
-            btnUndo.Size = new Size(85, 22);
+            btnUndo.Size = new Size(85, 23);
             btnUndo.Text = "↶ Deshacer";
             btnUndo.ToolTipText = "Deshacer el último cambio";
             btnUndo.Click += btnUndo_Click;
@@ -192,22 +195,47 @@ namespace EchoCut
             btnRedo.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnRedo.Enabled = false;
             btnRedo.Name = "btnRedo";
-            btnRedo.Size = new Size(73, 22);
+            btnRedo.Size = new Size(77, 23);
             btnRedo.Text = "↷ Rehacer";
             btnRedo.ToolTipText = "Rehacer el último cambio deshecho";
             btnRedo.Click += btnRedo_Click;
             // 
+            // toolStripSeparator4
+            // 
+            toolStripSeparator4.Name = "toolStripSeparator4";
+            toolStripSeparator4.Size = new Size(6, 25);
+            // 
+            // btnDetect
+            // 
+            btnDetect.DisplayStyle = ToolStripItemDisplayStyle.Text;
+            btnDetect.Name = "btnDetect";
+            btnDetect.Size = new Size(126, 22);
+            btnDetect.Text = "⌕ Detectar silencios";
+            btnDetect.ToolTipText = "Analizar el resultado, con fundidos y borrados aplicados, y proponer el comienzo y el final de la copia";
+            btnDetect.Click += btnDetect_Click;
+            // 
+            // btnResult
+            // 
+            btnResult.CheckOnClick = true;
+            btnResult.DisplayStyle = ToolStripItemDisplayStyle.Text;
+            btnResult.Name = "btnResult";
+            btnResult.Size = new Size(104, 22);
+            btnResult.Text = "⇄ Ver resultado";
+            btnResult.ToolTipText = "Ver la onda tal como quedará la copia, sin lo borrado y con los fundidos; vuelve a pulsar para editar";
+            btnResult.CheckedChanged += btnResult_CheckedChanged;
+            // 
             // toolStripSeparator3
             // 
             toolStripSeparator3.Name = "toolStripSeparator3";
-            toolStripSeparator3.Size = new Size(6, 25);
+            toolStripSeparator3.Size = new Size(6, 26);
             // 
             // btnZoomIn
             // 
             btnZoomIn.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnZoomIn.Name = "btnZoomIn";
-            btnZoomIn.Size = new Size(68, 22);
-            btnZoomIn.Text = "＋ Acercar";
+            btnZoomIn.AccessibleName = "Acercar";
+            btnZoomIn.Size = new Size(25, 23);
+            btnZoomIn.Text = "＋";
             btnZoomIn.ToolTipText = "Acercar la vista activa; también Ctrl+rueda sobre la onda";
             btnZoomIn.Click += btnZoomIn_Click;
             // 
@@ -215,8 +243,9 @@ namespace EchoCut
             // 
             btnZoomOut.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnZoomOut.Name = "btnZoomOut";
-            btnZoomOut.Size = new Size(64, 22);
-            btnZoomOut.Text = "－ Alejar";
+            btnZoomOut.AccessibleName = "Alejar";
+            btnZoomOut.Size = new Size(25, 23);
+            btnZoomOut.Text = "－";
             btnZoomOut.ToolTipText = "Alejar la vista activa; también Ctrl+rueda sobre la onda";
             btnZoomOut.Click += btnZoomOut_Click;
             // 
@@ -225,7 +254,7 @@ namespace EchoCut
             btnZoomSelection.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnZoomSelection.Enabled = false;
             btnZoomSelection.Name = "btnZoomSelection";
-            btnZoomSelection.Size = new Size(77, 22);
+            btnZoomSelection.Size = new Size(91, 23);
             btnZoomSelection.Text = "Ver selección";
             btnZoomSelection.ToolTipText = "Ajustar la vista activa a la selección";
             btnZoomSelection.Click += btnZoomSelection_Click;
@@ -234,7 +263,7 @@ namespace EchoCut
             // 
             btnZoomFit.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnZoomFit.Name = "btnZoomFit";
-            btnZoomFit.Size = new Size(62, 22);
+            btnZoomFit.Size = new Size(66, 23);
             btnZoomFit.Text = "Ver todo";
             btnZoomFit.ToolTipText = "Devolver la vista activa a su tramo inicial";
             btnZoomFit.Click += btnZoomFit_Click;
@@ -244,7 +273,7 @@ namespace EchoCut
             btnShortcuts.Alignment = ToolStripItemAlignment.Right;
             btnShortcuts.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnShortcuts.Name = "btnShortcuts";
-            btnShortcuts.Size = new Size(66, 22);
+            btnShortcuts.Size = new Size(74, 23);
             btnShortcuts.Text = "⌨ Atajos";
             btnShortcuts.ToolTipText = "Ver todos los atajos del editor";
             btnShortcuts.Click += btnShortcuts_Click;
@@ -255,8 +284,9 @@ namespace EchoCut
             btnDecibels.CheckOnClick = true;
             btnDecibels.DisplayStyle = ToolStripItemDisplayStyle.Text;
             btnDecibels.Name = "btnDecibels";
-            btnDecibels.Size = new Size(96, 22);
-            btnDecibels.Text = "Escala en dB";
+            btnDecibels.AccessibleName = "Escala en dB";
+            btnDecibels.Size = new Size(30, 23);
+            btnDecibels.Text = "dB";
             btnDecibels.ToolTipText = "Mostrar la amplitud en dB para ver colas de fundido y hiss";
             btnDecibels.CheckedChanged += btnDecibels_CheckedChanged;
             // 
@@ -264,16 +294,16 @@ namespace EchoCut
             // 
             statusStrip.Font = new Font("Segoe UI", 9F);
             statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblFinalLength, lblFadeCount, lblDeletedTotal, lblEncoding });
-            statusStrip.Location = new Point(0, 778);
+            statusStrip.Location = new Point(0, 776);
             statusStrip.Name = "statusStrip";
             statusStrip.ShowItemToolTips = true;
-            statusStrip.Size = new Size(1184, 22);
+            statusStrip.Size = new Size(1184, 24);
             statusStrip.TabIndex = 2;
             // 
             // lblStatus
             // 
             lblStatus.Name = "lblStatus";
-            lblStatus.Size = new Size(700, 17);
+            lblStatus.Size = new Size(812, 19);
             lblStatus.Spring = true;
             lblStatus.Text = "Arrastra sobre la onda para seleccionar; haz clic para marcar desde dónde escuchar.";
             lblStatus.TextAlign = ContentAlignment.MiddleLeft;
@@ -282,7 +312,7 @@ namespace EchoCut
             // 
             lblFinalLength.BorderSides = ToolStripStatusLabelBorderSides.Left;
             lblFinalLength.Name = "lblFinalLength";
-            lblFinalLength.Size = new Size(110, 17);
+            lblFinalLength.Size = new Size(74, 19);
             lblFinalLength.Text = "⏱ 00:00.000";
             lblFinalLength.ToolTipText = "Duración que tendrá la copia";
             // 
@@ -290,7 +320,7 @@ namespace EchoCut
             // 
             lblFadeCount.BorderSides = ToolStripStatusLabelBorderSides.Left;
             lblFadeCount.Name = "lblFadeCount";
-            lblFadeCount.Size = new Size(90, 17);
+            lblFadeCount.Size = new Size(90, 19);
             lblFadeCount.Text = "◢◣ 0 fundidos";
             lblFadeCount.ToolTipText = "Fundidos que lleva la copia";
             // 
@@ -298,7 +328,7 @@ namespace EchoCut
             // 
             lblDeletedTotal.BorderSides = ToolStripStatusLabelBorderSides.Left;
             lblDeletedTotal.Name = "lblDeletedTotal";
-            lblDeletedTotal.Size = new Size(100, 17);
+            lblDeletedTotal.Size = new Size(108, 19);
             lblDeletedTotal.Text = "⌫ 0.00 s borrados";
             lblDeletedTotal.ToolTipText = "Audio borrado dentro de lo que conserva la copia";
             // 
@@ -306,7 +336,7 @@ namespace EchoCut
             // 
             lblEncoding.BorderSides = ToolStripStatusLabelBorderSides.Left;
             lblEncoding.Name = "lblEncoding";
-            lblEncoding.Size = new Size(120, 17);
+            lblEncoding.Size = new Size(85, 19);
             lblEncoding.Text = "✔ Sin pérdida";
             lblEncoding.ToolTipText = "Si la copia sale por copia de flujo, sin pérdida, o se vuelve a codificar";
             // 
@@ -320,21 +350,20 @@ namespace EchoCut
             tableMain.Controls.Add(tableInspector, 1, 1);
             tableMain.Controls.Add(flowButtons, 0, 2);
             tableMain.Dock = DockStyle.Fill;
-            tableMain.Location = new Point(0, 29);
+            tableMain.Location = new Point(0, 30);
             tableMain.Name = "tableMain";
             tableMain.Padding = new Padding(9, 3, 9, 3);
             tableMain.RowCount = 3;
             tableMain.RowStyles.Add(new RowStyle());
             tableMain.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             tableMain.RowStyles.Add(new RowStyle());
-            tableMain.SetColumnSpan(lblTrack, 2);
-            tableMain.SetColumnSpan(flowButtons, 2);
-            tableMain.Size = new Size(1184, 749);
+            tableMain.Size = new Size(1184, 746);
             tableMain.TabIndex = 1;
             // 
             // lblTrack
             // 
             lblTrack.AutoEllipsis = true;
+            tableMain.SetColumnSpan(lblTrack, 2);
             lblTrack.Dock = DockStyle.Fill;
             lblTrack.Font = new Font("Segoe UI Semibold", 12F, FontStyle.Bold);
             lblTrack.Location = new Point(12, 3);
@@ -364,14 +393,13 @@ namespace EchoCut
             tableViews.RowStyles.Add(new RowStyle(SizeType.Percent, 42F));
             tableViews.RowStyles.Add(new RowStyle());
             tableViews.RowStyles.Add(new RowStyle(SizeType.Percent, 58F));
-            tableViews.SetColumnSpan(lblOverview, 2);
-            tableViews.SetColumnSpan(viewOverview, 2);
-            tableViews.Size = new Size(866, 668);
+            tableViews.Size = new Size(866, 672);
             tableViews.TabIndex = 1;
             // 
             // lblOverview
             // 
             lblOverview.AutoSize = true;
+            tableViews.SetColumnSpan(lblOverview, 2);
             lblOverview.Location = new Point(3, 3);
             lblOverview.Margin = new Padding(3);
             lblOverview.Name = "lblOverview";
@@ -381,16 +409,17 @@ namespace EchoCut
             // 
             // viewOverview
             // 
-            viewOverview.AccessibleDescription = "Forma de onda de la pista completa. Arrastrar selecciona un tramo; un clic marca desde dónde escuchar. Rueda: desplazar; Ctrl+rueda: zoom. Flechas izquierda y derecha mueven la marca activa; Inicio y Fin la eligen.";
+            viewOverview.AccessibleDescription = resources.GetString("viewOverview.AccessibleDescription");
             viewOverview.AccessibleName = "Forma de onda de la pista completa";
+            tableViews.SetColumnSpan(viewOverview, 2);
             viewOverview.Dock = DockStyle.Fill;
             viewOverview.Location = new Point(3, 28);
             viewOverview.Name = "viewOverview";
-            viewOverview.Size = new Size(860, 248);
+            viewOverview.Size = new Size(860, 253);
             viewOverview.TabIndex = 1;
-            viewOverview.FadeAdjusted += View_FadeAdjusted;
             viewOverview.MarkersChanged += View_MarkersChanged;
             viewOverview.SelectionChanged += View_SelectionChanged;
+            viewOverview.FadeAdjusted += View_FadeAdjusted;
             viewOverview.WaveformClicked += View_WaveformClicked;
             viewOverview.Enter += View_Enter;
             viewOverview.MouseUp += View_MouseUp;
@@ -398,36 +427,36 @@ namespace EchoCut
             // lblStartView
             // 
             lblStartView.AutoSize = true;
-            lblStartView.Location = new Point(3, 285);
+            lblStartView.Location = new Point(3, 290);
             lblStartView.Margin = new Padding(3, 6, 3, 3);
             lblStartView.Name = "lblStartView";
-            lblStartView.Size = new Size(110, 19);
+            lblStartView.Size = new Size(107, 19);
             lblStartView.TabIndex = 2;
             lblStartView.Text = "Inicio de la pista";
             // 
             // lblEndView
             // 
             lblEndView.AutoSize = true;
-            lblEndView.Location = new Point(436, 285);
+            lblEndView.Location = new Point(436, 290);
             lblEndView.Margin = new Padding(3, 6, 3, 3);
             lblEndView.Name = "lblEndView";
-            lblEndView.Size = new Size(104, 19);
+            lblEndView.Size = new Size(103, 19);
             lblEndView.TabIndex = 4;
             lblEndView.Text = "Final de la pista";
             // 
             // viewStart
             // 
-            viewStart.AccessibleDescription = "Detalle del inicio de la pista. Flechas izquierda y derecha mueven el comienzo de la copia: 10 ms, 100 ms con Mayús y 1 s con Ctrl. Arrastrar selecciona un tramo; rueda y Ctrl+rueda desplazan y acercan.";
+            viewStart.AccessibleDescription = resources.GetString("viewStart.AccessibleDescription");
             viewStart.AccessibleName = "Forma de onda del inicio";
             viewStart.Dock = DockStyle.Fill;
-            viewStart.Location = new Point(3, 310);
+            viewStart.Location = new Point(3, 315);
             viewStart.Name = "viewStart";
             viewStart.ShowEndMarker = false;
-            viewStart.Size = new Size(427, 355);
+            viewStart.Size = new Size(427, 354);
             viewStart.TabIndex = 3;
-            viewStart.FadeAdjusted += View_FadeAdjusted;
             viewStart.MarkersChanged += View_MarkersChanged;
             viewStart.SelectionChanged += View_SelectionChanged;
+            viewStart.FadeAdjusted += View_FadeAdjusted;
             viewStart.WaveformClicked += View_WaveformClicked;
             viewStart.Enter += View_Enter;
             viewStart.MouseUp += View_MouseUp;
@@ -437,14 +466,14 @@ namespace EchoCut
             viewEnd.AccessibleDescription = "Detalle del final de la pista. Flechas izquierda y derecha mueven el final de la copia: 10 ms, 100 ms con Mayús y 1 s con Ctrl. Arrastrar selecciona un tramo; rueda y Ctrl+rueda desplazan y acercan.";
             viewEnd.AccessibleName = "Forma de onda del final";
             viewEnd.Dock = DockStyle.Fill;
-            viewEnd.Location = new Point(436, 310);
+            viewEnd.Location = new Point(436, 315);
             viewEnd.Name = "viewEnd";
             viewEnd.ShowStartMarker = false;
-            viewEnd.Size = new Size(427, 355);
+            viewEnd.Size = new Size(427, 354);
             viewEnd.TabIndex = 5;
-            viewEnd.FadeAdjusted += View_FadeAdjusted;
             viewEnd.MarkersChanged += View_MarkersChanged;
             viewEnd.SelectionChanged += View_SelectionChanged;
+            viewEnd.FadeAdjusted += View_FadeAdjusted;
             viewEnd.WaveformClicked += View_WaveformClicked;
             viewEnd.Enter += View_Enter;
             viewEnd.MouseUp += View_MouseUp;
@@ -476,7 +505,7 @@ namespace EchoCut
             tableInspector.Controls.Add(pnlCurve, 0, 12);
             tableInspector.Controls.Add(btnContextAction, 0, 13);
             tableInspector.Dock = DockStyle.Fill;
-            tableInspector.Location = new Point(878, 36);
+            tableInspector.Location = new Point(881, 36);
             tableInspector.Margin = new Padding(6, 3, 0, 3);
             tableInspector.Name = "tableInspector";
             tableInspector.RowCount = 15;
@@ -495,24 +524,18 @@ namespace EchoCut
             tableInspector.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
             tableInspector.RowStyles.Add(new RowStyle());
             tableInspector.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            tableInspector.SetColumnSpan(lblCopyHeader, 2);
-            tableInspector.SetColumnSpan(flowCopyButtons, 2);
-            tableInspector.SetColumnSpan(lblDivider, 2);
-            tableInspector.SetColumnSpan(lblContextHeader, 2);
-            tableInspector.SetColumnSpan(lblContextHint, 2);
-            tableInspector.SetColumnSpan(pnlCurve, 2);
-            tableInspector.SetColumnSpan(btnContextAction, 2);
-            tableInspector.Size = new Size(294, 662);
+            tableInspector.Size = new Size(294, 666);
             tableInspector.TabIndex = 2;
             // 
             // lblCopyHeader
             // 
             lblCopyHeader.AutoSize = true;
+            tableInspector.SetColumnSpan(lblCopyHeader, 2);
             lblCopyHeader.Font = new Font("Segoe UI Semibold", 10F, FontStyle.Bold);
             lblCopyHeader.Location = new Point(3, 3);
             lblCopyHeader.Margin = new Padding(3, 3, 3, 6);
             lblCopyHeader.Name = "lblCopyHeader";
-            lblCopyHeader.Size = new Size(44, 19);
+            lblCopyHeader.Size = new Size(45, 19);
             lblCopyHeader.TabIndex = 0;
             lblCopyHeader.Text = "Copia";
             // 
@@ -522,7 +545,7 @@ namespace EchoCut
             lblStartCaption.AutoSize = true;
             lblStartCaption.Location = new Point(3, 34);
             lblStartCaption.Name = "lblStartCaption";
-            lblStartCaption.Size = new Size(97, 19);
+            lblStartCaption.Size = new Size(91, 19);
             lblStartCaption.TabIndex = 1;
             lblStartCaption.Text = "Comienzo (s):";
             // 
@@ -545,7 +568,7 @@ namespace EchoCut
             lblEndCaption.AutoSize = true;
             lblEndCaption.Location = new Point(3, 65);
             lblEndCaption.Name = "lblEndCaption";
-            lblEndCaption.Size = new Size(64, 19);
+            lblEndCaption.Size = new Size(58, 19);
             lblEndCaption.TabIndex = 3;
             lblEndCaption.Text = "Final (s):";
             // 
@@ -566,9 +589,9 @@ namespace EchoCut
             // 
             lblFinalCaption.Anchor = AnchorStyles.Left;
             lblFinalCaption.AutoSize = true;
-            lblFinalCaption.Location = new Point(3, 93);
+            lblFinalCaption.Location = new Point(3, 90);
             lblFinalCaption.Name = "lblFinalCaption";
-            lblFinalCaption.Size = new Size(100, 19);
+            lblFinalCaption.Size = new Size(96, 19);
             lblFinalCaption.TabIndex = 5;
             lblFinalCaption.Text = "Duración final:";
             // 
@@ -577,7 +600,7 @@ namespace EchoCut
             lblFinalValue.Anchor = AnchorStyles.Right;
             lblFinalValue.AutoSize = true;
             lblFinalValue.Font = new Font("Segoe UI Semibold", 10F, FontStyle.Bold);
-            lblFinalValue.Location = new Point(220, 93);
+            lblFinalValue.Location = new Point(220, 90);
             lblFinalValue.Name = "lblFinalValue";
             lblFinalValue.Size = new Size(71, 19);
             lblFinalValue.TabIndex = 6;
@@ -586,11 +609,12 @@ namespace EchoCut
             // flowCopyButtons
             // 
             flowCopyButtons.AutoSize = true;
+            tableInspector.SetColumnSpan(flowCopyButtons, 2);
             flowCopyButtons.Controls.Add(btnPlayStart);
             flowCopyButtons.Controls.Add(btnPlayEnd);
             flowCopyButtons.Controls.Add(btnReset);
             flowCopyButtons.Dock = DockStyle.Fill;
-            flowCopyButtons.Location = new Point(0, 118);
+            flowCopyButtons.Location = new Point(0, 112);
             flowCopyButtons.Margin = new Padding(0, 3, 0, 3);
             flowCopyButtons.Name = "flowCopyButtons";
             flowCopyButtons.Size = new Size(294, 70);
@@ -635,8 +659,9 @@ namespace EchoCut
             // lblDivider
             // 
             lblDivider.BorderStyle = BorderStyle.Fixed3D;
+            tableInspector.SetColumnSpan(lblDivider, 2);
             lblDivider.Dock = DockStyle.Top;
-            lblDivider.Location = new Point(3, 200);
+            lblDivider.Location = new Point(3, 194);
             lblDivider.Margin = new Padding(3, 9, 3, 9);
             lblDivider.Name = "lblDivider";
             lblDivider.Size = new Size(288, 2);
@@ -645,23 +670,25 @@ namespace EchoCut
             // lblContextHeader
             // 
             lblContextHeader.AutoSize = true;
+            tableInspector.SetColumnSpan(lblContextHeader, 2);
             lblContextHeader.Font = new Font("Segoe UI Semibold", 10F, FontStyle.Bold);
-            lblContextHeader.Location = new Point(3, 214);
-            lblContextHeader.Margin = new Padding(3, 3, 3, 3);
+            lblContextHeader.Location = new Point(3, 208);
+            lblContextHeader.Margin = new Padding(3);
             lblContextHeader.Name = "lblContextHeader";
-            lblContextHeader.Size = new Size(58, 19);
+            lblContextHeader.Size = new Size(59, 19);
             lblContextHeader.TabIndex = 9;
             lblContextHeader.Text = "Detalles";
             // 
             // lblContextHint
             // 
             lblContextHint.AutoSize = true;
+            tableInspector.SetColumnSpan(lblContextHint, 2);
             lblContextHint.ForeColor = SystemColors.GrayText;
-            lblContextHint.Location = new Point(3, 239);
+            lblContextHint.Location = new Point(3, 230);
             lblContextHint.Margin = new Padding(3, 0, 3, 6);
             lblContextHint.MaximumSize = new Size(288, 0);
             lblContextHint.Name = "lblContextHint";
-            lblContextHint.Size = new Size(280, 38);
+            lblContextHint.Size = new Size(288, 57);
             lblContextHint.TabIndex = 10;
             lblContextHint.Text = "Selecciona un tramo, o haz clic en un fundido o en un fragmento borrado, para ver aquí sus detalles.";
             // 
@@ -669,9 +696,9 @@ namespace EchoCut
             // 
             lblFromCaption.Anchor = AnchorStyles.Left;
             lblFromCaption.AutoSize = true;
-            lblFromCaption.Location = new Point(3, 289);
+            lblFromCaption.Location = new Point(3, 299);
             lblFromCaption.Name = "lblFromCaption";
-            lblFromCaption.Size = new Size(76, 19);
+            lblFromCaption.Size = new Size(68, 19);
             lblFromCaption.TabIndex = 11;
             lblFromCaption.Text = "Desde (s):";
             // 
@@ -681,7 +708,7 @@ namespace EchoCut
             numFrom.DecimalPlaces = 3;
             numFrom.Dock = DockStyle.Fill;
             numFrom.Increment = new decimal(new int[] { 1, 0, 0, 131072 });
-            numFrom.Location = new Point(123, 286);
+            numFrom.Location = new Point(123, 296);
             numFrom.Name = "numFrom";
             numFrom.Size = new Size(168, 25);
             numFrom.TabIndex = 12;
@@ -692,9 +719,9 @@ namespace EchoCut
             // 
             lblToCaption.Anchor = AnchorStyles.Left;
             lblToCaption.AutoSize = true;
-            lblToCaption.Location = new Point(3, 320);
+            lblToCaption.Location = new Point(3, 330);
             lblToCaption.Name = "lblToCaption";
-            lblToCaption.Size = new Size(72, 19);
+            lblToCaption.Size = new Size(65, 19);
             lblToCaption.TabIndex = 13;
             lblToCaption.Text = "Hasta (s):";
             // 
@@ -704,7 +731,7 @@ namespace EchoCut
             numTo.DecimalPlaces = 3;
             numTo.Dock = DockStyle.Fill;
             numTo.Increment = new decimal(new int[] { 1, 0, 0, 131072 });
-            numTo.Location = new Point(123, 317);
+            numTo.Location = new Point(123, 327);
             numTo.Name = "numTo";
             numTo.Size = new Size(168, 25);
             numTo.TabIndex = 14;
@@ -715,7 +742,7 @@ namespace EchoCut
             // 
             lblLengthCaption.Anchor = AnchorStyles.Left;
             lblLengthCaption.AutoSize = true;
-            lblLengthCaption.Location = new Point(3, 348);
+            lblLengthCaption.Location = new Point(3, 355);
             lblLengthCaption.Name = "lblLengthCaption";
             lblLengthCaption.Size = new Size(67, 19);
             lblLengthCaption.TabIndex = 15;
@@ -725,9 +752,9 @@ namespace EchoCut
             // 
             lblLengthValue.Anchor = AnchorStyles.Right;
             lblLengthValue.AutoSize = true;
-            lblLengthValue.Location = new Point(240, 348);
+            lblLengthValue.Location = new Point(237, 355);
             lblLengthValue.Name = "lblLengthValue";
-            lblLengthValue.Size = new Size(51, 19);
+            lblLengthValue.Size = new Size(54, 19);
             lblLengthValue.TabIndex = 16;
             lblLengthValue.Text = "0.000 s";
             // 
@@ -735,9 +762,9 @@ namespace EchoCut
             // 
             lblCurveCaption.Anchor = AnchorStyles.Left;
             lblCurveCaption.AutoSize = true;
-            lblCurveCaption.Location = new Point(3, 377);
+            lblCurveCaption.Location = new Point(3, 379);
             lblCurveCaption.Name = "lblCurveCaption";
-            lblCurveCaption.Size = new Size(49, 19);
+            lblCurveCaption.Size = new Size(48, 19);
             lblCurveCaption.TabIndex = 17;
             lblCurveCaption.Text = "Curva:";
             // 
@@ -747,7 +774,7 @@ namespace EchoCut
             cmbCurve.Dock = DockStyle.Fill;
             cmbCurve.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbCurve.FormattingEnabled = true;
-            cmbCurve.Location = new Point(123, 374);
+            cmbCurve.Location = new Point(123, 377);
             cmbCurve.Name = "cmbCurve";
             cmbCurve.Size = new Size(168, 25);
             cmbCurve.TabIndex = 18;
@@ -759,8 +786,9 @@ namespace EchoCut
             pnlCurve.AccessibleRole = AccessibleRole.Graphic;
             pnlCurve.BackColor = Color.White;
             pnlCurve.BorderStyle = BorderStyle.FixedSingle;
+            tableInspector.SetColumnSpan(pnlCurve, 2);
             pnlCurve.Dock = DockStyle.Fill;
-            pnlCurve.Location = new Point(3, 405);
+            pnlCurve.Location = new Point(3, 406);
             pnlCurve.Name = "pnlCurve";
             pnlCurve.Size = new Size(288, 90);
             pnlCurve.TabIndex = 19;
@@ -769,7 +797,8 @@ namespace EchoCut
             // btnContextAction
             // 
             btnContextAction.AutoSize = true;
-            btnContextAction.Location = new Point(3, 501);
+            tableInspector.SetColumnSpan(btnContextAction, 2);
+            btnContextAction.Location = new Point(3, 502);
             btnContextAction.Name = "btnContextAction";
             btnContextAction.Size = new Size(130, 29);
             btnContextAction.TabIndex = 20;
@@ -780,15 +809,16 @@ namespace EchoCut
             // flowButtons
             // 
             flowButtons.AutoSize = true;
+            tableMain.SetColumnSpan(flowButtons, 2);
             flowButtons.Controls.Add(btnCancel);
             flowButtons.Controls.Add(btnAccept);
             flowButtons.Controls.Add(btnSave);
             flowButtons.Dock = DockStyle.Fill;
             flowButtons.FlowDirection = FlowDirection.RightToLeft;
-            flowButtons.Location = new Point(9, 704);
+            flowButtons.Location = new Point(9, 708);
             flowButtons.Margin = new Padding(0, 3, 0, 0);
             flowButtons.Name = "flowButtons";
-            flowButtons.Size = new Size(1166, 42);
+            flowButtons.Size = new Size(1166, 35);
             flowButtons.TabIndex = 3;
             // 
             // btnCancel
@@ -841,7 +871,7 @@ namespace EchoCut
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = btnCancel;
-            ClientSize = new Size(1184, 800);
+            ClientSize = new Size(1280, 820);
             Controls.Add(tableMain);
             Controls.Add(statusStrip);
             Controls.Add(toolStrip);
@@ -849,7 +879,6 @@ namespace EchoCut
             Icon = (Icon)resources.GetObject("$this.Icon");
             MinimumSize = new Size(1000, 640);
             Name = "WaveformEditor";
-            StartPosition = FormStartPosition.WindowsDefaultLocation;
             Text = "Forma de onda, recorte y fundidos";
             FormClosing += WaveformEditor_FormClosing;
             FormClosed += WaveformEditor_FormClosed;
@@ -888,6 +917,9 @@ namespace EchoCut
         private ToolStripSeparator toolStripSeparator2;
         private ToolStripButton btnUndo;
         private ToolStripButton btnRedo;
+        private ToolStripSeparator toolStripSeparator4;
+        private ToolStripButton btnDetect;
+        private ToolStripButton btnResult;
         private ToolStripSeparator toolStripSeparator3;
         private ToolStripButton btnZoomIn;
         private ToolStripButton btnZoomOut;
