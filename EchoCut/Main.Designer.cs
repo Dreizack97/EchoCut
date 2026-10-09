@@ -356,7 +356,7 @@ namespace EchoCut
             // 
             mnuNormalize.Name = "mnuNormalize";
             mnuNormalize.Size = new Size(192, 24);
-            mnuNormalize.Text = "Normalizar";
+            mnuNormalize.Text = "Normalizar…";
             mnuNormalize.Click += mnuNormalize_Click;
             // 
             // btnExport

@@ -1541,6 +1541,54 @@ namespace EchoCut
             }
         }
 
+        /// <summary>
+        /// Pregunta qué propiedades normalizar y pide confirmación antes de tocar los archivos.
+        /// </summary>
+        /// <param name="count">Pistas a las que afectará el lote.</param>
+        /// <returns>Las propiedades elegidas, o <c>null</c> si el usuario canceló en cualquiera de los dos pasos.</returns>
+        /// <remarks>
+        /// La elección se guarda en cuanto se acepta el diálogo, aunque luego se cancele la
+        /// confirmación: es una preferencia sobre qué normalizar, no una orden de hacerlo ya.
+        /// La confirmación enumera las propiedades porque el diálogo ya se cerró, y lo que se va a
+        /// modificar —sobre todo si incluye renombrar archivos— debe leerse justo antes de aceptar.
+        /// </remarks>
+        private NormalizableFields? ChooseNormalizeFields(int count)
+        {
+            using NormalizeOptions dialog = new(_settings.NormalizeFields, count);
+            if (dialog.ShowDialog(this) != DialogResult.OK || dialog.Selected == NormalizableFields.None)
+            {
+                return null;
+            }
+
+            NormalizableFields fields = dialog.Selected;
+            _settings.NormalizeFields = fields;
+            _settings.Save();
+
+            string target = count == 1
+                ? $"«{_songs[0].Name}»"
+                : $"las {count} canciones cargadas en la lista";
+
+            string properties = string.Join(
+                Environment.NewLine,
+                NormalizeOptions.Describe(fields).Select(name => $" • {name}"));
+
+            string rename = fields.HasFlag(NormalizableFields.FileName)
+                ? "Los archivos se renombrarán en disco si su nombre cambia. "
+                : string.Empty;
+
+            DialogResult confirmation = MessageBox.Show(
+                this,
+                $"¿Normalizar {target}?\n\n"
+                + $"Se quitarán los acentos (conservando la «ñ») y cada palabra empezará con mayúscula en:\n{properties}\n\n"
+                + $"{rename}Los archivos originales se modifican directamente y el cambio no se puede deshacer.",
+                "Confirmar normalización de canciones",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button2);
+
+            return confirmation == DialogResult.Yes ? fields : null;
+        }
+
         private async void mnuNormalize_Click(object sender, EventArgs e)
         {
             if (IsBusy || _songs.Count == 0)
@@ -1549,19 +1597,8 @@ namespace EchoCut
             }
 
             int count = _songs.Count;
-            string confirmationMessage = count == 1
-                ? $"¿Está seguro de que desea normalizar «{_songs[0].Name}»?\n\nEsta operación removerá los acentos (conservando la letra «ñ») y convertirá las palabras a TitleCase tanto en los metadatos como en el nombre del archivo en disco."
-                : $"¿Está seguro de que desea normalizar las {count} canciones cargadas en la lista?\n\nEsta operación removerá los acentos (conservando la letra «ñ») y convertirá las palabras a TitleCase tanto en los metadatos como en el nombre del archivo en disco.";
 
-            DialogResult confirmation = MessageBox.Show(
-                this,
-                confirmationMessage,
-                "Confirmar normalización de canciones",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question,
-                MessageBoxDefaultButton.Button2);
-
-            if (confirmation != DialogResult.Yes)
+            if (ChooseNormalizeFields(count) is not { } fields)
             {
                 return;
             }
@@ -1597,7 +1634,7 @@ namespace EchoCut
                         try
                         {
                             string oldPath = song.FilePath;
-                            TrackInfo updated = TrackEditor.NormalizeTrack(oldPath);
+                            TrackInfo updated = TrackEditor.NormalizeTrack(oldPath, fields);
 
                             if (IsAlive)
                             {
