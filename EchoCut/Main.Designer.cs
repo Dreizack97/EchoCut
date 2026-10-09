@@ -65,6 +65,9 @@ namespace EchoCut
             mnuCleanMetadata = new ToolStripMenuItem();
             mnuAddMetadata = new ToolStripMenuItem();
             mnuNormalize = new ToolStripMenuItem();
+            mnuRename = new ToolStripMenuItem();
+            mnuAddSequence = new ToolStripMenuItem();
+            mnuRemoveLeading = new ToolStripMenuItem();
             btnExport = new ToolStripButton();
             btnAdvanced = new ToolStripButton();
             statusStrip = new StatusStrip();
@@ -350,7 +353,7 @@ namespace EchoCut
             // ddbUtilities
             // 
             ddbUtilities.DisplayStyle = ToolStripItemDisplayStyle.Text;
-            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize });
+            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize, mnuRename });
             ddbUtilities.Name = "ddbUtilities";
             ddbUtilities.Size = new Size(82, 23);
             ddbUtilities.Text = "Utilidades";
@@ -383,6 +386,27 @@ namespace EchoCut
             mnuNormalize.Size = new Size(192, 24);
             mnuNormalize.Text = "Normalizar…";
             mnuNormalize.Click += mnuNormalize_Click;
+            // 
+            // mnuRename
+            // 
+            mnuRename.DropDownItems.AddRange(new ToolStripItem[] { mnuAddSequence, mnuRemoveLeading });
+            mnuRename.Name = "mnuRename";
+            mnuRename.Size = new Size(192, 24);
+            mnuRename.Text = "Renombrar";
+            // 
+            // mnuAddSequence
+            // 
+            mnuAddSequence.Name = "mnuAddSequence";
+            mnuAddSequence.Size = new Size(260, 24);
+            mnuAddSequence.Text = "Agregar consecutivo…";
+            mnuAddSequence.Click += mnuAddSequence_Click;
+            // 
+            // mnuRemoveLeading
+            // 
+            mnuRemoveLeading.Name = "mnuRemoveLeading";
+            mnuRemoveLeading.Size = new Size(260, 24);
+            mnuRemoveLeading.Text = "Quitar caracteres iniciales…";
+            mnuRemoveLeading.Click += mnuRemoveLeading_Click;
             // 
             // btnExport
             // 
@@ -560,6 +584,9 @@ namespace EchoCut
         private ToolStripMenuItem mnuCleanMetadata;
         private ToolStripMenuItem mnuAddMetadata;
         private ToolStripMenuItem mnuNormalize;
+        private ToolStripMenuItem mnuRename;
+        private ToolStripMenuItem mnuAddSequence;
+        private ToolStripMenuItem mnuRemoveLeading;
         private StatusStrip statusStrip;
         private ToolStripStatusLabel lblStatus;
         private ToolStripProgressBar progressBar;

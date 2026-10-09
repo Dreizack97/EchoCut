@@ -4,7 +4,8 @@ using EchoCut.Objects;
 namespace EchoCut
 {
     /// <summary>
-    /// La parte de <see cref="Main"/> que renombra archivos desde la propia rejilla con F2.
+    /// La parte de <see cref="Main"/> que renombra archivos: una pista desde la propia rejilla con
+    /// F2, o varias a la vez anteponiendo un consecutivo o quitando caracteres del principio.
     /// </summary>
     public partial class Main
     {
@@ -180,5 +181,75 @@ namespace EchoCut
         private void RenameHost_Moved(object? sender, EventArgs e) => CommitRename();
 
         private void mnuRenameSong_Click(object? sender, EventArgs e) => BeginRename();
+
+        // ----------------------------------------------------------------- Renombrar en lote
+
+        private async void mnuAddSequence_Click(object? sender, EventArgs e) =>
+            await RenameBatchAsync(RenameMode.Sequence).ConfigureAwait(true);
+
+        private async void mnuRemoveLeading_Click(object? sender, EventArgs e) =>
+            await RenameBatchAsync(RenameMode.RemoveLeading).ConfigureAwait(true);
+
+        /// <summary>
+        /// Calcula los nombres nuevos con <see cref="RenameSongsDialog"/> y renombra las pistas que cambian.
+        /// </summary>
+        /// <remarks>
+        /// Con varias filas seleccionadas se renombran solo esas; con una o ninguna, todo el listado.
+        /// En ambos casos en el orden de la rejilla, que es el que el usuario ve y en el que espera
+        /// que se numere. La vista previa del diálogo hace de confirmación: muestra cada nombre
+        /// antes y después, y no deja aceptar si alguno no es válido.
+        /// </remarks>
+        private async Task RenameBatchAsync(RenameMode mode)
+        {
+            if (IsBusy || _songs.Count == 0)
+            {
+                return;
+            }
+
+            List<Song> selected = GetSelectedSongs();
+            bool selectionOnly = selected.Count > 1;
+            List<Song> targets = selectionOnly ? selected : [.. _songs];
+
+            using RenameSongsDialog dialog = new(
+                mode,
+                [.. targets.Select(song => new RenameItem(song.Track.Directory, song.Name, song.Extension))],
+                selectionOnly);
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            Dictionary<string, string> newNames = new(StringComparer.OrdinalIgnoreCase);
+            List<Song> changed = [];
+
+            for (int i = 0; i < targets.Count; i++)
+            {
+                if (!string.Equals(dialog.NewNames[i], targets[i].Name, StringComparison.Ordinal))
+                {
+                    newNames[targets[i].FilePath] = dialog.NewNames[i];
+                    changed.Add(targets[i]);
+                }
+            }
+
+            if (changed.Count == 0)
+            {
+                return;
+            }
+
+            await RunLibraryBatchAsync(
+                changed,
+                new LibraryBatch(
+                    "Renombrando canciones…",
+                    (success, total) => success == 1 && total == 1
+                        ? "1 canción renombrada."
+                        : $"{success} de {total} canciones renombradas.",
+                    "Renombrado cancelado.",
+                    "No se pudo completar el renombrado.",
+                    "Aviso de renombrado",
+                    "No se pudieron renombrar algunos archivos:"),
+                path => TrackEditor.RenameTrack(path, newNames[path]),
+                cts => _renameCts = cts).ConfigureAwait(true);
+        }
     }
 }
