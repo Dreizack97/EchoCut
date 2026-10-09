@@ -68,6 +68,8 @@ namespace EchoCut
             mnuRename = new ToolStripMenuItem();
             mnuAddSequence = new ToolStripMenuItem();
             mnuRemoveLeading = new ToolStripMenuItem();
+            sepTools = new ToolStripSeparator();
+            mnuConvertMp3 = new ToolStripMenuItem();
             sepExplorer = new ToolStripSeparator();
             mnuExplorer = new ToolStripMenuItem();
             btnExport = new ToolStripButton();
@@ -360,12 +362,12 @@ namespace EchoCut
             // ddbUtilities
             // 
             ddbUtilities.DisplayStyle = ToolStripItemDisplayStyle.Text;
-            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize, mnuRename, sepExplorer, mnuExplorer });
+            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize, mnuRename, sepTools, mnuConvertMp3, sepExplorer, mnuExplorer });
             ddbUtilities.Name = "ddbUtilities";
             ddbUtilities.Size = new Size(82, 23);
             ddbUtilities.Text = "Utilidades";
             ddbUtilities.DropDownOpening += ddbUtilities_DropDownOpening;
-            ddbUtilities.ToolTipText = "Operaciones que modifican los archivos originales";
+            ddbUtilities.ToolTipText = "Metadatos, nombres y conversión a MP3";
             // 
             // mnuMetadata
             // 
@@ -422,6 +424,19 @@ namespace EchoCut
             mnuRemoveLeading.Text = "Quitar caracteres iniciales…";
             mnuRemoveLeading.ToolTipText = "Quitar caracteres del principio del nombre de las canciones";
             mnuRemoveLeading.Click += mnuRemoveLeading_Click;
+            // 
+            // sepTools
+            // 
+            sepTools.Name = "sepTools";
+            sepTools.Size = new Size(189, 6);
+            // 
+            // mnuConvertMp3
+            // 
+            mnuConvertMp3.Name = "mnuConvertMp3";
+            mnuConvertMp3.Size = new Size(260, 24);
+            mnuConvertMp3.Text = "Convertir a MP3…";
+            mnuConvertMp3.ToolTipText = "Escribir una copia en MP3 de las canciones cargadas en la subcarpeta «MP3», sin tocar los originales";
+            mnuConvertMp3.Click += mnuConvertMp3_Click;
             // 
             // sepExplorer
             // 
@@ -626,6 +641,8 @@ namespace EchoCut
         private ToolStripMenuItem mnuRename;
         private ToolStripMenuItem mnuAddSequence;
         private ToolStripMenuItem mnuRemoveLeading;
+        private ToolStripSeparator sepTools;
+        private ToolStripMenuItem mnuConvertMp3;
         private ToolStripSeparator sepExplorer;
         private ToolStripMenuItem mnuExplorer;
         private StatusStrip statusStrip;

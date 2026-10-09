@@ -72,6 +72,7 @@ namespace EchoCut
                 new(Keys.Control | Keys.N, mnuNormalize, GroupUtilities),
                 new(Keys.Control | Keys.Shift | Keys.C, mnuAddSequence, GroupUtilities),
                 new(Keys.Control | Keys.Shift | Keys.Q, mnuRemoveLeading, GroupUtilities),
+                new(Keys.Control | Keys.Shift | Keys.M, mnuConvertMp3, GroupUtilities),
 
                 // Entrar abre la opción en negrita del menú contextual, como el verbo por defecto
                 // en el Explorador, y Alt+Entrar las propiedades, como allí.
