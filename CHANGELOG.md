@@ -10,6 +10,19 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 ## [Sin publicar]
 
 ### Añadido
+#### Resultado Editado y Detección de Silencios Posteriores
+* **Onda con las ediciones aplicadas**: `WaveformRenderer` pinta cada columna con la ganancia de los fundidos y, en la línea de tiempo del resultado, juntando los tramos del original que suenan en ella; se dibuja a partir del resumen ya cargado, sin volver a decodificar.
+* **«Ver resultado»** (`Ctrl+R`): Las tres vistas pasan a la línea de tiempo de la copia, sin lo borrado y con los empalmes marcados en morado; el detalle del final usa la pista completa para poder juntar lo que queda a ambos lados de un borrado.
+* **Ajuste del recorte sobre el resultado**: Con «Ver resultado» activo, las marcas de inicio y final se arrastran o se mueven con el teclado, y los campos de «Copia» muestran y aceptan tiempos del resultado; todo se traduce al original, y un borde llevado a un empalme o al final del resultado queda exactamente ahí. `WaveformView.MarkersOnly` deja mover solo las marcas, y un clic marca desde dónde escuchar. Deshacer sigue disponible y rehace la vista si cambia lo borrado.
+* **«Detectar silencios»** (`F5`): Analiza el resultado editado y propone el comienzo y el final de la copia; se deshace con `Ctrl+Z` y la fila adopta el análisis al aceptar o guardar.
+* **`SilenceAnalyzer.AnalyzeEditedAsync` y `EditedSampleSink`**: Análisis del resultado decodificando el archivo completo a través de `PcmEditor`, el mismo código que escribe la copia, porque un borrado impide el sondeo de la cola con `-sseof`.
+* **`TrackAnalysis.AnalyzedEdits` y `Timeline`**: Los silencios se miden en el resultado y los cortes se traducen al original; la traducción sobrevive a los cambios de tolerancia. `DeletedRegions` gana `OutputSecondsAt` y `SourceSpans` para traducir entre ambas líneas de tiempo.
+* **Análisis por lote del resultado**: `AnalysisRequest` lleva las ediciones de cada fila; las editadas se analizan sobre su resultado y las demás siguen con el sondeo rápido de los bordes.
+
+### Cambiado
+* **`Song.ApplyEdits`** descarta un análisis hecho sobre el resultado si las ediciones cambian, porque sus silencios eran los de otra copia.
+* **Editor de forma de onda**: Recibe sus servicios en `WaveformEditorServices`; los botones de zoom y la escala en dB se compactan para que la barra quepa entera, y la ventana se abre a 1280 × 820.
+
 #### Editor de Forma de Onda Rediseñado
 * **Estilo de la ventana principal**: Barra de herramientas con las acciones agrupadas (reproducir | aplicar a la selección | deshacer | zoom, con ayuda y escala en dB a la derecha) y barra de estado que describe cada opción al pasar el ratón y resume la copia: duración final, fundidos, borrado y si saldrá sin pérdida o se recodificará. Desaparecen los marcos de grupo y la barra de selección.
 * **Inspector**: Panel a la derecha con la copia (comienzo, final, duración final y escucha de los bordes) y una sección contextual para la selección, un fundido —con su curva dibujada y su nivel a mitad de camino— o un fragmento borrado, todos con sus instantes editables. Un clic sobre un fundido o sobre lo borrado lo muestra.
