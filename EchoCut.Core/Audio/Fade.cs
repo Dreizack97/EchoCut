@@ -63,7 +63,7 @@ public readonly record struct Fade(FadeDirection Direction, double StartSeconds,
     /// Ganancia entre 0 y 1; fuera del tramo vale 1, porque el fundido no toca lo que no se seleccionó.
     /// </returns>
     /// <remarks>
-    /// Es la versión continua de la envolvente que se aplica al audio, muestra
+    /// Es la versión continua de <see cref="FadeEnvelope"/>, que es la que se aplica al audio, muestra
     /// a muestra.
     /// </remarks>
     public double GainAt(double seconds)
