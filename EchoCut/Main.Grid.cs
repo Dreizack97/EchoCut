@@ -198,7 +198,8 @@ namespace EchoCut
         /// <remarks>
         /// Van primero, y no al final, por una razón práctica: la suma de anchos supera el de una
         /// ventana normal, así que puestas al final obligarían a desplazarse horizontalmente cada vez
-        /// que se quisiera reproducir o recortar una fila.
+        /// que se quisiera reproducir o recortar una fila. Por lo mismo quedan inmovilizadas: al
+        /// desplazarse hacia «Recorte» y «Estado» siguen a la vista junto a la fila que se consulta.
         /// Las columnas de datos se siguen generando solas desde las propiedades de <see cref="Song"/>;
         /// solo estas dos se añaden a mano, y de ahí la guarda para no duplicarlas en cada reenlace.
         /// </remarks>
@@ -224,6 +225,7 @@ namespace EchoCut
             UseColumnTextForButtonValue = false,
             SortMode = DataGridViewColumnSortMode.NotSortable,
             Resizable = DataGridViewTriState.False,
+            Frozen = true,
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
             Width = 36,
             MinimumWidth = 32,
