@@ -40,6 +40,9 @@ namespace EchoCut
             mnuOpenAudacity = new ToolStripMenuItem();
             mnuEditSong = new ToolStripMenuItem();
             mnuDeleteSong = new ToolStripMenuItem();
+            sepColumns = new ToolStripSeparator();
+            mnuColumns = new ToolStripMenuItem();
+            columnsMenuStrip = new ContextMenuStrip(components);
             label2 = new Label();
             numericTolerance = new NumericUpDown();
             folderBrowserDialog = new FolderBrowserDialog();
@@ -73,6 +76,7 @@ namespace EchoCut
             txtFilter = new TextBox();
             ((System.ComponentModel.ISupportInitialize)dataGrid).BeginInit();
             contextMenuStrip.SuspendLayout();
+            columnsMenuStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numericTolerance).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numericThreads).BeginInit();
             toolStrip.SuspendLayout();
@@ -122,6 +126,7 @@ namespace EchoCut
             dataGrid.Size = new Size(1076, 477);
             dataGrid.TabIndex = 9;
             dataGrid.CellContentClick += dataGrid_CellContentClick;
+            dataGrid.CellContextMenuStripNeeded += dataGrid_CellContextMenuStripNeeded;
             dataGrid.CellDoubleClick += dataGrid_CellDoubleClick;
             dataGrid.CellFormatting += dataGrid_CellFormatting;
             dataGrid.CellMouseDown += dataGrid_CellMouseDown;
@@ -136,7 +141,7 @@ namespace EchoCut
             // 
             // contextMenuStrip
             // 
-            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuWaveform, mnuOpenFolder, mnuOpenAudacity, mnuEditSong, mnuDeleteSong });
+            contextMenuStrip.Items.AddRange(new ToolStripItem[] { mnuWaveform, mnuOpenFolder, mnuOpenAudacity, mnuEditSong, mnuDeleteSong, sepColumns, mnuColumns });
             contextMenuStrip.Name = "contextMenuStrip";
             contextMenuStrip.Size = new Size(283, 114);
             // 
@@ -177,6 +182,25 @@ namespace EchoCut
             mnuDeleteSong.Size = new Size(282, 22);
             mnuDeleteSong.Text = "Eliminar archivo(s)";
             mnuDeleteSong.Click += mnuDeleteSong_Click;
+            // 
+            // sepColumns
+            // 
+            sepColumns.Name = "sepColumns";
+            sepColumns.Size = new Size(279, 6);
+            // 
+            // mnuColumns
+            // 
+            mnuColumns.Name = "mnuColumns";
+            mnuColumns.Size = new Size(282, 22);
+            mnuColumns.Text = "Columnas visibles";
+            mnuColumns.DropDownOpening += mnuColumns_DropDownOpening;
+            // 
+            // columnsMenuStrip
+            // 
+            columnsMenuStrip.Name = "columnsMenuStrip";
+            columnsMenuStrip.Size = new Size(61, 4);
+            columnsMenuStrip.Closing += columnsMenuStrip_Closing;
+            columnsMenuStrip.Opening += columnsMenuStrip_Opening;
             // 
             // label2
             // 
@@ -462,6 +486,7 @@ namespace EchoCut
             DragLeave += Main_DragLeave;
             ((System.ComponentModel.ISupportInitialize)dataGrid).EndInit();
             contextMenuStrip.ResumeLayout(false);
+            columnsMenuStrip.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)numericTolerance).EndInit();
             ((System.ComponentModel.ISupportInitialize)numericThreads).EndInit();
             toolStrip.ResumeLayout(false);
@@ -491,6 +516,9 @@ namespace EchoCut
         private OpenFileDialog openFileDialog;
         private ToolStripMenuItem mnuEditSong;
         private ToolStripMenuItem mnuDeleteSong;
+        private ToolStripSeparator sepColumns;
+        private ToolStripMenuItem mnuColumns;
+        private ContextMenuStrip columnsMenuStrip;
         private ToolStrip toolStrip;
         private ToolStripButton btnPath;
         private ToolStripButton btnFile;

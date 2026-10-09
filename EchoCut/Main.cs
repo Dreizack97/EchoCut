@@ -75,6 +75,10 @@ namespace EchoCut
             dataGrid.DataSource = _songs;
 
             _songs.ListChanged += Songs_ListChanged;
+
+            // El submenú necesita algún elemento para mostrar su flecha y abrirse; al abrirse se
+            // reconstruye con las columnas ya generadas.
+            BuildColumnItems(mnuColumns.DropDownItems);
             Disposed += (_, _) => _dropZoneTitleFont?.Dispose();
 
             UpdateButtons();

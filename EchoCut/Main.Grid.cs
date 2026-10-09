@@ -291,6 +291,8 @@ namespace EchoCut
             SetColumnAlignment(nameof(Song.Bitrate), DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(nameof(Song.Size), DataGridViewContentAlignment.MiddleRight);
 
+            ApplyHiddenColumns();
+
             if (!_columnsAutoSized)
             {
                 AutoSizeColumns();
