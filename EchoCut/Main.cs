@@ -1067,9 +1067,24 @@ namespace EchoCut
         /// Pasar por <see cref="ToolStripItem.PerformClick"/> respeta el estado habilitado: un atajo
         /// nunca dispara lo que el botón, deshabilitado, no permitiría. Esc solo se consume si hay
         /// algo que detener, para no robárselo a la edición de los controles numéricos.
+        /// Ctrl+F lleva al filtro y, dentro de él, Esc lo vacía antes que detener un lote: es la
+        /// acción más cercana a donde está el foco.
         /// </remarks>
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (keyData == (Keys.Control | Keys.F))
+            {
+                txtFilter.Focus();
+                txtFilter.SelectAll();
+                return true;
+            }
+
+            if (keyData == Keys.Escape && txtFilter.Focused && txtFilter.TextLength > 0)
+            {
+                ClearFilter();
+                return true;
+            }
+
             ToolStripItem? target = keyData switch
             {
                 Keys.Control | Keys.O => btnFile,

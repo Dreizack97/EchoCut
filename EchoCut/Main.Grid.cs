@@ -169,6 +169,13 @@ namespace EchoCut
             row.Visible = visible;
         }
 
+        /// <summary>Vacía el filtro y devuelve el foco a la rejilla.</summary>
+        private void ClearFilter()
+        {
+            txtFilter.Clear();
+            dataGrid.Focus();
+        }
+
         /// <summary>
         /// Inserta las dos columnas de acción al principio de la rejilla.
         /// </summary>
@@ -408,7 +415,7 @@ namespace EchoCut
             }
 
             string message = $"Ninguna pista coincide con «{FilterText}».\n"
-                + "Vacía el filtro para volver a mostrar "
+                + "Esc vacía el filtro y vuelve a mostrar "
                 + (_songs.Count == 1 ? "la pista cargada." : $"las {_songs.Count} pistas cargadas.");
 
             TextRenderer.DrawText(

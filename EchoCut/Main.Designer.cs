@@ -426,10 +426,10 @@ namespace EchoCut
             txtFilter.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             txtFilter.Location = new Point(788, 65);
             txtFilter.Name = "txtFilter";
-            txtFilter.PlaceholderText = "Filtrar por nombre";
+            txtFilter.PlaceholderText = "Filtrar por nombre (Ctrl+F)";
             txtFilter.Size = new Size(300, 25);
             txtFilter.TabIndex = 8;
-            toolTip.SetToolTip(txtFilter, "Muestra solo las pistas cuyo nombre contiene el texto, sin distinguir mayúsculas. Las operaciones por lote siguen actuando sobre todas las pistas cargadas.");
+            toolTip.SetToolTip(txtFilter, "Muestra solo las pistas cuyo nombre contiene el texto, sin distinguir mayúsculas. Esc lo vacía. Las operaciones por lote siguen actuando sobre todas las pistas cargadas.");
             txtFilter.TextChanged += txtFilter_TextChanged;
             // 
             // Main
