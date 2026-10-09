@@ -162,7 +162,12 @@ namespace EchoCut
             }
         }
 
-        private void Main_DragEnter(object sender, DragEventArgs e)
+        /// <remarks>
+        /// La rejilla ocupa casi toda la ventana y cada control decide por sí mismo si acepta lo que
+        /// se le suelta, así que comparte estos manejadores con el formulario: de lo contrario solo
+        /// funcionaría soltar sobre la franja de la ruta.
+        /// </remarks>
+        private void Main_DragEnter(object? sender, DragEventArgs e)
         {
             if (!IsBusy && e.Data?.GetDataPresent(DataFormats.FileDrop) == true)
             {
@@ -174,7 +179,7 @@ namespace EchoCut
             }
         }
 
-        private void Main_DragDrop(object sender, DragEventArgs e)
+        private void Main_DragDrop(object? sender, DragEventArgs e)
         {
             if (IsBusy || e.Data?.GetData(DataFormats.FileDrop) is not string[] dropped || dropped.Length == 0)
             {

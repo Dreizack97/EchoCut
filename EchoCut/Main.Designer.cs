@@ -103,6 +103,7 @@ namespace EchoCut
             dataGrid.AllowUserToResizeRows = false;
             dataGridViewCellStyle1.BackColor = SystemColors.Control;
             dataGrid.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
+            dataGrid.AllowDrop = true;
             dataGrid.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dataGrid.BorderStyle = BorderStyle.None;
             dataGrid.CellBorderStyle = DataGridViewCellBorderStyle.None;
@@ -121,6 +122,8 @@ namespace EchoCut
             dataGrid.CellFormatting += dataGrid_CellFormatting;
             dataGrid.CellMouseDown += dataGrid_CellMouseDown;
             dataGrid.DataBindingComplete += dataGrid_DataBindingComplete;
+            dataGrid.DragDrop += Main_DragDrop;
+            dataGrid.DragEnter += Main_DragEnter;
             dataGrid.KeyDown += dataGrid_KeyDown;
             // 
             // contextMenuStrip
