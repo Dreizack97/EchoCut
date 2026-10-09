@@ -262,37 +262,11 @@ namespace EchoCut
                 return;
             }
 
-            txtPath.Text = _sourceDirectories.Count switch
-            {
-                1 => _sourceDirectories[0],
-                _ => string.Join("; ", _sourceDirectories)
-            };
-            toolTip.SetToolTip(txtPath, string.Join(Environment.NewLine, _sourceDirectories));
+            ShowSourceDirectories();
 
             ScanResult scan = TrackScanner.Scan(_sourceDirectories);
 
-            _songs.RaiseListChangedEvents = false;
-            _songs.Clear();
-            _rows.Clear();
-
-            foreach (TrackInfo track in scan.Tracks)
-            {
-                if (_rows.ContainsKey(track.FilePath))
-                {
-                    continue;
-                }
-
-                Song song = new(track);
-                _songs.Add(song);
-                _rows[track.FilePath] = song;
-            }
-
-            _songs.RaiseListChangedEvents = true;
-            _songs.ResetBindings();
-
-            // Cargar otra selección de carpetas no debe dejar la cabecera marcada con un orden obsoleto.
-            _songs.ReapplySort();
-            AutoSizeColumns();
+            AddTracks(scan.Tracks, replace: true);
 
             string folderSummary = _sourceDirectories.Count == 1
                 ? "1 carpeta"
@@ -329,38 +303,11 @@ namespace EchoCut
                 .Where(d => !string.IsNullOrWhiteSpace(d))
                 .Distinct(StringComparer.OrdinalIgnoreCase)!);
 
-            txtPath.Text = _sourceDirectories.Count switch
-            {
-                0 => string.Empty,
-                1 => _sourceDirectories[0],
-                _ => string.Join("; ", _sourceDirectories)
-            };
-            toolTip.SetToolTip(txtPath, string.Join(Environment.NewLine, _sourceDirectories));
+            ShowSourceDirectories();
 
             ScanResult scan = TrackScanner.ScanFiles(validFiles);
 
-            _songs.RaiseListChangedEvents = false;
-            _songs.Clear();
-            _rows.Clear();
-
-            foreach (TrackInfo track in scan.Tracks)
-            {
-                if (_rows.ContainsKey(track.FilePath))
-                {
-                    continue;
-                }
-
-                Song song = new(track);
-                _songs.Add(song);
-                _rows[track.FilePath] = song;
-            }
-
-            _songs.RaiseListChangedEvents = true;
-            _songs.ResetBindings();
-
-            // Cargar nueva lista de pistas no debe dejar la cabecera marcada con un orden obsoleto.
-            _songs.ReapplySort();
-            AutoSizeColumns();
+            AddTracks(scan.Tracks, replace: true);
 
             string originSummary = _sourceDirectories.Count == 1
                 ? $"de la carpeta «{Path.GetFileName(_sourceDirectories[0])}»"
@@ -371,6 +318,62 @@ namespace EchoCut
                 : $"{_songs.Count} archivo(s) cargados {originSummary}; {scan.SkippedCount} ilegible(s) o no compatible(s) omitido(s).");
 
             UpdateButtons();
+        }
+
+        /// <summary>Muestra en el campo «Origen» las carpetas de las pistas cargadas.</summary>
+        private void ShowSourceDirectories()
+        {
+            txtPath.Text = _sourceDirectories.Count switch
+            {
+                0 => string.Empty,
+                1 => _sourceDirectories[0],
+                _ => string.Join("; ", _sourceDirectories)
+            };
+            toolTip.SetToolTip(txtPath, string.Join(Environment.NewLine, _sourceDirectories));
+        }
+
+        /// <summary>
+        /// Añade a la rejilla las pistas indicadas que aún no estén en ella.
+        /// </summary>
+        /// <param name="tracks">Pistas escaneadas.</param>
+        /// <param name="replace">Si se vacía antes el listado, como al abrir carpetas o archivos.</param>
+        /// <returns>Cuántas pistas se añadieron.</returns>
+        /// <remarks>
+        /// Los avisos de la lista se suspenden mientras se añade: con cientos de pistas, repintar la
+        /// rejilla por cada una tarda más que el propio escaneo. Al terminar se reaplica el orden,
+        /// porque cargar no debe dejar la cabecera marcada con un orden obsoleto, y se ajustan las
+        /// columnas a los nombres nuevos.
+        /// </remarks>
+        private int AddTracks(IEnumerable<TrackInfo> tracks, bool replace)
+        {
+            int added = 0;
+            _songs.RaiseListChangedEvents = false;
+
+            if (replace)
+            {
+                _songs.Clear();
+                _rows.Clear();
+            }
+
+            foreach (TrackInfo track in tracks)
+            {
+                if (_rows.ContainsKey(track.FilePath))
+                {
+                    continue;
+                }
+
+                Song song = new(track);
+                _songs.Add(song);
+                _rows[track.FilePath] = song;
+                added++;
+            }
+
+            _songs.RaiseListChangedEvents = true;
+            _songs.ResetBindings();
+            _songs.ReapplySort();
+            AutoSizeColumns();
+
+            return added;
         }
 
         // ---------------------------------------------------------------------------- Análisis
