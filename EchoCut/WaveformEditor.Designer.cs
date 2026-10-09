@@ -221,7 +221,7 @@ namespace EchoCut
             btnResult.Name = "btnResult";
             btnResult.Size = new Size(104, 22);
             btnResult.Text = "⇄ Ver resultado";
-            btnResult.ToolTipText = "Ver la onda tal como quedará la copia, sin lo borrado y con los fundidos; vuelve a pulsar para editar";
+            btnResult.ToolTipText = "Ver la onda tal como quedará la copia, sin lo borrado y con los fundidos, y ajustar ahí el recorte; vuelve a pulsar para editar fundidos y borrados";
             btnResult.CheckedChanged += btnResult_CheckedChanged;
             // 
             // toolStripSeparator3

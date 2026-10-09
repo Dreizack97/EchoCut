@@ -106,6 +106,7 @@ namespace EchoCut
         /// </remarks>
         private void Restore(EditorState state)
         {
+            bool deletionsChanged = !state.Deletions.Regions.SequenceEqual(_deletions.Regions);
             _restoring = true;
             try
             {
@@ -120,6 +121,13 @@ namespace EchoCut
                 ApplyDeletions();
                 ApplySelection(null);
                 ShowInspector(InspectorTarget.None);
+
+                // En la vista del resultado, deshacer un borrado cambia su duración y sus empalmes.
+                if (_showingResult && deletionsChanged)
+                {
+                    LayoutResult();
+                    SetEditingEnabled(false);
+                }
             }
             finally
             {
@@ -140,10 +148,8 @@ namespace EchoCut
 
         private void UpdateHistoryButtons()
         {
-            // En la vista del resultado no se edita, tampoco deshaciendo: lo deshecho podría cambiar
-            // lo borrado bajo una vista que lo muestra ya juntado.
-            btnUndo.Enabled = !_showingResult && _undo.Count > 0;
-            btnRedo.Enabled = !_showingResult && _redo.Count > 0;
+            btnUndo.Enabled = _undo.Count > 0;
+            btnRedo.Enabled = _redo.Count > 0;
         }
 
         /// <summary>Foto de lo que decide el editor.</summary>

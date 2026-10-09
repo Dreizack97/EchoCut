@@ -82,6 +82,13 @@ namespace EchoCut
         /// </summary>
         private void View_WaveformClicked(object? sender, WaveformClickEventArgs e)
         {
+            // En la vista del resultado un clic solo marca desde dónde escuchar, traducido al original.
+            if (_showingResult)
+            {
+                SetCursor(ToSourceSeconds(e.Seconds));
+                SetStatus($"Se escuchará desde {Time(e.Seconds)} s del resultado; pulsa Espacio para reproducir.");
+                return;
+            }
 
             if (_deletions.RegionAt(e.Seconds) is { } deleted)
             {

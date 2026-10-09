@@ -235,7 +235,7 @@ namespace EchoCut
             {
                 BeginChange();
                 _manual = true;
-                ApplyRange(view.StartMarkerSeconds, view.EndMarkerSeconds);
+                ApplyRange(ToSourceSeconds(view.StartMarkerSeconds), ToSourceSeconds(view.EndMarkerSeconds));
                 EndChange();
             }
         }
@@ -249,7 +249,7 @@ namespace EchoCut
 
             BeginChange();
             _manual = true;
-            ApplyRange(Math.Min((double)numStart.Value, _endSeconds - WaveformView.MinimumGapSeconds), _endSeconds);
+            ApplyRange(Math.Min(ToSourceSeconds((double)numStart.Value), _endSeconds - WaveformView.MinimumGapSeconds), _endSeconds);
             EndChange();
         }
 
@@ -262,7 +262,7 @@ namespace EchoCut
 
             BeginChange();
             _manual = true;
-            ApplyRange(_startSeconds, Math.Max((double)numEnd.Value, _startSeconds + WaveformView.MinimumGapSeconds));
+            ApplyRange(_startSeconds, Math.Max(ToSourceSeconds((double)numEnd.Value), _startSeconds + WaveformView.MinimumGapSeconds));
             EndChange();
         }
 
@@ -290,8 +290,9 @@ namespace EchoCut
                     view.SetMarkers(ToViewSeconds(_startSeconds), ToViewSeconds(_endSeconds));
                 }
 
-                numStart.Value = Math.Clamp((decimal)Math.Round(_startSeconds, 3), numStart.Minimum, numStart.Maximum);
-                numEnd.Value = Math.Clamp((decimal)Math.Round(_endSeconds, 3), numEnd.Minimum, numEnd.Maximum);
+                // Los campos hablan en la línea de tiempo que se ve: en la del resultado, sus segundos.
+                numStart.Value = Math.Clamp((decimal)Math.Round(ToViewSeconds(_startSeconds), 3), numStart.Minimum, numStart.Maximum);
+                numEnd.Value = Math.Clamp((decimal)Math.Round(ToViewSeconds(_endSeconds), 3), numEnd.Minimum, numEnd.Maximum);
             }
             finally
             {

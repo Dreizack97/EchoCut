@@ -14,8 +14,9 @@ namespace EchoCut
     /// <para>
     /// Se edita siempre sobre el original, donde lo borrado sigue a la vista para poder restaurarlo;
     /// la onda ya se pinta con los fundidos aplicados. «Ver resultado» cambia las tres vistas a la
-    /// línea de tiempo de la copia: lo borrado desaparece y los empalmes quedan marcados. Es una
-    /// vista para mirar y escuchar: para editar se vuelve al original.
+    /// línea de tiempo de la copia: lo borrado desaparece y los empalmes quedan marcados. Ahí se
+    /// ajusta el recorte, que es lo que se juzga mejor viendo el resultado; fundidos y borrados se
+    /// editan en el original, donde lo borrado sigue a la vista.
     /// </para>
     /// <para>
     /// «Detectar silencios» analiza ese resultado con el mismo algoritmo que la ventana principal y
@@ -94,7 +95,29 @@ namespace EchoCut
             }
         }
 
-        /// <summary>Pasa las tres vistas a la línea de tiempo de la copia, en modo de solo lectura.</summary>
+        /// <summary>Duración de la copia sin recortar: el original menos todo lo borrado.</summary>
+        private double ResultSeconds => Math.Max(WaveformView.MinimumSpanSeconds, _durationSeconds - _deletions.TotalSeconds);
+
+        /// <summary>Instante del original que corresponde a un instante de la vista.</summary>
+        /// <remarks>
+        /// En la vista del resultado, una marca llevada a un empalme queda en el borde de lo borrado, y
+        /// llevada al final del resultado, en el final del archivo: así se puede recortar exactamente
+        /// donde se ve y no dejar nunca una cola fuera por redondeo.
+        /// </remarks>
+        private double ToSourceSeconds(double viewSeconds)
+        {
+            if (!_showingResult)
+            {
+                return viewSeconds;
+            }
+
+            return viewSeconds >= ResultSeconds - 1e-9 ? _durationSeconds : _deletions.SourceSecondsAt(0.0, viewSeconds);
+        }
+
+        /// <summary>
+        /// Pasa las tres vistas a la línea de tiempo de la copia. Ahí solo se mueven las marcas de
+        /// recorte, que es justo lo que se ajusta mejor viendo el resultado.
+        /// </summary>
         private void ShowResult()
         {
             ApplySelection(null);
@@ -102,13 +125,36 @@ namespace EchoCut
             _showingResult = true;
             _sourceHomes = new Dictionary<WaveformView, (double Start, double End)>(_homes);
 
-            double resultSeconds = Math.Max(WaveformView.MinimumSpanSeconds, _durationSeconds - _deletions.TotalSeconds);
-            double headSpan = _homes[viewStart].End - _homes[viewStart].Start;
-            double tailSpan = _homes[viewEnd].End - _homes[viewEnd].Start;
+            foreach (WaveformView view in Views)
+            {
+                view.CollapseDeletions = true;
+                view.MarkersOnly = true;
+            }
+
+            LayoutResult();
+            SetEditingEnabled(false);
+            lblOverview.Text = "Resultado completo — así quedará la copia; arrastra las marcas para ajustar el recorte";
+            lblStartView.Text = "Inicio del resultado";
+            lblEndView.Text = "Final del resultado";
+            lblCopyHeader.Text = "Copia (tiempos del resultado)";
+            SetStatus(_deletions.IsEmpty
+                ? "Vista del resultado: ajusta el recorte con las marcas, las flechas o los campos de «Copia». Fundidos y borrados se editan en el original."
+                : $"Vista del resultado: {_deletions.Regions.Count} {(_deletions.Regions.Count == 1 ? "empalme marcado" : "empalmes marcados")} en morado. Ajusta el recorte con las marcas; fundidos y borrados se editan en el original.");
+        }
+
+        /// <summary>
+        /// Coloca las vistas sobre la línea de tiempo del resultado. Se repite si lo borrado cambia
+        /// estando en ella, por ejemplo al deshacer, porque cambia su duración y sus empalmes.
+        /// </summary>
+        private void LayoutResult()
+        {
+            double resultSeconds = ResultSeconds;
+            (double headStart, double headEnd) = _sourceHomes![viewStart];
+            (double tailStart, double tailEnd) = _sourceHomes[viewEnd];
 
             viewOverview.SetView(resultSeconds, 0.0, resultSeconds);
-            viewStart.SetView(resultSeconds, 0.0, Math.Min(resultSeconds, headSpan));
-            viewEnd.SetView(resultSeconds, Math.Max(0.0, resultSeconds - tailSpan), resultSeconds);
+            viewStart.SetView(resultSeconds, 0.0, Math.Min(resultSeconds, headEnd - headStart));
+            viewEnd.SetView(resultSeconds, Math.Max(0.0, resultSeconds - (tailEnd - tailStart)), resultSeconds);
             if (_fullWaveform is not null)
             {
                 viewEnd.Waveform = _fullWaveform;
@@ -118,22 +164,14 @@ namespace EchoCut
             foreach (WaveformView view in Views)
             {
                 _homes[view] = (view.ViewStartSeconds, view.ViewEndSeconds);
-                view.ReadOnly = true;
-                view.CollapseDeletions = true;
                 view.Splices = splices;
             }
 
+            SetCopyFieldsMaximum(resultSeconds);
             RefreshViews();
-            SetEditingEnabled(false);
-            lblOverview.Text = "Resultado completo — así quedará la copia (solo lectura)";
-            lblStartView.Text = "Inicio del resultado";
-            lblEndView.Text = "Final del resultado";
-            SetStatus(_deletions.IsEmpty
-                ? "Vista del resultado: la onda ya incluye los fundidos. Desactiva «Ver resultado» para editar."
-                : $"Vista del resultado: {_deletions.Regions.Count} {(_deletions.Regions.Count == 1 ? "empalme marcado" : "empalmes marcados")} en morado. Desactiva «Ver resultado» para editar.");
         }
 
-        /// <summary>Devuelve las tres vistas al original, donde se edita.</summary>
+        /// <summary>Devuelve las tres vistas al original, donde se edita todo.</summary>
         private void ShowSource()
         {
             _showingResult = false;
@@ -158,17 +196,35 @@ namespace EchoCut
 
             foreach (WaveformView view in Views)
             {
-                view.ReadOnly = false;
+                view.MarkersOnly = false;
                 view.CollapseDeletions = false;
                 view.Splices = [];
             }
 
+            SetCopyFieldsMaximum(_durationSeconds);
             RefreshViews();
             SetEditingEnabled(true);
             lblOverview.Text = "Pista completa";
             lblStartView.Text = "Inicio de la pista";
             lblEndView.Text = "Final de la pista";
+            lblCopyHeader.Text = "Copia";
             SetStatus("Vista del original: arrastra sobre la onda para seleccionar.");
+        }
+
+        /// <summary>Los campos de la copia hablan en la línea de tiempo que se ve, así que su máximo cambia con ella.</summary>
+        private void SetCopyFieldsMaximum(double seconds)
+        {
+            // Bajar el máximo por debajo del valor lo recorta y avisa de un cambio que no es del usuario.
+            _syncing = true;
+            try
+            {
+                numStart.Maximum = (decimal)seconds;
+                numEnd.Maximum = (decimal)seconds;
+            }
+            finally
+            {
+                _syncing = false;
+            }
         }
 
         /// <summary>Vuelve a llevar a las vistas todo lo que dibujan, en la línea de tiempo que muestren ahora.</summary>
@@ -181,12 +237,12 @@ namespace EchoCut
         }
 
         /// <summary>
-        /// En la vista del resultado no se edita: se apagan las acciones y los campos que cambian algo,
-        /// pero se sigue pudiendo escuchar los bordes.
+        /// En la vista del resultado solo se ajusta el recorte: se apagan la selección, los fundidos,
+        /// los borrados y el inspector de detalles, y siguen la copia, la escucha y deshacer.
         /// </summary>
         private void SetEditingEnabled(bool enabled)
         {
-            foreach (Control control in (Control[])[numStart, numEnd, btnReset, numFrom, numTo, cmbCurve, btnContextAction])
+            foreach (Control control in (Control[])[numFrom, numTo, cmbCurve, btnContextAction])
             {
                 control.Enabled = enabled;
             }
@@ -194,11 +250,10 @@ namespace EchoCut
             if (enabled)
             {
                 ApplySelection(_selection);
-                UpdateHistoryButtons();
                 return;
             }
 
-            foreach (ToolStripItem item in (ToolStripItem[])[btnFadeIn, btnFadeOut, btnDelete, btnRestore, btnUndo, btnRedo, btnZoomSelection])
+            foreach (ToolStripItem item in (ToolStripItem[])[btnFadeIn, btnFadeOut, btnDelete, btnRestore, btnZoomSelection])
             {
                 item.Enabled = false;
             }

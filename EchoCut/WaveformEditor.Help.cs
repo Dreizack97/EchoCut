@@ -61,6 +61,7 @@ namespace EchoCut
             new(GroupView, "Acercar o alejar bajo el puntero", "Ctrl+rueda"),
             new(GroupTrim, "Elegir la marca de inicio o la de fin", "Inicio / Fin"),
             new(GroupTrim, "Mover la marca elegida 0,01 s / 0,1 s / 1 s", "← → / Shift+← → / Ctrl+← →"),
+            new(GroupTrim, "Ajustar el recorte sobre el resultado", "Ctrl+R y arrastrar las marcas"),
             new(GroupWindow, "Cerrar (sin selección)", "Esc"),
         ];
 

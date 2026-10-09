@@ -78,7 +78,9 @@ public sealed class WaveformClickEventArgs(double seconds) : EventArgs
 /// <para>
 /// Resultado: con <see cref="RenderEdits"/> la onda se pinta con los fundidos aplicados y, con
 /// <see cref="CollapseDeletions"/>, en la línea de tiempo de la copia, sin lo borrado y con los
-/// empalmes de <see cref="Splices"/> marcados. <see cref="ReadOnly"/> deja mirar sin editar.
+/// empalmes de <see cref="Splices"/> marcados. <see cref="ReadOnly"/> deja mirar sin editar, y
+/// <see cref="MarkersOnly"/> deja mover solo las marcas de recorte, que es lo único que tiene sentido
+/// ajustar sobre una línea de tiempo que ya no es la del original.
 /// </para>
 /// <para>
 /// La envolvente de <see cref="Fades"/> se dibuja en ámbar con la misma escala vertical que la
@@ -153,6 +155,7 @@ public sealed class WaveformView : Control
     private bool _collapseDeletions;
     private IReadOnlyList<double> _splices = [];
     private bool _readOnly;
+    private bool _markersOnly;
     private double _startMarkerSeconds;
     private double _endMarkerSeconds = 1.0;
     private bool _showStartMarker = true;
@@ -277,6 +280,24 @@ public sealed class WaveformView : Control
         set
         {
             _readOnly = value;
+            EndDrag();
+            Invalidate();
+        }
+    }
+
+    /// <summary>Si en la vista solo se pueden mover las marcas de recorte.</summary>
+    /// <value>
+    /// <c>true</c> para dejar mover las marcas con el ratón y el teclado, y marcar con un clic desde
+    /// dónde escuchar, sin seleccionar ni ajustar fundidos.
+    /// </value>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public bool MarkersOnly
+    {
+        get => _markersOnly;
+        set
+        {
+            _markersOnly = value;
             EndDrag();
             Invalidate();
         }
@@ -707,6 +728,14 @@ public sealed class WaveformView : Control
             ActiveMarker = marker;
             Capture = true;
         }
+        else if (e.Button == MouseButtons.Left && _waveform is not null && _markersOnly)
+        {
+            // Fuera de las marcas solo cabe un clic, que marca desde dónde escuchar.
+            _dragTarget = DragTarget.Click;
+            _dragStarted = false;
+            _dragOriginX = e.X;
+            Capture = true;
+        }
         else if (e.Button == MouseButtons.Left && _waveform is not null)
         {
             // Sobre un borde de la selección o de un fundido se arrastra ese borde: el ancla es el
@@ -749,7 +778,9 @@ public sealed class WaveformView : Control
         {
             Cursor = _readOnly || _waveform is null
                 ? Cursors.Default
-                : HitTest(e.X) != TrimMarker.None || EdgeAt(e.X, out _) != DragTarget.None ? Cursors.SizeWE : Cursors.IBeam;
+                : HitTest(e.X) != TrimMarker.None ? Cursors.SizeWE
+                : _markersOnly ? Cursors.Default
+                : EdgeAt(e.X, out _) != DragTarget.None ? Cursors.SizeWE : Cursors.IBeam;
         }
 
         base.OnMouseMove(e);
@@ -760,7 +791,7 @@ public sealed class WaveformView : Control
     {
         // Un clic que no llegó a arrastrar no es una selección: lo interpreta quien contiene la
         // vista, que sabe si toca situar el cursor, seleccionar lo borrado o mostrar un fundido.
-        if (_dragTarget == DragTarget.Selection && !_dragStarted)
+        if ((_dragTarget is DragTarget.Selection or DragTarget.Click) && !_dragStarted)
         {
             WaveformClicked?.Invoke(this, new WaveformClickEventArgs(Math.Clamp(SecondsAt(e.X), 0.0, _durationSeconds)));
         }
@@ -1450,6 +1481,7 @@ public sealed class WaveformView : Control
     private enum DragTarget
     {
         None,
+        Click,
         Selection,
         FadeIn,
         FadeOut,
