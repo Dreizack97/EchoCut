@@ -268,7 +268,7 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
      - *Editar propiedades*: Abre la ventana modal nativa de propiedades para consultar o editar metadatos ID3/Vorbis (título, artistas, año, álbum, etc.) o renombrar el archivo físico en disco.
      - *Eliminar archivo(s)*: Elimina permanentemente los archivos seleccionados del disco tras confirmar la operación (también disponible pulsando la tecla **Suprimir** en la cuadrícula).
    - **Limpiar metadatos (`Limpiar metadatos`)**: Elimina todas las etiquetas (título, artistas, portada, etc.) de las pistas cargadas, tras confirmar la operación. Modifica los archivos originales.
-   - **Normalizar (`Normalizar`)**: Quita los acentos (conservando la «ñ») y pone en mayúscula la inicial de cada palabra tanto en el nombre del archivo como en los metadatos de texto de las pistas cargadas, tras confirmar la operación. Modifica y renombra los archivos originales.
+   - **Normalizar (`Utilidades › Normalizar…`)**: Quita los acentos (conservando la «ñ») y pone en mayúscula la inicial de cada palabra en las propiedades que elijas de las pistas cargadas: nombre del archivo, título, subtítulo, intérpretes, artistas del álbum, álbum, géneros, compositores, comentario y derechos de autor. La selección se recuerda entre sesiones y la operación se confirma antes de empezar. Solo se reescriben las etiquetas elegidas y los archivos que realmente cambian; si se incluye el nombre del archivo, este se renombra en disco.
    - **Exportar (`Exportar`)**: Genera un archivo CSV codificado en UTF-8 con BOM y separador regional, listo para abrirse en Microsoft Excel con todas las métricas acústicas de cada pista.
 
 ---
