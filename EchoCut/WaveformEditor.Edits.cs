@@ -120,6 +120,7 @@ namespace EchoCut
             btnFadeIn.Enabled = usable;
             btnFadeOut.Enabled = usable;
             btnDelete.Enabled = usable;
+            btnZoomSelection.Enabled = usable;
             btnRestore.Enabled = selection is { } region && _deletions.Regions.Any(region.Overlaps);
 
             if (_inspected == InspectorTarget.Selection)

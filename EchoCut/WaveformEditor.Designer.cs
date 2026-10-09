@@ -40,6 +40,11 @@ namespace EchoCut
             toolStripSeparator2 = new ToolStripSeparator();
             btnUndo = new ToolStripButton();
             btnRedo = new ToolStripButton();
+            toolStripSeparator3 = new ToolStripSeparator();
+            btnZoomIn = new ToolStripButton();
+            btnZoomOut = new ToolStripButton();
+            btnZoomSelection = new ToolStripButton();
+            btnZoomFit = new ToolStripButton();
             btnShortcuts = new ToolStripButton();
             btnDecibels = new ToolStripButton();
             statusStrip = new StatusStrip();
@@ -105,7 +110,7 @@ namespace EchoCut
             // 
             toolStrip.Font = new Font("Segoe UI", 10F);
             toolStrip.GripStyle = ToolStripGripStyle.Hidden;
-            toolStrip.Items.AddRange(new ToolStripItem[] { btnPlay, toolStripSeparator1, btnFadeIn, btnFadeOut, btnDelete, btnRestore, toolStripSeparator2, btnUndo, btnRedo, btnShortcuts, btnDecibels });
+            toolStrip.Items.AddRange(new ToolStripItem[] { btnPlay, toolStripSeparator1, btnFadeIn, btnFadeOut, btnDelete, btnRestore, toolStripSeparator2, btnUndo, btnRedo, toolStripSeparator3, btnZoomIn, btnZoomOut, btnZoomSelection, btnZoomFit, btnShortcuts, btnDecibels });
             toolStrip.Location = new Point(0, 0);
             toolStrip.Name = "toolStrip";
             toolStrip.Padding = new Padding(6, 2, 6, 2);
@@ -191,6 +196,48 @@ namespace EchoCut
             btnRedo.Text = "↷ Rehacer";
             btnRedo.ToolTipText = "Rehacer el último cambio deshecho";
             btnRedo.Click += btnRedo_Click;
+            // 
+            // toolStripSeparator3
+            // 
+            toolStripSeparator3.Name = "toolStripSeparator3";
+            toolStripSeparator3.Size = new Size(6, 25);
+            // 
+            // btnZoomIn
+            // 
+            btnZoomIn.DisplayStyle = ToolStripItemDisplayStyle.Text;
+            btnZoomIn.Name = "btnZoomIn";
+            btnZoomIn.Size = new Size(68, 22);
+            btnZoomIn.Text = "＋ Acercar";
+            btnZoomIn.ToolTipText = "Acercar la vista activa; también Ctrl+rueda sobre la onda";
+            btnZoomIn.Click += btnZoomIn_Click;
+            // 
+            // btnZoomOut
+            // 
+            btnZoomOut.DisplayStyle = ToolStripItemDisplayStyle.Text;
+            btnZoomOut.Name = "btnZoomOut";
+            btnZoomOut.Size = new Size(64, 22);
+            btnZoomOut.Text = "－ Alejar";
+            btnZoomOut.ToolTipText = "Alejar la vista activa; también Ctrl+rueda sobre la onda";
+            btnZoomOut.Click += btnZoomOut_Click;
+            // 
+            // btnZoomSelection
+            // 
+            btnZoomSelection.DisplayStyle = ToolStripItemDisplayStyle.Text;
+            btnZoomSelection.Enabled = false;
+            btnZoomSelection.Name = "btnZoomSelection";
+            btnZoomSelection.Size = new Size(77, 22);
+            btnZoomSelection.Text = "Ver selección";
+            btnZoomSelection.ToolTipText = "Ajustar la vista activa a la selección";
+            btnZoomSelection.Click += btnZoomSelection_Click;
+            // 
+            // btnZoomFit
+            // 
+            btnZoomFit.DisplayStyle = ToolStripItemDisplayStyle.Text;
+            btnZoomFit.Name = "btnZoomFit";
+            btnZoomFit.Size = new Size(62, 22);
+            btnZoomFit.Text = "Ver todo";
+            btnZoomFit.ToolTipText = "Devolver la vista activa a su tramo inicial";
+            btnZoomFit.Click += btnZoomFit_Click;
             // 
             // btnShortcuts
             // 
@@ -345,6 +392,7 @@ namespace EchoCut
             viewOverview.MarkersChanged += View_MarkersChanged;
             viewOverview.SelectionChanged += View_SelectionChanged;
             viewOverview.WaveformClicked += View_WaveformClicked;
+            viewOverview.Enter += View_Enter;
             viewOverview.MouseUp += View_MouseUp;
             // 
             // lblStartView
@@ -381,6 +429,7 @@ namespace EchoCut
             viewStart.MarkersChanged += View_MarkersChanged;
             viewStart.SelectionChanged += View_SelectionChanged;
             viewStart.WaveformClicked += View_WaveformClicked;
+            viewStart.Enter += View_Enter;
             viewStart.MouseUp += View_MouseUp;
             // 
             // viewEnd
@@ -397,6 +446,7 @@ namespace EchoCut
             viewEnd.MarkersChanged += View_MarkersChanged;
             viewEnd.SelectionChanged += View_SelectionChanged;
             viewEnd.WaveformClicked += View_WaveformClicked;
+            viewEnd.Enter += View_Enter;
             viewEnd.MouseUp += View_MouseUp;
             // 
             // tableInspector
@@ -838,6 +888,11 @@ namespace EchoCut
         private ToolStripSeparator toolStripSeparator2;
         private ToolStripButton btnUndo;
         private ToolStripButton btnRedo;
+        private ToolStripSeparator toolStripSeparator3;
+        private ToolStripButton btnZoomIn;
+        private ToolStripButton btnZoomOut;
+        private ToolStripButton btnZoomSelection;
+        private ToolStripButton btnZoomFit;
         private ToolStripButton btnShortcuts;
         private ToolStripButton btnDecibels;
         private StatusStrip statusStrip;
