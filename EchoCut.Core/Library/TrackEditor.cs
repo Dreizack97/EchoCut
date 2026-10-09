@@ -159,6 +159,93 @@ public static class TrackEditor
     }
 
     /// <summary>
+    /// Aplica a una pista las etiquetas indicadas, reemplazando las que tuviera.
+    /// </summary>
+    /// <param name="filePath">Ruta absoluta del archivo de audio.</param>
+    /// <param name="patch">Etiquetas a aplicar; las propiedades en blanco no se tocan.</param>
+    /// <returns>La información de pista releída del disco.</returns>
+    /// <exception cref="ArgumentException">Si <paramref name="filePath"/> es nulo o está en blanco.</exception>
+    /// <exception cref="ArgumentNullException">Si <paramref name="patch"/> es <c>null</c>.</exception>
+    /// <exception cref="FileNotFoundException">Si el archivo no existe en disco.</exception>
+    /// <remarks>
+    /// <para>
+    /// Los intérpretes y géneros se separan solo por «;», y no también por «/» como en
+    /// <see cref="SaveProperties"/>: un intérprete como «AC/DC» debe llegar entero.
+    /// </para>
+    /// <para>
+    /// El resto de etiquetas no se reescribe, y si las elegidas ya tenían esos valores el archivo
+    /// no se guarda, para no alterar su fecha de modificación.
+    /// </para>
+    /// </remarks>
+    public static TrackInfo ApplyTags(string filePath, TagPatch patch)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        ArgumentNullException.ThrowIfNull(patch);
+        if (!File.Exists(filePath))
+        {
+            throw new FileNotFoundException("El archivo de audio no existe en disco.", filePath);
+        }
+
+        string? title = patch.TitleFromFileName ? Path.GetFileNameWithoutExtension(filePath) : patch.Title;
+
+        using (TagLib.File tagFile = TagLib.File.Create(filePath))
+        {
+            TagLib.Tag tag = tagFile.Tag;
+            bool changed = false;
+
+            changed |= TryAssign(tag.Performers, SplitBySemicolon(patch.Artist), values => tag.Performers = values);
+            changed |= TryAssign(tag.Title, title, value => tag.Title = value);
+            changed |= TryAssign(tag.Album, patch.Album, value => tag.Album = value);
+            changed |= TryAssign(tag.Genres, SplitBySemicolon(patch.Genre), values => tag.Genres = values);
+            changed |= TryAssign(tag.Comment, patch.Comment, value => tag.Comment = value);
+
+            if (changed)
+            {
+                tagFile.Save();
+            }
+        }
+
+        return TrackScanner.Read(filePath);
+    }
+
+    /// <summary>Asigna un valor de texto si no está en blanco y difiere del actual.</summary>
+    /// <returns><c>true</c> si se asignó.</returns>
+    private static bool TryAssign(string? current, string? value, Action<string> assign)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        string trimmed = value.Trim();
+        if (string.Equals(current, trimmed, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        assign(trimmed);
+        return true;
+    }
+
+    /// <summary>Asigna una lista si no está vacía y difiere de la actual.</summary>
+    /// <returns><c>true</c> si se asignó.</returns>
+    private static bool TryAssign(string[]? current, string[] values, Action<string[]> assign)
+    {
+        if (values.Length == 0 || (current ?? []).SequenceEqual(values, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        assign(values);
+        return true;
+    }
+
+    private static string[] SplitBySemicolon(string? text) =>
+        string.IsNullOrWhiteSpace(text)
+            ? []
+            : text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    /// <summary>
     /// Elimina todos los metadatos y etiquetas del archivo de audio indicado en disco.
     /// </summary>
     /// <param name="filePath">Ruta absoluta del archivo de audio.</param>
