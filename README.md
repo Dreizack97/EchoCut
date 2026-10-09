@@ -155,6 +155,19 @@ flowchart TD
 
 ---
 
+## 🧬 Huella Acústica para Encontrar Duplicados
+
+La búsqueda de duplicados no compara nombres ni etiquetas, sino el sonido. EchoCut calcula para cada canción una **huella acústica** con su propio motor DSP, siguiendo el algoritmo de Haitsma y Kalker (Philips, 2002):
+
+1. **Decodificación ligera**: FFmpeg entrega el audio en mono a 5512 Hz, suficiente para la banda que interesa.
+2. **Espectro por tramas**: tramas de 1024 muestras (186 ms) con salto de 128 (23 ms), ventana de Hann y FFT.
+3. **33 bandas logarítmicas entre 300 y 2000 Hz**, la zona más estable de una grabación frente a la compresión y la ecualización.
+4. **Una palabra de 32 bits por trama**: cada bit es el signo de cómo cambia la diferencia de energía entre dos bandas vecinas de una trama a la siguiente. No depende del volumen y apenas del códec; las tramas en silencio se marcan para no contarlas.
+
+Para comparar una biblioteca entera sin enfrentar cada canción con todas las demás, las palabras se guardan en un **índice invertido**: entre copias de la misma grabación decenas de palabras coinciden exactamente y en el mismo desfase, lo que propone las parejas candidatas. Cada candidata se verifica alineando ambas huellas y midiendo la **tasa de bits distintos** sobre lo que suena en las dos: entre copias en distinto formato ronda 0.05–0.10, y entre canciones distintas, 0.5. Se acepta por debajo de 0.25 si coincide al menos el 80 % de lo que suena en cada una —así una mezcla que contiene una canción no pasa por copia suya— y las parejas se agrupan: si A se parece a B y B a C, las tres son copias de lo mismo.
+
+---
+
 ## 🎛️ Parámetros del Algoritmo
 
 EchoCut incluye 24 parámetros calibrados exhaustivamente para música comercial masterizada. Puedes ajustarlos desde el diálogo **Avanzado**:
@@ -290,6 +303,8 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
      - *Agregar consecutivo…*: Antepone un número con ceros a la izquierda, por ejemplo `0001 - Artista - Nombre.mp3`; se eligen el número inicial, los dígitos y el separador.
      - *Quitar caracteres iniciales…*: Elimina una cantidad de caracteres del principio del nombre y, opcionalmente, los espacios y separadores que queden delante.
    - **Exportar (`Exportar`)**: Genera un archivo CSV codificado en UTF-8 con BOM y separador regional, listo para abrirse en Microsoft Excel con todas las métricas acústicas de cada pista.
+   - **Convertir a MP3 (`Utilidades › Convertir a MP3…`)**: Escribe una copia en MP3 de las canciones cargadas en la subcarpeta `MP3/` junto a cada original, que no se modifica, con sus etiquetas y su carátula. Se elige la calidad —*VBR V0* (~245 kbps, recomendada), *VBR V2* (~190 kbps), *CBR 320* o *CBR 192*— y se recuerda entre sesiones. Las que ya son MP3 se omiten, porque volver a codificarlas solo les quitaría calidad. Se convierte el original tal cual: el recorte y las ediciones se siguen aplicando con *Recortar*.
+   - **Buscar duplicados por audio (`Utilidades › Buscar duplicados por audio…`)**: Encuentra las canciones que contienen la misma grabación aunque tengan otro nombre, formato, tasa de bits o volumen, o silencios de distinta duración. Muestra los grupos con su parecido, duración, formato, bitrate, tamaño y carpeta; en cada uno propone conservar la de mejor calidad (sin pérdida, más bitrate, más duración) y deja marcadas las demás. Se puede escuchar cada copia, abrir su ubicación y cambiar las marcas antes de enviar las marcadas a la **Papelera de reciclaje**, de donde se pueden recuperar. Una mezcla o un popurrí que contiene una canción no se toma por copia suya.
    - **Integrar con el Explorador de Windows (`Utilidades`)**: Agrega o quita «Abrir con EchoCut» en el menú contextual de los archivos de audio y las carpetas, sin permisos de administrador. En Windows 11 aparece en «Mostrar más opciones». Lo abierto desde el Explorador se suma al listado de la ventana ya abierta; si se mueve la carpeta de EchoCut, basta con volver a activar la opción.
 
 ### ⌨️ Atajos de teclado
@@ -305,6 +320,7 @@ El botón **⌨ Atajos** de la barra de herramientas, o `F1`, muestra la lista c
 | Procesar | Exportar CSV | `Ctrl+E` |
 | Utilidades | Agregar metadatos / Normalizar | `Ctrl+M` / `Ctrl+N` |
 | Utilidades | Agregar consecutivo / Quitar caracteres iniciales | `Ctrl+Shift+C` / `Ctrl+Shift+Q` |
+| Utilidades | Convertir a MP3 / Buscar duplicados por audio | `Ctrl+Shift+M` / `Ctrl+Shift+D` |
 | Rejilla | Ver forma de onda y ajustar recorte | `Entrar` |
 | Rejilla | Renombrar / Editar propiedades | `F2` / `Alt+Entrar` |
 | Rejilla | Abrir carpeta contenedora | `Ctrl+Shift+E` |
