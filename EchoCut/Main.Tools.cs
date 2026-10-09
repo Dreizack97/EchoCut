@@ -1,12 +1,14 @@
 using EchoCut.Audio;
+using EchoCut.Fingerprints;
 using EchoCut.Library;
+using EchoCut.Objects;
 using EchoCut.Processing;
 
 namespace EchoCut
 {
     /// <summary>
-    /// La parte de <see cref="Main"/> con las utilidades que no tocan los originales, como convertir
-    /// a MP3.
+    /// La parte de <see cref="Main"/> con las utilidades que no tocan los originales: convertir a MP3
+    /// y buscar canciones duplicadas por su audio.
     /// </summary>
     /// <remarks>
     /// Siguen el patrón de los demás lotes: un <see cref="CancellationTokenSource"/> propio que entra en
@@ -86,6 +88,97 @@ namespace EchoCut
             }
 
             ReportFailures(errors, "Convertir a MP3", "No se pudieron convertir algunas canciones:");
+        }
+
+        // ------------------------------------------------------------------ Buscar duplicados
+
+        private async void mnuFindDuplicates_Click(object? sender, EventArgs e)
+        {
+            if (IsBusy || _songs.Count < 2 || !EnsureFFmpeg())
+            {
+                return;
+            }
+
+            List<TrackInfo> tracks = [.. _songs.Select(song => song.Track)];
+            StopPreview();
+            using CancellationTokenSource cts = new();
+            _duplicatesCts = cts;
+            UpdateButtons();
+            StartProgress(tracks.Count, "Calculando las huellas acústicas…");
+
+            List<string> errors = [];
+            IReadOnlyList<DuplicateGroup>? groups = null;
+            try
+            {
+                Task<IReadOnlyList<DuplicateGroup>> search = new DuplicateFinder(_locator).FindAsync(
+                    tracks,
+                    (int)numericThreads.Value,
+                    CreateProgress<AudioFingerprint>(progress => TrackProgressOf(progress, errors)),
+                    cts.Token);
+
+                _running = search;
+                groups = await search.ConfigureAwait(true);
+                SetStatus(groups.Count == 0
+                    ? $"No hay canciones duplicadas por su audio entre las {tracks.Count} cargadas."
+                    : $"{groups.Count} {(groups.Count == 1 ? "grupo" : "grupos")} de canciones duplicadas por su audio.");
+            }
+            catch (OperationCanceledException)
+            {
+                SetStatus("Búsqueda de duplicados detenida.");
+            }
+            catch (Exception exception)
+            {
+                ShowError("No se pudo completar la búsqueda de duplicados.", exception);
+            }
+            finally
+            {
+                _duplicatesCts = null;
+                _running = null;
+                if (IsAlive)
+                {
+                    EndProgress();
+                    UpdateButtons();
+                }
+            }
+
+            ReportFailures(errors, "Buscar duplicados", "No se pudo calcular la huella de algunas canciones, que quedaron fuera de la búsqueda:");
+
+            if (groups is null || !IsAlive)
+            {
+                return;
+            }
+
+            if (groups.Count == 0)
+            {
+                MessageBox.Show(this, $"No se encontraron canciones duplicadas por su audio entre las {tracks.Count} cargadas.", "Buscar duplicados", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using DuplicatesDialog dialog = new(groups, _locator.Require().FFmpeg);
+            dialog.ShowDialog(this);
+            RemoveDeletedRows(dialog.DeletedPaths);
+        }
+
+        /// <summary>Retira las filas de los archivos enviados a la Papelera desde la ventana de duplicados.</summary>
+        private void RemoveDeletedRows(IReadOnlyList<string> paths)
+        {
+            if (paths.Count == 0)
+            {
+                return;
+            }
+
+            HashSet<string> deleted = new(paths, StringComparer.OrdinalIgnoreCase);
+            List<Song> removed = [.. _songs.Where(song => deleted.Contains(song.FilePath))];
+
+            DiscardEditors(removed);
+            foreach (Song song in removed)
+            {
+                _rows.Remove(song.FilePath);
+                _songs.Remove(song);
+            }
+
+            UpdateButtons();
+            SetStatus($"Se {(removed.Count == 1 ? "envió 1 canción" : $"enviaron {removed.Count} canciones")} a la Papelera de reciclaje.");
         }
 
         /// <summary>Avanza la barra con cada pista terminada y anota las que fallaron.</summary>

@@ -38,6 +38,7 @@ namespace EchoCut
         private CancellationTokenSource? _tagCts;
         private CancellationTokenSource? _renameCts;
         private CancellationTokenSource? _convertCts;
+        private CancellationTokenSource? _duplicatesCts;
 
         /// <summary>
         /// Editores de forma de onda abiertos, uno por fila: volver a abrir una pista trae al frente
@@ -136,7 +137,7 @@ namespace EchoCut
             }
         }
 
-        private bool IsBusy => _analysisCts is not null || _trimCts is not null || _cleanCts is not null || _normalizeCts is not null || _tagCts is not null || _renameCts is not null || _convertCts is not null;
+        private bool IsBusy => _analysisCts is not null || _trimCts is not null || _cleanCts is not null || _normalizeCts is not null || _tagCts is not null || _renameCts is not null || _convertCts is not null || _duplicatesCts is not null;
 
         /// <summary>
         /// Si la ventana sigue viva. Un lote que ya había terminado hace que la espera del cierre
@@ -480,6 +481,7 @@ namespace EchoCut
             _tagCts?.Cancel();
             _renameCts?.Cancel();
             _convertCts?.Cancel();
+            _duplicatesCts?.Cancel();
         }
 
         // ------------------------------------------------------------------ Acciones de fila
@@ -1019,19 +1021,21 @@ namespace EchoCut
             bool tagging = _tagCts is not null;
             bool renaming = _renameCts is not null;
             bool converting = _convertCts is not null;
+            bool searching = _duplicatesCts is not null;
             bool hasSongs = _songs.Count > 0;
 
             btnPath.Enabled = !IsBusy;
             btnFile.Enabled = !IsBusy;
             btnAnalyze.Enabled = !IsBusy && hasSongs;
             btnCropAll.Enabled = !IsBusy && hasSongs;
-            btnStop.Enabled = analyzing || cleaning || normalizing || tagging || renaming || trimming || converting;
+            btnStop.Enabled = analyzing || cleaning || normalizing || tagging || renaming || trimming || converting || searching;
             btnExport.Enabled = !IsBusy && hasSongs;
             ddbUtilities.Enabled = !IsBusy;
             mnuMetadata.Enabled = hasSongs;
             mnuNormalize.Enabled = hasSongs;
             mnuRename.Enabled = hasSongs;
             mnuConvertMp3.Enabled = hasSongs;
+            mnuFindDuplicates.Enabled = _songs.Count > 1;
             btnAdvanced.Enabled = !IsBusy;
             numericThreads.Enabled = !IsBusy;
             numericTolerance.Enabled = !IsBusy;
@@ -1095,6 +1099,7 @@ namespace EchoCut
             _tagCts?.Cancel();
             _renameCts?.Cancel();
             _convertCts?.Cancel();
+            _duplicatesCts?.Cancel();
             SetStatus("Cerrando: esperando a que terminen las tareas en curso…");
 
             try

@@ -70,6 +70,7 @@ namespace EchoCut
             mnuRemoveLeading = new ToolStripMenuItem();
             sepTools = new ToolStripSeparator();
             mnuConvertMp3 = new ToolStripMenuItem();
+            mnuFindDuplicates = new ToolStripMenuItem();
             sepExplorer = new ToolStripSeparator();
             mnuExplorer = new ToolStripMenuItem();
             btnExport = new ToolStripButton();
@@ -362,12 +363,12 @@ namespace EchoCut
             // ddbUtilities
             // 
             ddbUtilities.DisplayStyle = ToolStripItemDisplayStyle.Text;
-            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize, mnuRename, sepTools, mnuConvertMp3, sepExplorer, mnuExplorer });
+            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize, mnuRename, sepTools, mnuConvertMp3, mnuFindDuplicates, sepExplorer, mnuExplorer });
             ddbUtilities.Name = "ddbUtilities";
             ddbUtilities.Size = new Size(82, 23);
             ddbUtilities.Text = "Utilidades";
             ddbUtilities.DropDownOpening += ddbUtilities_DropDownOpening;
-            ddbUtilities.ToolTipText = "Metadatos, nombres y conversión a MP3";
+            ddbUtilities.ToolTipText = "Metadatos, nombres, conversión a MP3 y búsqueda de duplicados";
             // 
             // mnuMetadata
             // 
@@ -437,6 +438,14 @@ namespace EchoCut
             mnuConvertMp3.Text = "Convertir a MP3…";
             mnuConvertMp3.ToolTipText = "Escribir una copia en MP3 de las canciones cargadas en la subcarpeta «MP3», sin tocar los originales";
             mnuConvertMp3.Click += mnuConvertMp3_Click;
+            // 
+            // mnuFindDuplicates
+            // 
+            mnuFindDuplicates.Name = "mnuFindDuplicates";
+            mnuFindDuplicates.Size = new Size(260, 24);
+            mnuFindDuplicates.Text = "Buscar duplicados por audio…";
+            mnuFindDuplicates.ToolTipText = "Encontrar canciones con la misma grabación aunque tengan otro nombre, formato o calidad";
+            mnuFindDuplicates.Click += mnuFindDuplicates_Click;
             // 
             // sepExplorer
             // 
@@ -643,6 +652,7 @@ namespace EchoCut
         private ToolStripMenuItem mnuRemoveLeading;
         private ToolStripSeparator sepTools;
         private ToolStripMenuItem mnuConvertMp3;
+        private ToolStripMenuItem mnuFindDuplicates;
         private ToolStripSeparator sepExplorer;
         private ToolStripMenuItem mnuExplorer;
         private StatusStrip statusStrip;
