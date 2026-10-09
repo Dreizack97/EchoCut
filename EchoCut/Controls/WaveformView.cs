@@ -1,3 +1,5 @@
+using EchoCut.Audio;
+using EchoCut.Objects;
 using EchoCut.Waveforms;
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -20,6 +22,22 @@ public enum TrimMarker
     End,
 }
 
+/// <summary>Tramo que el usuario seleccionó para un fundido.</summary>
+/// <param name="direction">Fundido al que corresponde la selección.</param>
+/// <param name="startSeconds">Comienzo del tramo, en segundos del archivo.</param>
+/// <param name="endSeconds">Final del tramo, en segundos del archivo.</param>
+public sealed class FadeSelectionEventArgs(FadeDirection direction, double startSeconds, double endSeconds) : EventArgs
+{
+    /// <value>Fundido al que corresponde la selección.</value>
+    public FadeDirection Direction { get; } = direction;
+
+    /// <value>Comienzo del tramo, en segundos del archivo.</value>
+    public double StartSeconds { get; } = startSeconds;
+
+    /// <value>Final del tramo, en segundos del archivo.</value>
+    public double EndSeconds { get; } = endSeconds;
+}
+
 /// <summary>
 /// Muestra un tramo de una <see cref="Waveforms.Waveform"/> con las marcas de recorte superpuestas
 /// y permite moverlas con el ratón o con el teclado.
@@ -37,6 +55,12 @@ public enum TrimMarker
 /// Teclado: ← y → mueven la marca activa 10 ms (100 ms con Mayús, 1 s con Ctrl); Inicio y Fin eligen
 /// la marca activa. El valor de las marcas se expone a los lectores de pantalla.
 /// </para>
+/// <para>
+/// Fundidos: con <see cref="SelectionTarget"/> asignado, arrastrar fuera de las marcas selecciona el
+/// tramo de ese fundido, como una selección de Audacity, y arrastrar uno de sus bordes lo ajusta.
+/// Los extremos se adhieren a las marcas de recorte cercanas. La envolvente de <see cref="Fades"/>
+/// se dibuja sobre la onda en ámbar, con la misma escala vertical que ella.
+/// </para>
 /// </remarks>
 [DefaultEvent(nameof(MarkersChanged))]
 public sealed class WaveformView : Control
@@ -46,6 +70,15 @@ public sealed class WaveformView : Control
 
     /// <summary>Rojo del cursor de reproducción: contrasta 5.7:1 con el fondo blanco.</summary>
     private static readonly Color PlayheadColor = Color.FromArgb(0xC4, 0x2B, 0x1C);
+
+    /// <summary>Marrón ámbar de la envolvente de fundido: contrasta 8.6:1 con el fondo blanco.</summary>
+    private static readonly Color FadeLineColor = Color.FromArgb(0x8A, 0x3B, 0x00);
+
+    /// <summary>Velo ámbar translúcido sobre el tramo con fundido; la onda se sigue viendo debajo.</summary>
+    private static readonly Color FadeTintColor = Color.FromArgb(56, 0xE6, 0x9F, 0x00);
+
+    /// <summary>Recorrido mínimo, en píxeles lógicos, para que un clic se tome por selección y no por un clic suelto.</summary>
+    private const int SelectionThreshold = 3;
 
     private const double FineStepSeconds = 0.01;
     private const double CoarseStepSeconds = 0.1;
@@ -72,6 +105,11 @@ public sealed class WaveformView : Control
     private double? _playheadSeconds;
     private TrimMarker _activeMarker;
     private TrimMarker _dragging;
+    private TrackFades? _fades;
+    private FadeDirection? _selectionTarget;
+    private double? _selectionAnchor;
+    private int _selectionOriginX;
+    private bool _selectionStarted;
 
     private PinnedBitmap? _normalImage;
     private PinnedBitmap? _removedImage;
@@ -94,6 +132,41 @@ public sealed class WaveformView : Control
     [Category("Forma de onda")]
     [Description("Se produce cuando el usuario mueve una marca de recorte.")]
     public event EventHandler? MarkersChanged;
+
+    /// <summary>Se produce mientras el usuario selecciona, o ajusta, el tramo de un fundido con el ratón.</summary>
+    /// <remarks>
+    /// Se produce en cada movimiento, no solo al soltar, para que quien escucha actualice en vivo las
+    /// demás vistas y los campos numéricos. La vista no cambia <see cref="Fades"/> por su cuenta: es
+    /// quien escucha quien decide si el tramo vale.
+    /// </remarks>
+    [Category("Forma de onda")]
+    [Description("Se produce mientras el usuario selecciona el tramo de un fundido.")]
+    public event EventHandler<FadeSelectionEventArgs>? FadeSelected;
+
+    /// <summary>Fundidos que se dibujan sobre la onda.</summary>
+    /// <value>Los fundidos de la pista, o <c>null</c> si no hay ninguno.</value>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public TrackFades? Fades
+    {
+        get => _fades;
+        set
+        {
+            _fades = value;
+            Invalidate();
+            AccessibilityNotifyClients(AccessibleEvents.ValueChange, -1);
+        }
+    }
+
+    /// <summary>Fundido que se selecciona al arrastrar sobre la onda.</summary>
+    /// <value>El sentido del fundido, o <c>null</c> si en esta vista no se seleccionan fundidos.</value>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public FadeDirection? SelectionTarget
+    {
+        get => _selectionTarget;
+        set => _selectionTarget = value;
+    }
 
     /// <summary>Escala vertical de la forma de onda.</summary>
     /// <value>Lineal o en dB. Por defecto, <see cref="AmplitudeScale.Linear"/>.</value>
@@ -298,6 +371,8 @@ public sealed class WaveformView : Control
             DrawRemoved(g, image, _endMarkerSeconds, _viewEndSeconds);
         }
 
+        DrawFades(g, image);
+
         if (_showStartMarker)
         {
             DrawMarker(g, image, TrimMarker.Start, _startMarkerSeconds);
@@ -391,6 +466,21 @@ public sealed class WaveformView : Control
             ActiveMarker = marker;
             Capture = true;
         }
+        else if (e.Button == MouseButtons.Left && _selectionTarget is not null && _waveform is not null)
+        {
+            // Sobre un borde del fundido se arrastra ese borde: el ancla es el borde contrario. En
+            // cualquier otro punto empieza una selección nueva anclada donde se pulsó.
+            FadeEdge edge = FadeEdgeAt(e.X);
+            _selectionAnchor = edge switch
+            {
+                FadeEdge.Start => TargetFade!.Value.EndSeconds,
+                FadeEdge.End => TargetFade!.Value.StartSeconds,
+                _ => Snap(SecondsAt(e.X)),
+            };
+            _selectionStarted = edge != FadeEdge.None;
+            _selectionOriginX = e.X;
+            Capture = true;
+        }
 
         base.OnMouseDown(e);
     }
@@ -402,9 +492,22 @@ public sealed class WaveformView : Control
         {
             MoveMarker(_dragging, SecondsAt(e.X));
         }
+        else if (_selectionAnchor is { } anchor)
+        {
+            _selectionStarted |= Math.Abs(e.X - _selectionOriginX) >= LogicalToDeviceUnits(SelectionThreshold);
+            if (_selectionStarted)
+            {
+                double current = Snap(SecondsAt(e.X));
+                double start = Math.Clamp(Math.Min(anchor, current), 0.0, _durationSeconds);
+                double end = Math.Clamp(Math.Max(anchor, current), 0.0, _durationSeconds);
+                FadeSelected?.Invoke(this, new FadeSelectionEventArgs(_selectionTarget!.Value, start, end));
+            }
+        }
         else
         {
-            Cursor = HitTest(e.X) == TrimMarker.None ? Cursors.Default : Cursors.SizeWE;
+            Cursor = HitTest(e.X) != TrimMarker.None || FadeEdgeAt(e.X) != FadeEdge.None
+                ? Cursors.SizeWE
+                : _selectionTarget is not null && _waveform is not null ? Cursors.IBeam : Cursors.Default;
         }
 
         base.OnMouseMove(e);
@@ -414,6 +517,7 @@ public sealed class WaveformView : Control
     protected override void OnMouseUp(MouseEventArgs e)
     {
         _dragging = TrimMarker.None;
+        _selectionAnchor = null;
         Capture = false;
         base.OnMouseUp(e);
     }
@@ -422,6 +526,7 @@ public sealed class WaveformView : Control
     protected override void OnMouseCaptureChanged(EventArgs e)
     {
         _dragging = TrimMarker.None;
+        _selectionAnchor = null;
         base.OnMouseCaptureChanged(e);
     }
 
@@ -475,6 +580,52 @@ public sealed class WaveformView : Control
         }
 
         return best;
+    }
+
+    /// <summary>Fundido que se edita en esta vista, si existe.</summary>
+    private Fade? TargetFade => _selectionTarget switch
+    {
+        FadeDirection.In => _fades?.FadeIn,
+        FadeDirection.Out => _fades?.FadeOut,
+        _ => null,
+    };
+
+    /// <summary>Borde del fundido editable que queda bajo el puntero.</summary>
+    private FadeEdge FadeEdgeAt(int x)
+    {
+        if (TargetFade is not { } fade)
+        {
+            return FadeEdge.None;
+        }
+
+        int tolerance = LogicalToDeviceUnits(6);
+        float toStart = Math.Abs(XFor(fade.StartSeconds) - x);
+        float toEnd = Math.Abs(XFor(fade.EndSeconds) - x);
+
+        if (Math.Min(toStart, toEnd) > tolerance)
+        {
+            return FadeEdge.None;
+        }
+
+        return toStart <= toEnd ? FadeEdge.Start : FadeEdge.End;
+    }
+
+    /// <summary>
+    /// Adhiere un instante a la marca de recorte más cercana si cae a pocos píxeles de ella: un
+    /// fundido que debe acabar justo en el corte final no tendría que depender del pulso.
+    /// </summary>
+    private double Snap(double seconds)
+    {
+        int tolerance = LogicalToDeviceUnits(6);
+        foreach (double marker in (ReadOnlySpan<double>)[_startMarkerSeconds, _endMarkerSeconds])
+        {
+            if (Math.Abs(XFor(marker) - XFor(seconds)) <= tolerance)
+            {
+                return marker;
+            }
+        }
+
+        return seconds;
     }
 
     /// <summary>Mueve una marca respetando el orden y la separación mínima, y avisa si cambió.</summary>
@@ -548,6 +699,117 @@ public sealed class WaveformView : Control
 
         Rectangle part = new(x0, 0, x1 - x0, image.Height);
         g.DrawImage(_removedImage!.Bitmap, part, part, GraphicsUnit.Pixel);
+    }
+
+    /// <summary>
+    /// Dibuja cada fundido: un velo ámbar sobre su tramo, la envolvente de ganancia arriba y abajo
+    /// —como las envolventes de Audacity— y una etiqueta con su sentido y su curva.
+    /// </summary>
+    /// <remarks>
+    /// La envolvente es la ganancia combinada de ambos fundidos pasada por la escala vertical de la
+    /// vista: en dB se ve la caída real, y donde dos fundidos se solapan se ve su producto, que es lo
+    /// que sonará.
+    /// </remarks>
+    private void DrawFades(Graphics g, Rectangle image)
+    {
+        if (_fades is not { } fades)
+        {
+            return;
+        }
+
+        foreach (Fade? candidate in (ReadOnlySpan<Fade?>)[fades.FadeIn, fades.FadeOut])
+        {
+            if (candidate is not { } fade)
+            {
+                continue;
+            }
+
+            int x0 = Math.Clamp((int)Math.Floor(XFor(fade.StartSeconds)), 0, image.Width);
+            int x1 = Math.Clamp((int)Math.Ceiling(XFor(fade.EndSeconds)), 0, image.Width);
+            if (x1 <= x0)
+            {
+                continue;
+            }
+
+            using (SolidBrush tint = new(FadeTintColor))
+            {
+                g.FillRectangle(tint, x0, 0, x1 - x0, image.Height);
+            }
+
+            DrawEnvelope(g, image, fades, fade, x0, x1);
+            DrawFadeEdges(g, image, fade);
+            DrawFadeLabel(g, image, fade, x0, x1);
+        }
+    }
+
+    /// <summary>Envolvente de un fundido, muestreada una vez por píxel.</summary>
+    /// <remarks>
+    /// El instante de cada píxel se acota al tramo del fundido: los píxeles de los bordes, redondeados
+    /// hacia fuera, caerían justo fuera de él, donde la ganancia vuelve a 1, y dibujarían un pico
+    /// vertical que no existe en el audio.
+    /// </remarks>
+    private void DrawEnvelope(Graphics g, Rectangle image, TrackFades fades, Fade fade, int x0, int x1)
+    {
+        PointF[] top = new PointF[x1 - x0 + 1];
+        PointF[] bottom = new PointF[top.Length];
+        float middle = (image.Height - 1) / 2f;
+
+        for (int i = 0; i < top.Length; i++)
+        {
+            int x = x0 + i;
+            double seconds = Math.Clamp(SecondsAt(x), fade.StartSeconds, fade.EndSeconds);
+            float height = (float)_amplitudeScale.ToHeight(fades.GainAt(seconds));
+            top[i] = new PointF(x, middle - (height * middle));
+            bottom[i] = new PointF(x, middle + (height * middle));
+        }
+
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        using (Pen outline = new(Color.White, LogicalToDeviceUnits(4)))
+        {
+            g.DrawLines(outline, top);
+            g.DrawLines(outline, bottom);
+        }
+
+        using (Pen line = new(FadeLineColor, LogicalToDeviceUnits(2)))
+        {
+            g.DrawLines(line, top);
+            g.DrawLines(line, bottom);
+        }
+
+        g.SmoothingMode = SmoothingMode.None;
+    }
+
+    /// <summary>Bordes del tramo en trazo discontinuo, para distinguirlos de las marcas de recorte, que son continuas.</summary>
+    private void DrawFadeEdges(Graphics g, Rectangle image, Fade fade)
+    {
+        using Pen edge = new(FadeLineColor, LogicalToDeviceUnits(1)) { DashStyle = DashStyle.Dash };
+        foreach (double seconds in (ReadOnlySpan<double>)[fade.StartSeconds, fade.EndSeconds])
+        {
+            float x = XFor(seconds);
+            if (x >= 0 && x <= image.Width)
+            {
+                g.DrawLine(edge, x, 0, x, image.Bottom);
+            }
+        }
+    }
+
+    /// <summary>Etiqueta al pie del tramo; si no cabe en él, se omite para no tapar la onda vecina.</summary>
+    private void DrawFadeLabel(Graphics g, Rectangle image, Fade fade, int x0, int x1)
+    {
+        string label = $"{FadeText.Name(fade.Direction)} · {FadeText.Name(fade.Curve)}";
+        Size text = TextRenderer.MeasureText(g, label, Font);
+        int padding = LogicalToDeviceUnits(3);
+        if (text.Width + (2 * padding) > x1 - x0)
+        {
+            return;
+        }
+
+        int left = fade.Direction == FadeDirection.In ? x0 + padding : x1 - text.Width - padding;
+        Rectangle box = new(left, image.Bottom - text.Height - padding, text.Width, text.Height);
+
+        g.FillRectangle(Brushes.White, box);
+        g.DrawRectangle(Pens.Black, box);
+        TextRenderer.DrawText(g, label, Font, box, Color.Black, TextFormatFlags.NoPadding);
     }
 
     /// <summary>
@@ -727,7 +989,23 @@ public sealed class WaveformView : Control
             parts.Add($"final en {_endMarkerSeconds:0.000} s");
         }
 
+        foreach (Fade? candidate in (ReadOnlySpan<Fade?>)[_fades?.FadeIn, _fades?.FadeOut])
+        {
+            if (candidate is { } fade)
+            {
+                parts.Add($"{FadeText.Name(fade.Direction).ToLowerInvariant()} {FadeText.Name(fade.Curve).ToLowerInvariant()} de {fade.StartSeconds:0.000} a {fade.EndSeconds:0.000} s");
+            }
+        }
+
         return string.Join(", ", parts);
+    }
+
+    /// <summary>Borde de un fundido.</summary>
+    private enum FadeEdge
+    {
+        None,
+        Start,
+        End,
     }
 
     /// <summary>
