@@ -43,7 +43,6 @@ namespace EchoCut
 
         /// <summary>Carpetas escaneadas, origen de las pistas cargadas.</summary>
         private readonly List<string> _sourceDirectories = [];
-        private readonly ToolTip _pathToolTip = new();
 
         /// <summary>Si se está arrastrando encima algo que se puede soltar; resalta la zona de arrastre.</summary>
         private bool _dropHighlighted;
@@ -257,7 +256,7 @@ namespace EchoCut
                 1 => _sourceDirectories[0],
                 _ => string.Join("; ", _sourceDirectories)
             };
-            _pathToolTip.SetToolTip(txtPath, string.Join(Environment.NewLine, _sourceDirectories));
+            toolTip.SetToolTip(txtPath, string.Join(Environment.NewLine, _sourceDirectories));
 
             ScanResult scan = TrackScanner.Scan(_sourceDirectories);
 
@@ -324,7 +323,7 @@ namespace EchoCut
                 1 => _sourceDirectories[0],
                 _ => string.Join("; ", _sourceDirectories)
             };
-            _pathToolTip.SetToolTip(txtPath, string.Join(Environment.NewLine, _sourceDirectories));
+            toolTip.SetToolTip(txtPath, string.Join(Environment.NewLine, _sourceDirectories));
 
             ScanResult scan = TrackScanner.ScanFiles(validFiles);
 
@@ -1020,7 +1019,6 @@ namespace EchoCut
             StopPreview();
             _preview?.Dispose();
             _preview = null;
-            _pathToolTip.Dispose();
 
             _settings.Silence.ToleranceSeconds = (double)numericTolerance.Value;
             _settings.ThreadCount = (int)numericThreads.Value;
