@@ -154,10 +154,20 @@ namespace EchoCut
                 return;
             }
 
-            // Fijar la celda actual selecciona su fila en modo de fila completa; se conserva la
-            // selección que hubiera para no deshacer una multiselección al teclear en el filtro.
+            // Teclear en el filtro no debe deshacer una multiselección.
+            SetCurrentCellKeepingSelection(dataGrid.Rows[address.Y].Cells[address.X]);
+        }
+
+        /// <summary>Fija la celda actual sin perder las filas que ya estuvieran seleccionadas.</summary>
+        /// <param name="cell">Celda que pasa a ser la actual; su fila queda seleccionada.</param>
+        /// <remarks>
+        /// En modo de fila completa, asignar <see cref="DataGridView.CurrentCell"/> borra la
+        /// selección y deja solo la fila de la celda. Se guarda antes y se vuelve a marcar después.
+        /// </remarks>
+        private void SetCurrentCellKeepingSelection(DataGridViewCell cell)
+        {
             List<DataGridViewRow> selected = [.. dataGrid.SelectedRows.Cast<DataGridViewRow>()];
-            dataGrid.CurrentCell = dataGrid.Rows[address.Y].Cells[address.X];
+            dataGrid.CurrentCell = cell;
 
             foreach (DataGridViewRow row in selected)
             {

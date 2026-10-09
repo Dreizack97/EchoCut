@@ -1123,15 +1123,19 @@ namespace EchoCut
         {
             if (e.Button == MouseButtons.Right && e.RowIndex >= 0 && e.ColumnIndex >= 0)
             {
-                // Si la fila pulsada con clic derecho no forma parte de la selección actual,
-                // se restablece la selección a dicha fila; de lo contrario, se conserva la multiselección.
-                if (!dataGrid.Rows[e.RowIndex].Selected)
+                // Si la fila pulsada con clic derecho no forma parte de la selección actual, la
+                // selección pasa a ser solo esa fila; si forma parte, se conserva la multiselección
+                // para que el menú actúe sobre todas, como en el Explorador.
+                DataGridViewCell cell = dataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                if (dataGrid.Rows[e.RowIndex].Selected)
+                {
+                    SetCurrentCellKeepingSelection(cell);
+                }
+                else
                 {
                     dataGrid.ClearSelection();
-                    dataGrid.Rows[e.RowIndex].Selected = true;
+                    dataGrid.CurrentCell = cell;
                 }
-
-                dataGrid.CurrentCell = dataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex];
                 mnuEditSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count == 1;
                 mnuDeleteSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count > 0;
             }
