@@ -6,8 +6,8 @@ namespace EchoCut.Processing;
 /// <summary>Una pista y el tramo que debe conservar su copia recortada.</summary>
 /// <param name="Track">Pista a recortar.</param>
 /// <param name="Range">Tramo del original que se conserva.</param>
-/// <param name="Fades">Fundidos a aplicar en la copia, o <c>null</c> si no lleva ninguno.</param>
-public sealed record TrimRequest(TrackInfo Track, TrimRange Range, TrackFades? Fades = null);
+/// <param name="Edits">Fundidos y borrados a aplicar en la copia, o <c>null</c> si no lleva ninguno.</param>
+public sealed record TrimRequest(TrackInfo Track, TrimRange Range, AudioEdits? Edits = null);
 
 /// <summary>Dónde quedó la copia recortada de una pista.</summary>
 /// <param name="OutputPath">Ruta absoluta del archivo escrito.</param>
@@ -19,7 +19,7 @@ public sealed record TrimOutcome(string OutputPath);
 /// </summary>
 /// <remarks>
 /// Cada pista sale por el camino más fiel posible: por copia de flujo, sin pérdida, salvo que algún
-/// fundido llegue a la copia; solo entonces se recodifica con <see cref="AudioFader"/>.
+/// fundido o borrado llegue a la copia; solo entonces se recodifica con <see cref="AudioRenderer"/>.
 /// </remarks>
 public sealed class TrimService
 {
@@ -78,13 +78,13 @@ public sealed class TrimService
     {
         (string ffmpeg, string ffprobe) = _locator.Require();
         AudioTrimmer trimmer = new(ffmpeg);
-        AudioFader fader = new(ffmpeg, ffprobe);
+        AudioRenderer renderer = new(ffmpeg, ffprobe);
 
         return await BatchRunner.RunAsync(
             requests,
             maxDegreeOfParallelism,
             static request => request.Track,
-            (request, token) => WriteAsync(trimmer, fader, request, outputDirectoryResolver(request), token),
+            (request, token) => WriteAsync(trimmer, renderer, request, outputDirectoryResolver(request), token),
             progress,
             cancellationToken).ConfigureAwait(false);
     }
@@ -129,34 +129,34 @@ public sealed class TrimService
     {
         (string ffmpeg, string ffprobe) = _locator.Require();
 
-        return await WriteAsync(new AudioTrimmer(ffmpeg), new AudioFader(ffmpeg, ffprobe), request, outputDirectory, cancellationToken)
+        return await WriteAsync(new AudioTrimmer(ffmpeg), new AudioRenderer(ffmpeg, ffprobe), request, outputDirectory, cancellationToken)
             .ConfigureAwait(false);
     }
 
-    /// <summary>Escribe la copia de una pista por copia de flujo o, si lleva fundidos, recodificándola.</summary>
+    /// <summary>Escribe la copia de una pista por copia de flujo o, si lleva ediciones, recodificándola.</summary>
     /// <remarks>
-    /// Los fundidos que el recorte deja fuera no cuentan: si ninguno llega a la copia, recodificar
+    /// Las ediciones que el recorte deja fuera no cuentan: si ninguna llega a la copia, recodificar
     /// solo costaría calidad. Tras recodificar se copian las etiquetas y la carátula del original,
     /// que la copia de flujo ya conserva por sí sola.
     /// </remarks>
     private static async Task<TrimOutcome> WriteAsync(
         AudioTrimmer trimmer,
-        AudioFader fader,
+        AudioRenderer renderer,
         TrimRequest request,
         string outputDirectory,
         CancellationToken cancellationToken)
     {
         string source = request.Track.FilePath;
 
-        if (request.Fades?.Within(request.Range) is not { } fades)
+        if (request.Edits?.Within(request.Range) is not { } edits)
         {
             return new TrimOutcome(await trimmer
                 .TrimAsync(source, request.Range, outputDirectory, cancellationToken)
                 .ConfigureAwait(false));
         }
 
-        string written = await fader
-            .RenderAsync(source, request.Range, fades, outputDirectory, cancellationToken)
+        string written = await renderer
+            .RenderAsync(source, request.Range, edits, outputDirectory, cancellationToken)
             .ConfigureAwait(false);
 
         TrackEditor.CopyTags(source, written);
