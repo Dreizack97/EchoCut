@@ -62,9 +62,6 @@ namespace EchoCut
         /// <summary>Si se está guardando: la ventana no se puede cerrar ni editar a medias.</summary>
         private bool _saving;
 
-        /// <summary>Si hay cambios que todavía no se llevaron a la fila.</summary>
-        private bool _dirty;
-
         /// <summary>Prepara la ventana para una pista, partiendo de lo que ya tenga decidido su fila.</summary>
         /// <param name="song">Fila de la pista a mostrar.</param>
         /// <param name="service">Servicio que carga las formas de onda.</param>
@@ -230,9 +227,10 @@ namespace EchoCut
         {
             if (sender is WaveformView view)
             {
+                BeginChange();
                 _manual = true;
                 ApplyRange(view.StartMarkerSeconds, view.EndMarkerSeconds);
-                MarkDirty();
+                EndChange();
             }
         }
 
@@ -243,9 +241,10 @@ namespace EchoCut
                 return;
             }
 
+            BeginChange();
             _manual = true;
             ApplyRange(Math.Min((double)numStart.Value, _endSeconds - WaveformView.MinimumGapSeconds), _endSeconds);
-            MarkDirty();
+            EndChange();
         }
 
         private void numEnd_ValueChanged(object? sender, EventArgs e)
@@ -255,17 +254,19 @@ namespace EchoCut
                 return;
             }
 
+            BeginChange();
             _manual = true;
             ApplyRange(_startSeconds, Math.Max((double)numEnd.Value, _startSeconds + WaveformView.MinimumGapSeconds));
-            MarkDirty();
+            EndChange();
         }
 
         private void btnReset_Click(object? sender, EventArgs e)
         {
+            BeginChange();
             TrimRange range = _analysisRange ?? new TrimRange(0.0, _durationSeconds);
             _manual = false;
             ApplyRange(range.StartSeconds, range.EndSeconds);
-            MarkDirty();
+            EndChange();
             SetStatus(_analysisRange is null ? "Se quitó el ajuste: la copia conserva la pista completa." : "Se restableció el recorte del análisis.");
         }
 
@@ -368,19 +369,6 @@ namespace EchoCut
                 SetStatus("Guardando la copia…");
             }
         }
-
-        /// <value><c>true</c> si hay cambios que todavía no se llevaron a la fila.</value>
-        private bool IsDirty => _dirty;
-
-        /// <summary>Anota que hubo un cambio sin llevar a la fila y lo refleja en el resumen.</summary>
-        private void MarkDirty()
-        {
-            _dirty = true;
-            UpdateSummary();
-        }
-
-        /// <summary>Anota que lo que hay ahora es lo que tiene la fila.</summary>
-        private void MarkApplied() => _dirty = false;
 
         /// <summary>Si hay cambios sin aplicar, pregunta qué hacer con ellos antes de cerrar.</summary>
         private void WaveformEditor_FormClosing(object? sender, FormClosingEventArgs e)

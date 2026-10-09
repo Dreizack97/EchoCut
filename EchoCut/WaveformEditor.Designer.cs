@@ -37,6 +37,9 @@ namespace EchoCut
             btnFadeOut = new ToolStripButton();
             btnDelete = new ToolStripButton();
             btnRestore = new ToolStripButton();
+            toolStripSeparator2 = new ToolStripSeparator();
+            btnUndo = new ToolStripButton();
+            btnRedo = new ToolStripButton();
             btnShortcuts = new ToolStripButton();
             btnDecibels = new ToolStripButton();
             statusStrip = new StatusStrip();
@@ -102,7 +105,7 @@ namespace EchoCut
             // 
             toolStrip.Font = new Font("Segoe UI", 10F);
             toolStrip.GripStyle = ToolStripGripStyle.Hidden;
-            toolStrip.Items.AddRange(new ToolStripItem[] { btnPlay, toolStripSeparator1, btnFadeIn, btnFadeOut, btnDelete, btnRestore, btnShortcuts, btnDecibels });
+            toolStrip.Items.AddRange(new ToolStripItem[] { btnPlay, toolStripSeparator1, btnFadeIn, btnFadeOut, btnDelete, btnRestore, toolStripSeparator2, btnUndo, btnRedo, btnShortcuts, btnDecibels });
             toolStrip.Location = new Point(0, 0);
             toolStrip.Name = "toolStrip";
             toolStrip.Padding = new Padding(6, 2, 6, 2);
@@ -163,6 +166,31 @@ namespace EchoCut
             btnRestore.Text = "↺ Restaurar";
             btnRestore.ToolTipText = "Devolver a la copia el audio borrado que cae dentro de la selección";
             btnRestore.Click += btnRestore_Click;
+            // 
+            // toolStripSeparator2
+            // 
+            toolStripSeparator2.Name = "toolStripSeparator2";
+            toolStripSeparator2.Size = new Size(6, 25);
+            // 
+            // btnUndo
+            // 
+            btnUndo.DisplayStyle = ToolStripItemDisplayStyle.Text;
+            btnUndo.Enabled = false;
+            btnUndo.Name = "btnUndo";
+            btnUndo.Size = new Size(85, 22);
+            btnUndo.Text = "↶ Deshacer";
+            btnUndo.ToolTipText = "Deshacer el último cambio";
+            btnUndo.Click += btnUndo_Click;
+            // 
+            // btnRedo
+            // 
+            btnRedo.DisplayStyle = ToolStripItemDisplayStyle.Text;
+            btnRedo.Enabled = false;
+            btnRedo.Name = "btnRedo";
+            btnRedo.Size = new Size(73, 22);
+            btnRedo.Text = "↷ Rehacer";
+            btnRedo.ToolTipText = "Rehacer el último cambio deshecho";
+            btnRedo.Click += btnRedo_Click;
             // 
             // btnShortcuts
             // 
@@ -317,6 +345,7 @@ namespace EchoCut
             viewOverview.MarkersChanged += View_MarkersChanged;
             viewOverview.SelectionChanged += View_SelectionChanged;
             viewOverview.WaveformClicked += View_WaveformClicked;
+            viewOverview.MouseUp += View_MouseUp;
             // 
             // lblStartView
             // 
@@ -352,6 +381,7 @@ namespace EchoCut
             viewStart.MarkersChanged += View_MarkersChanged;
             viewStart.SelectionChanged += View_SelectionChanged;
             viewStart.WaveformClicked += View_WaveformClicked;
+            viewStart.MouseUp += View_MouseUp;
             // 
             // viewEnd
             // 
@@ -367,6 +397,7 @@ namespace EchoCut
             viewEnd.MarkersChanged += View_MarkersChanged;
             viewEnd.SelectionChanged += View_SelectionChanged;
             viewEnd.WaveformClicked += View_WaveformClicked;
+            viewEnd.MouseUp += View_MouseUp;
             // 
             // tableInspector
             // 
@@ -804,6 +835,9 @@ namespace EchoCut
         private ToolStripButton btnFadeOut;
         private ToolStripButton btnDelete;
         private ToolStripButton btnRestore;
+        private ToolStripSeparator toolStripSeparator2;
+        private ToolStripButton btnUndo;
+        private ToolStripButton btnRedo;
         private ToolStripButton btnShortcuts;
         private ToolStripButton btnDecibels;
         private StatusStrip statusStrip;

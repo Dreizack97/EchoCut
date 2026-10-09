@@ -140,12 +140,13 @@ namespace EchoCut
                 return;
             }
 
+            BeginChange();
             SetFade(direction, selection.StartSeconds, selection.EndSeconds, direction == FadeDirection.In ? _lastCurveIn : _lastCurveOut);
-            MarkDirty();
+            EndChange();
 
             ApplySelection(null);
             ShowInspector(direction == FadeDirection.In ? InspectorTarget.FadeIn : InspectorTarget.FadeOut);
-            SetStatus($"{FadeText.Name(direction)} de {Time(selection.DurationSeconds)} s. Cambia su curva en el inspector.");
+            SetStatus($"{FadeText.Name(direction)} de {Time(selection.DurationSeconds)} s. Cambia su curva en el inspector; Ctrl+Z la deshace.");
         }
 
         private void btnDelete_Click(object? sender, EventArgs e) => DeleteSelection();
@@ -168,13 +169,14 @@ namespace EchoCut
                 return;
             }
 
+            BeginChange();
             _deletions = deletions;
             ApplyDeletions();
-            MarkDirty();
+            EndChange();
 
             ApplySelection(null);
             ShowInspector(InspectorTarget.None);
-            SetStatus($"Se borraron {Time(selection.DurationSeconds)} s. Haz clic en lo borrado para restaurarlo.");
+            SetStatus($"Se borraron {Time(selection.DurationSeconds)} s. Haz clic en lo borrado para restaurarlo; Ctrl+Z lo deshace.");
         }
 
         /// <summary>Devuelve a la copia lo borrado que cae dentro de la selección.</summary>
@@ -188,9 +190,10 @@ namespace EchoCut
 
         private void RestoreDeleted(TimeRegion region)
         {
+            BeginChange();
             _deletions = _deletions.Remove(region);
             ApplyDeletions();
-            MarkDirty();
+            EndChange();
 
             ApplySelection(null);
             ShowInspector(InspectorTarget.None);
@@ -222,9 +225,10 @@ namespace EchoCut
                 return;
             }
 
+            BeginChange();
             Fade? current = e.Direction == FadeDirection.In ? _fadeIn : _fadeOut;
             SetFade(e.Direction, e.StartSeconds, e.EndSeconds, current?.Curve ?? FadeCurve.Linear);
-            MarkDirty();
+            EndChange();
             ShowInspector(e.Direction == FadeDirection.In ? InspectorTarget.FadeIn : InspectorTarget.FadeOut);
         }
 
@@ -389,16 +393,18 @@ namespace EchoCut
                     break;
 
                 case InspectorTarget.FadeIn or InspectorTarget.FadeOut when InspectedFade is { } fade:
+                    BeginChange();
                     SetFade(fade.Direction, from, to, fade.Curve, keepStart);
-                    MarkDirty();
+                    EndChange();
                     break;
 
                 case InspectorTarget.Deletion when _inspectedDeletion is { } deleted:
                     (double newStart, double newEnd) = Widen(from, to, WaveformView.MinimumGapSeconds, keepStart);
+                    BeginChange();
                     _deletions = _deletions.Remove(deleted).Add(new TimeRegion(newStart, newEnd));
                     _inspectedDeletion = _deletions.RegionAt(newStart);
                     ApplyDeletions();
-                    MarkDirty();
+                    EndChange();
                     ApplySelection(_inspectedDeletion);
                     SyncInspector();
                     break;
@@ -422,8 +428,9 @@ namespace EchoCut
                 _lastCurveOut = curve;
             }
 
+            BeginChange();
             SetFade(fade.Direction, fade.StartSeconds, fade.EndSeconds, curve);
-            MarkDirty();
+            EndChange();
         }
 
         /// <summary>Quita el fundido que se muestra, o restaura el fragmento borrado.</summary>
@@ -431,6 +438,7 @@ namespace EchoCut
         {
             if (InspectedFade is { } fade)
             {
+                BeginChange();
                 if (fade.Direction == FadeDirection.In)
                 {
                     _fadeIn = null;
@@ -441,9 +449,9 @@ namespace EchoCut
                 }
 
                 ApplyFades();
-                MarkDirty();
+                EndChange();
                 ShowInspector(InspectorTarget.None);
-                SetStatus($"Se quitó la {FadeText.Name(fade.Direction).ToLowerInvariant()}.");
+                SetStatus($"Se quitó la {FadeText.Name(fade.Direction).ToLowerInvariant()}; Ctrl+Z la recupera.");
             }
             else if (_inspectedDeletion is { } deleted)
             {
