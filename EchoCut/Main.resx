@@ -132,6 +132,9 @@
   <data name="openFileDialog.Filter" xml:space="preserve">
     <value>Archivos de audio (*.aa;*.aax;*.aac;*.aiff;*.ape;*.dsf;*.flac;*.m4a;*.m4b;*.m4p;*.mp3;*.mpc;*.mpp;*.ogg;*.oga;*.wav;*.wma;*.wv;*.webm)|*.aa;*.aax;*.aac;*.aiff;*.ape;*.dsf;*.flac;*.m4a;*.m4b;*.m4p;*.mp3;*.mpc;*.mpp;*.ogg;*.oga;*.wav;*.wma;*.wv;*.webm|Todos los archivos (*.*)|*.*</value>
   </data>
+  <metadata name="toolStrip.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+    <value>588, 17</value>
+  </metadata>
   <assembly alias="System.Drawing" name="System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
   <data name="$this.Icon" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
     <value>

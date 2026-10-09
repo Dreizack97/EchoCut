@@ -407,9 +407,10 @@ namespace EchoCut
             AdvanceProgress(progress.CompletedCount);
         }
 
-        private void btnCancel_Click(object sender, EventArgs e)
+        private void btnStop_Click(object sender, EventArgs e)
         {
             _analysisCts?.Cancel();
+            _trimCts?.Cancel();
             _cleanCts?.Cancel();
             _normalizeCts?.Cancel();
         }
@@ -691,8 +692,6 @@ namespace EchoCut
             AdvanceProgress(progress.CompletedCount);
         }
 
-        private void btnStop_Click(object sender, EventArgs e) => _trimCts?.Cancel();
-
         /// <summary>
         /// Recorta una sola pista, la de la fila pulsada.
         /// </summary>
@@ -963,12 +962,10 @@ namespace EchoCut
             btnPath.Enabled = !IsBusy;
             btnFile.Enabled = !IsBusy;
             btnAnalyze.Enabled = !IsBusy && hasSongs;
-            btnCancel.Enabled = analyzing || cleaning || normalizing;
             btnCropAll.Enabled = !IsBusy && hasSongs;
-            btnStop.Enabled = trimming;
+            btnStop.Enabled = analyzing || cleaning || normalizing || trimming;
             btnExport.Enabled = !IsBusy && hasSongs;
-            btnClean.Enabled = !IsBusy && hasSongs;
-            btnNormalize.Enabled = !IsBusy && hasSongs;
+            ddbUtilities.Enabled = !IsBusy && hasSongs;
             btnAdvanced.Enabled = !IsBusy;
             numericThreads.Enabled = !IsBusy;
             numericTolerance.Enabled = !IsBusy;
@@ -1308,7 +1305,7 @@ namespace EchoCut
             }
         }
 
-        private async void btnClean_Click(object sender, EventArgs e)
+        private async void mnuCleanMetadata_Click(object sender, EventArgs e)
         {
             if (IsBusy || _songs.Count == 0)
             {
@@ -1462,7 +1459,7 @@ namespace EchoCut
             }
         }
 
-        private async void btnNormalize_Click(object sender, EventArgs e)
+        private async void mnuNormalize_Click(object sender, EventArgs e)
         {
             if (IsBusy || _songs.Count == 0)
             {
