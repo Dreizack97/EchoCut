@@ -395,7 +395,9 @@ namespace EchoCut
 
             StopPreview();
 
-            List<TrackInfo> pending = _songs.Select(x => x.Track).ToList();
+            // Las filas con fundidos o borrados se analizan sobre su resultado, que es lo que quedará
+            // en la copia; las demás, con el sondeo rápido de los bordes del original.
+            List<AnalysisRequest> pending = [.. _songs.Select(x => new AnalysisRequest(x.Track, x.Edits))];
 
             using CancellationTokenSource cts = new();
             _analysisCts = cts;

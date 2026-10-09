@@ -321,6 +321,14 @@ public sealed class Song : INotifyPropertyChanged
 
         _edits = edits is { HasAny: true } ? edits : null;
         OnPropertyChanged(nameof(Edits));
+
+        // Un análisis hecho sobre el resultado editado deja de valer si las ediciones cambian: sus
+        // silencios eran los de otra copia. Uno hecho sobre el original sigue valiendo tal cual.
+        if (_analysis is { } analysis && !analysis.Describes(_edits))
+        {
+            Analysis = null;
+        }
+
         OnPropertyChanged(nameof(Crop));
         Estatus = DecisionStatus();
     }
