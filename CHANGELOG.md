@@ -9,6 +9,10 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 
 ## [Sin publicar]
 
+---
+
+## [1.3.0] - 2026-10-09
+
 ### Añadido
 #### Regularización de Volumen sin Pérdida
 * **Ventana «Regularizar volumen»** (`Utilidades › Regularizar volumen…`, `Ctrl+Shift+V`): Lista las canciones MP3 cargadas con su volumen, el ajuste propuesto, el resultado previsto, el pico, la saturación y el ajuste acumulado. *Analizar* mide sin modificar; *Aplicar ajuste* cambia los originales marcados sin recodificar y cada fila enseña el volumen de antes, lo aplicado y cómo quedó; *Restaurar original* los devuelve a su volumen de siempre leyendo `MP3GAIN_UNDO`, también en archivos ajustados con MP3Gain. Objetivo de 89 dB por defecto, ajustable entre 75 y 105 dB, que recalcula las propuestas al instante y se recuerda en `AppSettings.VolumeTargetDb`. Las subidas que saturarían se limitan a lo que permite el pico. `VolumeRow` concentra la presentación con la paleta accesible y glifos redundantes al color.
@@ -19,6 +23,27 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 * **Convertir a MP3** (`Utilidades`, `Ctrl+Shift+M`): Copia en MP3 de las canciones cargadas en la subcarpeta `MP3/` junto a cada original, con etiquetas y carátula; calidad VBR V0, VBR V2, CBR 320 o CBR 192, recordada en `AppSettings.Mp3Quality`. Las que ya son MP3 se omiten. `Mp3Converter`, `Mp3Quality` y `ConversionService` en el motor.
 * **Buscar duplicados por audio** (`Utilidades`, `Ctrl+Shift+D`): Huella acústica propia según Haitsma y Kalker —33 bandas logarítmicas entre 300 y 2000 Hz, 32 bits por trama de 23 ms— en `EchoCut.Fingerprints` (`FftPlan`, `FingerprintBuilder`, `AudioFingerprint`), con búsqueda de candidatas por índice invertido y verificación por tasa de bits distintos tras alinear (`DuplicateDetector`). Reconoce la misma grabación en otro formato, tasa de bits o volumen y con silencios distintos; exige que coincida el 80 % de lo que suena en ambas para no confundir una mezcla con la canción que contiene.
 * **Ventana de duplicados**: Grupos con parecido, duración, formato, bitrate, tamaño y carpeta; propone conservar la copia de mejor calidad (`DuplicateFinder`), permite escuchar, abrir la ubicación y cambiar las marcas, y envía las marcadas a la Papelera de reciclaje tras confirmarlo, retirando sus filas del listado.
+
+#### Edición de la Biblioteca y Renombrado
+* **Renombrar con `F2`** (y *Renombrar* en el menú contextual): Cuadro de edición sobre la celda «Nombre», con confirmación con `Entrar` o al perder el foco y descarte con `Esc`. Un nombre no válido o repetido se explica y reabre la edición con lo escrito. `TrackEditor.RenameTrack` cambia solo el nombre, sin reescribir las etiquetas.
+* **Agregar consecutivo… y Quitar caracteres iniciales…** (`Utilidades › Renombrar`, `Ctrl+Shift+C` / `Ctrl+Shift+Q`): Antepone un número con ceros a la izquierda, por ejemplo `0001 - Artista - Nombre`, o quita caracteres del principio, con una vista previa que no deja continuar si algún nombre no es válido, se repite o ya existe. `TrackNaming` calcula ambas cosas como funciones puras, para que la vista previa y el renombrado real coincidan.
+* **Agregar metadatos…** (`Utilidades › Metadatos`): Aplica artista, título, álbum, género y comentarios a todo el listado; los campos en blanco no se tocan, el título puede tomarse del nombre del archivo y los archivos que ya tienen esos valores no se reescriben. `TagPatch` y `TrackEditor.ApplyTags`.
+* **Normalizar por propiedades** (`Utilidades › Normalizar…`): Diálogo con una casilla por propiedad que recuerda la última elección (`AppSettings.NormalizeFields`) y confirma antes de procesar, indicando si habrá renombrados. `NormalizableFields` solo escribe las etiquetas elegidas, sin partir las listas de intérpretes con «/».
+
+#### Rejilla, Atajos y Presentación
+* **Filtro por nombre** (`Ctrl+F`, `Esc` para vaciarlo): Oculta mientras se escribe las filas cuyo nombre no contiene el texto, sin distinguir mayúsculas ni acentos. Es solo de presentación: los lotes y la exportación siguen actuando sobre todas las pistas, y la barra de estado indica cuántas se ven.
+* **Columnas ocultables**: Clic derecho sobre una cabecera —o la opción *Columnas visibles* del menú de las filas— para mostrar u ocultar cada columna, con *Mostrar todas*. La elección se guarda en `AppSettings.HiddenColumns`, por nombre y no por posición. «Nombre» siempre queda visible.
+* **Anchos ajustados al contenido**: Las columnas se miden por su contenido en todas las filas, sin cortar los nombres largos; Nombre, Título, Artista y Álbum se limitan al 40 % del ancho visible. *Ajustar anchos al contenido* lo repite a mano.
+* **Columnas de acción fijas**: Las de reproducir y recortar siguen a la vista al desplazarse en horizontal.
+* **Barra de estado** (`StatusStrip`): Mensaje de la última acción, progreso y contador durante los lotes, y un resumen permanente de pistas, recortables, recortadas y errores con los mismos glifos y colores de la rejilla.
+* **Zona de arrastre**: Con la lista vacía, la rejilla invita a arrastrar carpetas o archivos y se resalta mientras se arrastra encima algo aceptable.
+* **Tooltips explicativos** en la barra de herramientas, en los parámetros de tolerancia e hilos y en la ruta de origen, que indica dónde se escriben las copias.
+* **Tabla única de atajos** (`Main.Shortcuts.cs`): Los de la ventana principal se ejecutan, se anuncian en el menú y en los tooltips y se listan en *Atajos* (`F1`) desde la misma tabla.
+
+#### Integración con el Sistema y Formatos
+* **Integrar con el Explorador de Windows** (`Utilidades › Integrar con el Explorador de Windows`): Agrega o quita «Abrir con EchoCut» para las extensiones de audio, las carpetas y el fondo de una carpeta abierta. Se registra en `HKEY_CURRENT_USER` sin permisos de administrador y sin cambiar el reproductor asociado a cada extensión.
+* **Una sola ventana**: Abrir archivos o carpetas desde el Explorador mientras EchoCut ya está abierto entrega sus rutas a la ventana existente por una tubería con nombre (`SingleInstance`), que las agrupa unos instantes y las suma al listado sin duplicarlas.
+* **Soporte para `.mp2`** (MPEG Audio Layer II): Se escanea, se edita y se recorta con `-c copy`; las copias con fundidos o borrados se recodifican con el codificador MP2 de FFmpeg y con etiquetas ID3v2.3.
 
 #### Resultado Editado y Detección de Silencios Posteriores
 * **Onda con las ediciones aplicadas**: `WaveformRenderer` pinta cada columna con la ganancia de los fundidos y, en la línea de tiempo del resultado, juntando los tramos del original que suenan en ella; se dibuja a partir del resumen ya cargado, sin volver a decodificar.
@@ -32,6 +57,7 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 ### Cambiado
 * **`Song.ApplyEdits`** descarta un análisis hecho sobre el resultado si las ediciones cambian, porque sus silencios eran los de otra copia.
 * **Editor de forma de onda**: Recibe sus servicios en `WaveformEditorServices`; los botones de zoom y la escala en dB se compactan para que la barra quepa entera, y la ventana se abre a 1280 × 820.
+* **Utilidades › Metadatos y Normalizar**: Metadatos pasa a ser un submenú con *Eliminar metadatos* y *Agregar metadatos…*; *Normalizar* deja de tocar todas las propiedades a la vez.
 
 #### Editor de Forma de Onda Rediseñado
 * **Estilo de la ventana principal**: Barra de herramientas con las acciones agrupadas (reproducir | aplicar a la selección | deshacer | zoom, con ayuda y escala en dB a la derecha) y barra de estado que describe cada opción al pasar el ratón y resume la copia: duración final, fundidos, borrado y si saldrá sin pérdida o se recodificará. Desaparecen los marcos de grupo y la barra de selección.
@@ -62,6 +88,11 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 * **`TrimService`**: Las pistas sin fundido que llegue a la copia siguen recortándose con `-c copy`; solo las que lo llevan se recodifican.
 * **`Song`**: Los fundidos (`Fades`) duran la sesión, hacen recortable la pista aunque no se elimine silencio y la marcan como «Ajustado».
 * **`FFmpegRunner.Start`**: Puede redirigir la entrada estándar.
+
+### Corregido
+* **Forma de onda**: La etiqueta del fundido ya no queda tapada por las referencias de amplitud.
+* **Clic derecho en la rejilla**: Conserva la multiselección cuando el clic cae sobre una fila ya seleccionada.
+* **Arrastre a la rejilla**: Acepta carpetas y archivos soltados sobre ella.
 
 ## [1.2.0] - 2026-10-02
 
