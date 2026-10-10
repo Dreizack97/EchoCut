@@ -16,6 +16,16 @@ public sealed record ReplayGainResult(double GainDb, double Peak)
     /// <summary>Nivel percibido de la pista en la escala de ReplayGain.</summary>
     /// <value>Decibelios SPL equivalentes; 89 dB es la referencia.</value>
     public double LevelDb => ReplayGainAnalyzer.ReferenceLevelDb - GainDb;
+
+    /// <summary>La medida que tendría la pista tras cambiar su <c>global_gain</c>.</summary>
+    /// <param name="steps">Pasos de 1.5 dB aplicados.</param>
+    /// <returns>La medida desplazada, sin volver a decodificar.</returns>
+    /// <remarks>
+    /// Es exacta, no una estimación: el cambio escala todas las muestras por el mismo factor
+    /// 2^(pasos/4), así que el percentil se desplaza en dB y el pico se multiplica por el factor.
+    /// </remarks>
+    public ReplayGainResult AfterSteps(int steps) =>
+        new(GainDb - (steps * Mp3GainEditor.StepDecibels), Peak * Math.Pow(2.0, steps / 4.0));
 }
 
 /// <summary>
