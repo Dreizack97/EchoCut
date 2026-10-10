@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet&logoColor=white" alt=".NET 10" />
   <img src="https://img.shields.io/badge/C%23-14-239120?style=flat-square&logo=csharp&logoColor=white" alt="C# 14" />
-  <img src="https://img.shields.io/badge/Versi%C3%B3n-1.2.0-blue.svg?style=flat-square" alt="Versión 1.2.0" />
+  <img src="https://img.shields.io/badge/Versi%C3%B3n-1.3.0-blue.svg?style=flat-square" alt="Versión 1.3.0" />
   <img src="https://img.shields.io/badge/UI-Windows%20Forms-0078D7?style=flat-square&logo=windows&logoColor=white" alt="Windows Forms" />
   <img src="https://img.shields.io/badge/Engine-FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white" alt="FFmpeg" />
   <img src="https://img.shields.io/badge/Licencia-GPLv3-blue.svg?style=flat-square" alt="Licencia GPLv3" />
@@ -216,11 +216,12 @@ EchoCut incluye 24 parámetros calibrados exhaustivamente para música comercial
 
 ## 🎵 Formatos de Audio Compatibles
 
-Gracias a la integración combinada de **TagLibSharp** (lectura de metadatos) y **FFmpeg** (decodificación y copia de flujo), EchoCut soporta 19 extensiones:
+Gracias a la integración combinada de **TagLibSharp** (lectura de metadatos) y **FFmpeg** (decodificación y copia de flujo), EchoCut soporta 20 extensiones:
 
 | Formato | Extensiones | Corte sin pérdida (`-c copy`) | Fundidos y borrados (recodifica) |
 | :--- | :--- | :---: | :---: |
 | **MPEG Audio** | `.mp3` | ✅ | ✅ |
+| **MPEG Audio Layer II** | `.mp2` | ✅ | ✅ |
 | **Free Lossless Audio Codec** | `.flac` | ✅ | ✅ sin pérdida |
 | **Waveform Audio** | `.wav` | ✅ | ✅ sin pérdida |
 | **Advanced Audio Coding** | `.aac`, `.m4a`, `.m4b`, `.m4p` | ✅ | ✅ (salvo `.m4p`) |
@@ -280,6 +281,9 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
 ## 📖 Guía de Uso Paso a Paso
 
 1. **Seleccionar Carpeta(s) o Archivo(s) (`Ruta...` / `Archivo(s)...`)**: Elige uno o varios directorios o selecciona archivos específicos directamente. EchoCut listará las pistas y leerá sus etiquetas y metadatos en segundo plano.
+   - Con la lista vacía, también puedes arrastrar carpetas o archivos sobre la rejilla. Si EchoCut ya está abierto, abrir archivos desde el Explorador los suma a esa misma ventana.
+   - **Filtrar** (`Ctrl+F`): Oculta mientras escribes las canciones cuyo nombre no contiene el texto; `Esc` lo vacía. Los lotes siguen actuando sobre todas las canciones cargadas, y la barra de estado indica cuántas se ven.
+   - **Columnas**: Clic derecho sobre una cabecera para mostrar u ocultar columnas. La elección se recuerda entre sesiones, y «Nombre» siempre queda visible.
 2. **Ajustar Tolerancia e Hilos**:
    - **Tolerancia**: Los segundos de silencio que deseas conservar al final (0.3 s por defecto es el estándar musical ideal).
    - **Hilos**: Grado de paralelismo (EchoCut calibra automáticamente entre 1 y 8 hilos según tu procesador).
