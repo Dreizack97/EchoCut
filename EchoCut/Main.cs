@@ -1034,6 +1034,7 @@ namespace EchoCut
             mnuMetadata.Enabled = hasSongs;
             mnuNormalize.Enabled = hasSongs;
             mnuRename.Enabled = hasSongs;
+            mnuVolume.Enabled = hasSongs;
             mnuConvertMp3.Enabled = hasSongs;
             mnuFindDuplicates.Enabled = _songs.Count > 1;
             btnAdvanced.Enabled = !IsBusy;

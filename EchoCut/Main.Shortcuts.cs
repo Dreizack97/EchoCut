@@ -72,6 +72,7 @@ namespace EchoCut
                 new(Keys.Control | Keys.N, mnuNormalize, GroupUtilities),
                 new(Keys.Control | Keys.Shift | Keys.C, mnuAddSequence, GroupUtilities),
                 new(Keys.Control | Keys.Shift | Keys.Q, mnuRemoveLeading, GroupUtilities),
+                new(Keys.Control | Keys.Shift | Keys.V, mnuVolume, GroupUtilities),
                 new(Keys.Control | Keys.Shift | Keys.M, mnuConvertMp3, GroupUtilities),
                 new(Keys.Control | Keys.Shift | Keys.D, mnuFindDuplicates, GroupUtilities),
 

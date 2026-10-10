@@ -69,6 +69,7 @@ namespace EchoCut
             mnuAddSequence = new ToolStripMenuItem();
             mnuRemoveLeading = new ToolStripMenuItem();
             sepTools = new ToolStripSeparator();
+            mnuVolume = new ToolStripMenuItem();
             mnuConvertMp3 = new ToolStripMenuItem();
             mnuFindDuplicates = new ToolStripMenuItem();
             sepExplorer = new ToolStripSeparator();
@@ -363,12 +364,12 @@ namespace EchoCut
             // ddbUtilities
             // 
             ddbUtilities.DisplayStyle = ToolStripItemDisplayStyle.Text;
-            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize, mnuRename, sepTools, mnuConvertMp3, mnuFindDuplicates, sepExplorer, mnuExplorer });
+            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize, mnuRename, sepTools, mnuVolume, mnuConvertMp3, mnuFindDuplicates, sepExplorer, mnuExplorer });
             ddbUtilities.Name = "ddbUtilities";
             ddbUtilities.Size = new Size(82, 23);
             ddbUtilities.Text = "Utilidades";
             ddbUtilities.DropDownOpening += ddbUtilities_DropDownOpening;
-            ddbUtilities.ToolTipText = "Metadatos, nombres, conversión a MP3 y búsqueda de duplicados";
+            ddbUtilities.ToolTipText = "Metadatos, nombres, volumen, conversión a MP3 y búsqueda de duplicados";
             // 
             // mnuMetadata
             // 
@@ -430,6 +431,14 @@ namespace EchoCut
             // 
             sepTools.Name = "sepTools";
             sepTools.Size = new Size(189, 6);
+            // 
+            // mnuVolume
+            // 
+            mnuVolume.Name = "mnuVolume";
+            mnuVolume.Size = new Size(260, 24);
+            mnuVolume.Text = "Regularizar volumen…";
+            mnuVolume.ToolTipText = "Medir el volumen de las canciones MP3 y llevarlas todas al mismo nivel, sin recodificar y de forma reversible";
+            mnuVolume.Click += mnuVolume_Click;
             // 
             // mnuConvertMp3
             // 
@@ -651,6 +660,7 @@ namespace EchoCut
         private ToolStripMenuItem mnuAddSequence;
         private ToolStripMenuItem mnuRemoveLeading;
         private ToolStripSeparator sepTools;
+        private ToolStripMenuItem mnuVolume;
         private ToolStripMenuItem mnuConvertMp3;
         private ToolStripMenuItem mnuFindDuplicates;
         private ToolStripSeparator sepExplorer;
