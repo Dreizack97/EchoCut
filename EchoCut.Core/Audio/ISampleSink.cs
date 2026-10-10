@@ -14,7 +14,8 @@ public interface ISampleSink
 {
     /// <summary>Consume un bloque de muestras. El búfer se reutiliza al volver, no se puede retener.</summary>
     /// <param name="samples">
-    /// Muestras mono en punto flotante, en orden cronológico. La memoria que respalda el <c>span</c>
+    /// Muestras en punto flotante, en orden cronológico: mono, o intercaladas por canal si el
+    /// decodificador se pidió con más de uno. La memoria que respalda el <c>span</c>
     /// no es válida más allá de esta llamada.
     /// </param>
     void Write(ReadOnlySpan<float> samples);

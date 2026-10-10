@@ -68,6 +68,10 @@ namespace EchoCut
             mnuRename = new ToolStripMenuItem();
             mnuAddSequence = new ToolStripMenuItem();
             mnuRemoveLeading = new ToolStripMenuItem();
+            sepTools = new ToolStripSeparator();
+            mnuVolume = new ToolStripMenuItem();
+            mnuConvertMp3 = new ToolStripMenuItem();
+            mnuFindDuplicates = new ToolStripMenuItem();
             sepExplorer = new ToolStripSeparator();
             mnuExplorer = new ToolStripMenuItem();
             btnExport = new ToolStripButton();
@@ -360,12 +364,12 @@ namespace EchoCut
             // ddbUtilities
             // 
             ddbUtilities.DisplayStyle = ToolStripItemDisplayStyle.Text;
-            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize, mnuRename, sepExplorer, mnuExplorer });
+            ddbUtilities.DropDownItems.AddRange(new ToolStripItem[] { mnuMetadata, mnuNormalize, mnuRename, sepTools, mnuVolume, mnuConvertMp3, mnuFindDuplicates, sepExplorer, mnuExplorer });
             ddbUtilities.Name = "ddbUtilities";
             ddbUtilities.Size = new Size(82, 23);
             ddbUtilities.Text = "Utilidades";
             ddbUtilities.DropDownOpening += ddbUtilities_DropDownOpening;
-            ddbUtilities.ToolTipText = "Operaciones que modifican los archivos originales";
+            ddbUtilities.ToolTipText = "Metadatos, nombres, volumen, conversión a MP3 y búsqueda de duplicados";
             // 
             // mnuMetadata
             // 
@@ -422,6 +426,35 @@ namespace EchoCut
             mnuRemoveLeading.Text = "Quitar caracteres iniciales…";
             mnuRemoveLeading.ToolTipText = "Quitar caracteres del principio del nombre de las canciones";
             mnuRemoveLeading.Click += mnuRemoveLeading_Click;
+            // 
+            // sepTools
+            // 
+            sepTools.Name = "sepTools";
+            sepTools.Size = new Size(189, 6);
+            // 
+            // mnuVolume
+            // 
+            mnuVolume.Name = "mnuVolume";
+            mnuVolume.Size = new Size(260, 24);
+            mnuVolume.Text = "Regularizar volumen…";
+            mnuVolume.ToolTipText = "Medir el volumen de las canciones MP3 y llevarlas todas al mismo nivel, sin recodificar y de forma reversible";
+            mnuVolume.Click += mnuVolume_Click;
+            // 
+            // mnuConvertMp3
+            // 
+            mnuConvertMp3.Name = "mnuConvertMp3";
+            mnuConvertMp3.Size = new Size(260, 24);
+            mnuConvertMp3.Text = "Convertir a MP3…";
+            mnuConvertMp3.ToolTipText = "Escribir una copia en MP3 de las canciones cargadas en la subcarpeta «MP3», sin tocar los originales";
+            mnuConvertMp3.Click += mnuConvertMp3_Click;
+            // 
+            // mnuFindDuplicates
+            // 
+            mnuFindDuplicates.Name = "mnuFindDuplicates";
+            mnuFindDuplicates.Size = new Size(260, 24);
+            mnuFindDuplicates.Text = "Buscar duplicados por audio…";
+            mnuFindDuplicates.ToolTipText = "Encontrar canciones con la misma grabación aunque tengan otro nombre, formato o calidad";
+            mnuFindDuplicates.Click += mnuFindDuplicates_Click;
             // 
             // sepExplorer
             // 
@@ -626,6 +659,10 @@ namespace EchoCut
         private ToolStripMenuItem mnuRename;
         private ToolStripMenuItem mnuAddSequence;
         private ToolStripMenuItem mnuRemoveLeading;
+        private ToolStripSeparator sepTools;
+        private ToolStripMenuItem mnuVolume;
+        private ToolStripMenuItem mnuConvertMp3;
+        private ToolStripMenuItem mnuFindDuplicates;
         private ToolStripSeparator sepExplorer;
         private ToolStripMenuItem mnuExplorer;
         private StatusStrip statusStrip;

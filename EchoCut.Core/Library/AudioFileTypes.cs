@@ -9,7 +9,7 @@ public static class AudioFileTypes
 {
     private static readonly HashSet<string> Supported = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".aa", ".aax", ".aac", ".aiff", ".ape", ".dsf", ".flac", ".m4a", ".m4b", ".m4p", ".mp3",
+        ".aa", ".aax", ".aac", ".aiff", ".ape", ".dsf", ".flac", ".m4a", ".m4b", ".m4p", ".mp2", ".mp3",
         ".mpc", ".mpp", ".ogg", ".oga", ".wav", ".wma", ".wv", ".webm",
     };
 

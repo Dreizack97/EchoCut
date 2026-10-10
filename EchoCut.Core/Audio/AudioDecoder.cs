@@ -9,6 +9,10 @@ namespace EchoCut.Audio;
 /// Decodificación vía FFmpeg. El audio se pide en mono, a baja frecuencia y en punto flotante:
 /// para métricas de energía sobra, y reduce el PCM que atraviesa la tubería a ~88 KB/s.
 /// </summary>
+/// <remarks>
+/// La medida de sonoridad es la excepción: ReplayGain filtra cada canal por separado y promedia
+/// después, así que pide los dos canales intercalados y la frecuencia original de la pista.
+/// </remarks>
 public sealed class AudioDecoder
 {
     /// <summary>Frecuencia de análisis. Muy por encima de lo que exige una medida de energía.</summary>
@@ -25,18 +29,28 @@ public sealed class AudioDecoder
     /// <see cref="AnalysisSampleRate"/>; el espectrograma necesita más para mostrar las altas
     /// frecuencias donde viven el hiss y las colas de platillos.
     /// </param>
-    /// <exception cref="ArgumentOutOfRangeException">Se lanza si <paramref name="sampleRate"/> no es positiva.</exception>
-    public AudioDecoder(string ffmpegPath, string ffprobePath, int sampleRate = AnalysisSampleRate)
+    /// <param name="channels">
+    /// Canales del PCM. Con 1, FFmpeg mezcla a mono; con más, las muestras llegan intercaladas.
+    /// </param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Se lanza si <paramref name="sampleRate"/> o <paramref name="channels"/> no son positivos.
+    /// </exception>
+    public AudioDecoder(string ffmpegPath, string ffprobePath, int sampleRate = AnalysisSampleRate, int channels = 1)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sampleRate);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(channels);
 
         _ffmpegPath = ffmpegPath;
         _ffprobePath = ffprobePath;
         SampleRate = sampleRate;
+        Channels = channels;
     }
 
     /// <value>Frecuencia de muestreo del PCM que entrega este decodificador, en Hz.</value>
     public int SampleRate { get; }
+
+    /// <value>Canales del PCM que entrega este decodificador; 1 salvo que se pidan más.</value>
+    public int Channels { get; }
 
     /// <summary>Duración total del archivo según ffprobe, en segundos.</summary>
     /// <param name="filePath">Ruta del archivo de audio a consultar.</param>
@@ -196,7 +210,7 @@ public sealed class AudioDecoder
         [
             "-map", "0:a:0",
             "-vn",
-            "-ac", "1",
+            "-ac", Channels.ToString(CultureInfo.InvariantCulture),
             "-ar", SampleRate.ToString(CultureInfo.InvariantCulture),
             "-f", "f32le",
             "-",

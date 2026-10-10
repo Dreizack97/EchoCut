@@ -269,6 +269,40 @@ public static class TrackEditor
             : text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     /// <summary>
+    /// Copia las etiquetas y las imágenes de un archivo a otro, típicamente de un original a su
+    /// copia recodificada.
+    /// </summary>
+    /// <param name="sourcePath">Archivo del que se leen las etiquetas; no se modifica.</param>
+    /// <param name="destinationPath">Archivo al que se escriben.</param>
+    /// <remarks>
+    /// FFmpeg ya hereda las etiquetas de texto al recodificar, pero no la carátula: tendría que
+    /// tratarla como flujo de vídeo, y no todos los contenedores la admiten así. TagLibSharp la
+    /// escribe donde cada formato la guarda, así que se repasa aquí todo el conjunto.
+    /// </remarks>
+    /// <exception cref="ArgumentException">Si alguna ruta es nula o está en blanco.</exception>
+    /// <exception cref="FileNotFoundException">Si alguno de los archivos no existe en disco.</exception>
+    public static void CopyTags(string sourcePath, string destinationPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+
+        foreach (string path in (ReadOnlySpan<string>)[sourcePath, destinationPath])
+        {
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException("El archivo de audio no existe en disco.", path);
+            }
+        }
+
+        using TagLib.File source = TagLib.File.Create(sourcePath);
+        using TagLib.File destination = TagLib.File.Create(destinationPath);
+
+        source.Tag.CopyTo(destination.Tag, overwrite: true);
+        destination.Tag.Pictures = source.Tag.Pictures;
+        destination.Save();
+    }
+
+    /// <summary>
     /// Elimina todos los metadatos y etiquetas del archivo de audio indicado en disco.
     /// </summary>
     /// <param name="filePath">Ruta absoluta del archivo de audio.</param>

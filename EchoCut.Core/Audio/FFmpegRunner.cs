@@ -23,9 +23,17 @@ public static class FFmpegRunner
     /// <param name="redirectStandardOutput">
     /// Si se debe redirigir la salida estándar del proceso para poder leerla desde el llamador.
     /// </param>
+    /// <param name="redirectStandardInput">
+    /// Si se debe redirigir la entrada estándar para alimentar al proceso desde el llamador, como
+    /// cuando FFmpeg codifica PCM que se le escribe por tubería.
+    /// </param>
     /// <returns>El proceso recién iniciado, ya en ejecución.</returns>
     /// <exception cref="FFmpegException">Se lanza si el sistema operativo no llega a crear el proceso.</exception>
-    public static Process Start(string executable, IReadOnlyList<string> arguments, bool redirectStandardOutput)
+    public static Process Start(
+        string executable,
+        IReadOnlyList<string> arguments,
+        bool redirectStandardOutput,
+        bool redirectStandardInput = false)
     {
         ProcessStartInfo info = new()
         {
@@ -33,6 +41,7 @@ public static class FFmpegRunner
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = redirectStandardOutput,
+            RedirectStandardInput = redirectStandardInput,
             RedirectStandardError = true,
         };
 

@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet&logoColor=white" alt=".NET 10" />
   <img src="https://img.shields.io/badge/C%23-14-239120?style=flat-square&logo=csharp&logoColor=white" alt="C# 14" />
-  <img src="https://img.shields.io/badge/Versi%C3%B3n-1.2.0-blue.svg?style=flat-square" alt="Versión 1.2.0" />
+  <img src="https://img.shields.io/badge/Versi%C3%B3n-1.3.0-blue.svg?style=flat-square" alt="Versión 1.3.0" />
   <img src="https://img.shields.io/badge/UI-Windows%20Forms-0078D7?style=flat-square&logo=windows&logoColor=white" alt="Windows Forms" />
   <img src="https://img.shields.io/badge/Engine-FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white" alt="FFmpeg" />
   <img src="https://img.shields.io/badge/Licencia-GPLv3-blue.svg?style=flat-square" alt="Licencia GPLv3" />
@@ -86,6 +86,7 @@ graph TD
             BiquadFilter["Biquad (Paso Alto EBU R128)"]
             Decoder["AudioDecoder (FFmpeg f32le Mono)"]
             Trimmer["AudioTrimmer (FFmpeg -c copy)"]
+            Renderer["AudioRenderer (PcmEditor entre dos FFmpeg)"]
             Locator["FFmpegLocator"]
         end
 
@@ -154,6 +155,32 @@ flowchart TD
 
 ---
 
+## 🧬 Huella Acústica para Encontrar Duplicados
+
+La búsqueda de duplicados no compara nombres ni etiquetas, sino el sonido. EchoCut calcula para cada canción una **huella acústica** con su propio motor DSP, siguiendo el algoritmo de Haitsma y Kalker (Philips, 2002):
+
+1. **Decodificación ligera**: FFmpeg entrega el audio en mono a 5512 Hz, suficiente para la banda que interesa.
+2. **Espectro por tramas**: tramas de 1024 muestras (186 ms) con salto de 128 (23 ms), ventana de Hann y FFT.
+3. **33 bandas logarítmicas entre 300 y 2000 Hz**, la zona más estable de una grabación frente a la compresión y la ecualización.
+4. **Una palabra de 32 bits por trama**: cada bit es el signo de cómo cambia la diferencia de energía entre dos bandas vecinas de una trama a la siguiente. No depende del volumen y apenas del códec; las tramas en silencio se marcan para no contarlas.
+
+Para comparar una biblioteca entera sin enfrentar cada canción con todas las demás, las palabras se guardan en un **índice invertido**: entre copias de la misma grabación decenas de palabras coinciden exactamente y en el mismo desfase, lo que propone las parejas candidatas. Cada candidata se verifica alineando ambas huellas y midiendo la **tasa de bits distintos** sobre lo que suena en las dos: entre copias en distinto formato ronda 0.05–0.10, y entre canciones distintas, 0.5. Se acepta por debajo de 0.25 si coincide al menos el 80 % de lo que suena en cada una —así una mezcla que contiene una canción no pasa por copia suya— y las parejas se agrupan: si A se parece a B y B a C, las tres son copias de lo mismo.
+
+---
+
+## 🔊 Igualación de Volumen sin Pérdida (ReplayGain)
+
+Para que una biblioteca suene pareja, sin saltos de volumen entre canciones, EchoCut porta el método de **MP3Gain**: mide la sonoridad percibida de cada pista y la ajusta **sin decodificar ni recodificar**.
+
+1. **Medida ReplayGain 1.0** (`ReplayGainAnalyzer`, port de `gain_analysis.c`): cada canal, decodificado en estéreo a su frecuencia original, pasa por un filtro Yule-Walker de orden 10 que imita la curva de igual sonoridad del oído y por un Butterworth paso alto a 150 Hz. Se mide el RMS en ventanas de 50 ms y se toma el **percentil 95**: el nivel que solo supera el 5 % más fuerte, para que una intro tranquila o unos golpes aislados no falseen la medida. La ganancia es la distancia a la referencia de **89 dB**.
+2. **Ajuste en la trama** (`Mp3GainEditor`): cada gránulo MP3 guarda un `global_gain` de 8 bits que escala sus muestras por 2^(n/4). Sumarle un entero cambia el volumen en pasos de **1.5 dB** sin tocar los datos cuantizados, así que no se pierde calidad y el cambio se deshace restando lo mismo. Se recalcula el CRC de las tramas que lo llevan y se respetan los gránulos de silencio digital.
+3. **Protección contra saturación** (`GainPlanner`): una subida se limita a lo que permite el pico de la pista; bajar nunca se limita.
+4. **Seguro y reversible**: cada archivo se reescribe en una copia temporal que sustituye al original solo al terminar, y el cambio se anota en la etiqueta APE con los mismos campos que MP3Gain (`MP3GAIN_UNDO`, `MP3GAIN_MINMAX`), además de corregir los valores ReplayGain para que ningún reproductor aplique la ganancia dos veces. Se puede deshacer desde EchoCut o con el propio MP3Gain.
+
+Solo se aplica a MP3: el truco de `global_gain` es exclusivo de MPEG Layer III y cualquier otro formato exigiría recodificar.
+
+---
+
 ## 🎛️ Parámetros del Algoritmo
 
 EchoCut incluye 24 parámetros calibrados exhaustivamente para música comercial masterizada. Puedes ajustarlos desde el diálogo **Avanzado**:
@@ -189,23 +216,26 @@ EchoCut incluye 24 parámetros calibrados exhaustivamente para música comercial
 
 ## 🎵 Formatos de Audio Compatibles
 
-Gracias a la integración combinada de **TagLibSharp** (lectura de metadatos) y **FFmpeg** (decodificación y copia de flujo), EchoCut soporta 19 extensiones:
+Gracias a la integración combinada de **TagLibSharp** (lectura de metadatos) y **FFmpeg** (decodificación y copia de flujo), EchoCut soporta 20 extensiones:
 
-| Formato | Extensiones | Corte sin pérdida (`-c copy`) |
-| :--- | :--- | :---: |
-| **MPEG Audio** | `.mp3` | ✅ |
-| **Free Lossless Audio Codec** | `.flac` | ✅ |
-| **Waveform Audio** | `.wav` | ✅ |
-| **Advanced Audio Coding** | `.aac`, `.m4a`, `.m4b`, `.m4p` | ✅ |
-| **Ogg Vorbis / Audio** | `.ogg`, `.oga` | ✅ |
-| **Windows Media Audio** | `.wma` | ✅ |
-| **Audio Interchange (Apple)** | `.aiff` | ✅ |
-| **Monkey's Audio** | `.ape` | ✅ |
-| **WavPack** | `.wv` | ✅ |
-| **Musepack** | `.mpc`, `.mpp` | ✅ |
-| **Direct Stream Digital** | `.dsf` | ✅ |
-| **WebM / Opus** | `.webm` | ✅ |
-| **Audible Audiobooks** | `.aa`, `.aax` | ✅ |
+| Formato | Extensiones | Corte sin pérdida (`-c copy`) | Fundidos y borrados (recodifica) |
+| :--- | :--- | :---: | :---: |
+| **MPEG Audio** | `.mp3` | ✅ | ✅ |
+| **MPEG Audio Layer II** | `.mp2` | ✅ | ✅ |
+| **Free Lossless Audio Codec** | `.flac` | ✅ | ✅ sin pérdida |
+| **Waveform Audio** | `.wav` | ✅ | ✅ sin pérdida |
+| **Advanced Audio Coding** | `.aac`, `.m4a`, `.m4b`, `.m4p` | ✅ | ✅ (salvo `.m4p`) |
+| **Ogg Vorbis / Audio** | `.ogg`, `.oga` | ✅ | ✅ |
+| **Windows Media Audio** | `.wma` | ✅ | ✅ |
+| **Audio Interchange (Apple)** | `.aiff` | ✅ | ✅ sin pérdida |
+| **Monkey's Audio** | `.ape` | ✅ | ❌ |
+| **WavPack** | `.wv` | ✅ | ✅ sin pérdida |
+| **Musepack** | `.mpc`, `.mpp` | ✅ | ❌ |
+| **Direct Stream Digital** | `.dsf` | ✅ | ❌ |
+| **WebM / Opus** | `.webm` | ✅ | ✅ |
+| **Audible Audiobooks** | `.aa`, `.aax` | ✅ | ❌ |
+
+Una copia con fundidos o fragmentos borrados no puede salir por copia de flujo: se recodifica al **mismo códec** del original (a su misma tasa de bits en los formatos con pérdida, y a su misma resolución en los sin pérdida) y se le copian etiquetas y carátula. Las pistas sin ediciones siguen recortándose con `-c copy`. Los formatos marcados con ❌ no tienen codificador en FFmpeg y la copia editada falla con un mensaje claro.
 
 ---
 
@@ -251,10 +281,13 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
 ## 📖 Guía de Uso Paso a Paso
 
 1. **Seleccionar Carpeta(s) o Archivo(s) (`Ruta...` / `Archivo(s)...`)**: Elige uno o varios directorios o selecciona archivos específicos directamente. EchoCut listará las pistas y leerá sus etiquetas y metadatos en segundo plano.
+   - Con la lista vacía, también puedes arrastrar carpetas o archivos sobre la rejilla. Si EchoCut ya está abierto, abrir archivos desde el Explorador los suma a esa misma ventana.
+   - **Filtrar** (`Ctrl+F`): Oculta mientras escribes las canciones cuyo nombre no contiene el texto; `Esc` lo vacía. Los lotes siguen actuando sobre todas las canciones cargadas, y la barra de estado indica cuántas se ven.
+   - **Columnas**: Clic derecho sobre una cabecera para mostrar u ocultar columnas. La elección se recuerda entre sesiones, y «Nombre» siempre queda visible.
 2. **Ajustar Tolerancia e Hilos**:
    - **Tolerancia**: Los segundos de silencio que deseas conservar al final (0.3 s por defecto es el estándar musical ideal).
    - **Hilos**: Grado de paralelismo (EchoCut calibra automáticamente entre 1 y 8 hilos según tu procesador).
-3. **Analizar (`Analizar`)**: EchoCut procesará el principio y el final de las canciones en paralelo, mostrando el progreso y coloreando las filas recortables en ámbar oscuro.
+3. **Analizar (`Analizar`)**: EchoCut procesará el principio y el final de las canciones en paralelo, mostrando el progreso y coloreando las filas recortables en ámbar oscuro. Las canciones con fundidos o fragmentos borrados se analizan sobre su **resultado editado**, que es lo que quedará en la copia, para que sus silencios y su recorte lo reflejen.
 4. **Previsualizar de Oído (`▶` / `⏹`)**: Pulsa el botón de reproducción en cualquier fila. Sonará de inmediato la música previa al punto de corte (3.0 s por defecto, personalizable en **Avanzado**) más la tolerancia conservada, permitiéndote comprobar auditivamente que el corte no interrumpe la frase musical.
 5. **Recortar**:
    - Pulsa **`Recortar todo`** para procesar en lote todas las pistas válidas.
@@ -262,7 +295,18 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
    - Las copias resultantes se crearán en la subcarpeta `Recortados/` correspondiente a la carpeta de cada archivo.
 6. **Auditoría, Edición de Metadatos y Gestión**:
    - **Clic derecho sobre una o varias filas**:
-     - *Ver forma de onda y ajustar recorte*: Muestra la forma de onda de la pista completa y, en detalle, su principio y su final con el recorte superpuesto; lo que se eliminaría aparece con fondo gris y onda atenuada, como una selección de Audacity. La casilla *Escala en dB* agranda las colas de fundido y el hiss que en escala lineal parecen una línea plana. Arrastra las marcas con el ratón, muévelas con ← y → (10 ms; 100 ms con Mayús; 1 s con Ctrl) o escribe el instante exacto, y escucha cada borde tal como quedará mientras un cursor rojo recorre la forma de onda (el mismo botón lo detiene). El ajuste manual prevalece sobre el análisis durante la sesión, aunque cambies la tolerancia o vuelvas a analizar, y la fila pasa a estado *Ajustado*. También funciona con pistas sin analizar.
+     - *Ver forma de onda y ajustar recorte*: Abre una ventana propia para la pista; puedes tener varias abiertas a la vez, una por canción, y seguir usando la ventana principal (volver a abrir una canción trae su ventana al frente). Sigue el estilo de la ventana principal: arriba, una barra de herramientas con las acciones (*Reproducir*, *Aparición*, *Desaparición*, *Borrar*, *Restaurar*, *Deshacer*, *Rehacer* y el zoom); en el centro, la forma de onda de la pista completa y, en detalle, su principio y su final; a la derecha, un **inspector**, y abajo, una barra de estado que describe cada opción al pasar el ratón y resume la copia: su duración final (⏱), los fundidos, lo borrado y si saldrá sin pérdida o se recodificará. *⌨ Atajos* (`F1`) reúne todos los atajos del editor. También funciona con pistas sin analizar.
+       - **Recorte**: Lo que se eliminaría aparece con fondo gris y onda atenuada, como una selección de Audacity. Arrastra las marcas con el ratón, muévelas con ← y → (10 ms; 100 ms con Mayús; 1 s con Ctrl) o escribe el instante exacto en la sección *Copia* del inspector, que también muestra la duración final y escucha cada borde (*▶ Inicio*, *▶ Final*). El ajuste manual prevalece sobre el análisis durante la sesión, aunque cambies la tolerancia o vuelvas a analizar, y la fila pasa a estado *Ajustado*.
+       - **Seleccionar y actuar**: Como en Audacity, arrastra sobre cualquiera de las tres vistas para seleccionar un tramo y después actúa sobre él desde la barra. Un clic suelto quita la selección y marca desde dónde escuchar (línea punteada); un clic sobre un fundido o sobre un fragmento borrado lo muestra en el inspector. Los bordes de la selección y de los fundidos se pueden arrastrar, y los extremos se adhieren a las marcas de recorte y a los bordes de lo borrado cercanos. `Esc` quita la selección.
+       - **Inspector**: Muestra siempre la copia y, debajo, los detalles de lo último que tocaste: la selección, un fundido o un fragmento borrado, con sus instantes exactos editables. En un fundido elige la curva entre los preajustes de «Adjustable fade» de Audacity —*Lineal* (el Fade In/Out integrado), *Curva S*, *Coseno*, *Redondeada*, *Logarítmica* y *Exponencial*—, dibujada con su nivel a mitad de camino, y permite quitarlo; en un fragmento borrado, restaurarlo.
+       - **Fundidos (aparición/desaparición)**: Con un tramo seleccionado, pulsa *◢ Aparición* (`Ctrl+Shift+A`) o *◣ Desaparición* (`Ctrl+Shift+D`); el fundido nace con la última curva usada en ese sentido y su envolvente se dibuja en ámbar sobre la onda. Como en Audacity, el efecto solo toca la selección.
+       - **Borrar** (`Supr`): Quita de la copia el audio seleccionado y une lo anterior con lo posterior, como el *Borrar* de Audacity: la canción se acorta y el empalme queda en seco, exacto a la muestra. Lo borrado se ve gris y rayado, y la escucha y el cursor lo saltan. *Restaurar* (`Ctrl+Shift+R`) devuelve lo borrado que caiga dentro de la selección.
+       - **Deshacer y rehacer** (`Ctrl+Z` / `Ctrl+Y`): Cualquier cambio —marcas, fundidos, curvas, borrados y restauraciones— se puede deshacer; un arrastre cuenta como un solo cambio.
+       - **Escuchar** (`Espacio`): Suena la selección o, sin ella, desde el punto marcado con un clic (o desde el comienzo de la copia), hasta 30 s, con los fundidos y los borrados ya aplicados; volver a pulsar detiene. Solo suena una cosa a la vez en toda la aplicación.
+       - **Ver el resultado** (`⇄ Ver resultado`, `Ctrl+R`): Sobre el original la onda ya se dibuja con los fundidos aplicados, y lo borrado sigue rayado para poder restaurarlo. *Ver resultado* cambia las tres vistas a la línea de tiempo de la copia: lo borrado desaparece, lo anterior y lo posterior se juntan y cada empalme queda marcado en morado. Ahí puedes **ajustar el recorte con precisión** sobre lo que de verdad sonará: arrastra las marcas de inicio y final, muévelas con ← y → o escribe el instante en la sección *Copia*, que pasa a mostrar los tiempos del resultado; EchoCut los traduce al original. Un clic marca desde dónde escuchar y `Ctrl+Z` sigue deshaciendo. Fundidos y borrados se editan en el original: vuelve a pulsar *Ver resultado*.
+       - **Detectar silencios** (`⌕ Detectar silencios`, `F5`): Analiza el resultado editado con el mismo algoritmo que la ventana principal y propone el comienzo y el final de la copia. Sirve para recortar silencios que solo aparecen al editar: borrar una pista oculta deja el final en silencio, o una desaparición deja la cola por debajo del umbral. Se puede deshacer con `Ctrl+Z`, y al aceptar o guardar la fila adopta ese análisis.
+       - **Zoom**: La rueda desplaza cada vista y `Ctrl`+rueda acerca o aleja bajo el puntero. Los botones y atajos (`Ctrl++`, `Ctrl+−`, *Ver selección* `Ctrl+E`, *Ver todo* `Ctrl+F`) actúan sobre la última vista tocada. *Escala en dB* agranda las colas de fundido y el hiss que en escala lineal parecen una línea plana.
+       - **Guardar** (`💾 Guardar`, `Ctrl+S`): Aplica los ajustes a la fila y escribe la copia en `Recortados/`, sin tocar el original y sin cerrar la ventana; la fila pasa a *Recortado*. *Aceptar* (`Ctrl+Entrar`) aplica los ajustes y cierra; *Cancelar* cierra y, si hay cambios sin aplicar, pregunta qué hacer con ellos. Una copia con fundidos o borrados se recodifica (ver *Formatos de Audio Compatibles*).
      - *Abrir ubicación*: Revela los archivos en el Explorador de Windows con las canciones seleccionadas.
      - *Abrir en Audacity*: Abre simultáneamente todas las pistas seleccionadas en una sesión de Audacity (o haz doble clic sobre cualquier fila para abrirla de inmediato).
      - *Editar propiedades*: Abre la ventana modal nativa de propiedades para consultar o editar metadatos ID3/Vorbis (título, artistas, año, álbum, etc.) o renombrar el archivo físico en disco.
@@ -276,6 +320,9 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
      - *Agregar consecutivo…*: Antepone un número con ceros a la izquierda, por ejemplo `0001 - Artista - Nombre.mp3`; se eligen el número inicial, los dígitos y el separador.
      - *Quitar caracteres iniciales…*: Elimina una cantidad de caracteres del principio del nombre y, opcionalmente, los espacios y separadores que queden delante.
    - **Exportar (`Exportar`)**: Genera un archivo CSV codificado en UTF-8 con BOM y separador regional, listo para abrirse en Microsoft Excel con todas las métricas acústicas de cada pista.
+   - **Regularizar volumen (`Utilidades › Regularizar volumen…`)**: Abre una ventana con las canciones MP3 cargadas (las demás se omiten). *Analizar* (`F5`) mide su volumen sin tocarlas y la lista muestra, por canción, el **volumen** actual, el **ajuste** propuesto, el **resultado** previsto, el **pico**, si **satura** o si la subida se limitó para no saturar, y el ajuste **acumulado** respecto a su volumen original. El **volumen objetivo** —89 dB por defecto, entre 75 y 105 dB y recordado entre sesiones— recalcula las propuestas al instante. *Aplicar ajuste* (`Ctrl+Entrar`) modifica los originales marcados **sin recodificar**, en pasos de 1.5 dB, y cada fila pasa a enseñar el volumen de antes, el ajuste aplicado y cómo quedó. *Restaurar original* devuelve las marcadas a su volumen de siempre, también si el ajuste se hizo con MP3Gain. Las columnas se ordenan con un clic en su encabezado.
+   - **Convertir a MP3 (`Utilidades › Convertir a MP3…`)**: Escribe una copia en MP3 de las canciones cargadas en la subcarpeta `MP3/` junto a cada original, que no se modifica, con sus etiquetas y su carátula. Se elige la calidad —*VBR V0* (~245 kbps, recomendada), *VBR V2* (~190 kbps), *CBR 320* o *CBR 192*— y se recuerda entre sesiones. Las que ya son MP3 se omiten, porque volver a codificarlas solo les quitaría calidad. Se convierte el original tal cual: el recorte y las ediciones se siguen aplicando con *Recortar*.
+   - **Buscar duplicados por audio (`Utilidades › Buscar duplicados por audio…`)**: Encuentra las canciones que contienen la misma grabación aunque tengan otro nombre, formato, tasa de bits o volumen, o silencios de distinta duración. Muestra los grupos con su parecido, duración, formato, bitrate, tamaño y carpeta; en cada uno propone conservar la de mejor calidad (sin pérdida, más bitrate, más duración) y deja marcadas las demás. Se puede escuchar cada copia, abrir su ubicación y cambiar las marcas antes de enviar las marcadas a la **Papelera de reciclaje**, de donde se pueden recuperar. Una mezcla o un popurrí que contiene una canción no se toma por copia suya.
    - **Integrar con el Explorador de Windows (`Utilidades`)**: Agrega o quita «Abrir con EchoCut» en el menú contextual de los archivos de audio y las carpetas, sin permisos de administrador. En Windows 11 aparece en «Mostrar más opciones». Lo abierto desde el Explorador se suma al listado de la ventana ya abierta; si se mueve la carpeta de EchoCut, basta con volver a activar la opción.
 
 ### ⌨️ Atajos de teclado
@@ -291,6 +338,8 @@ El botón **⌨ Atajos** de la barra de herramientas, o `F1`, muestra la lista c
 | Procesar | Exportar CSV | `Ctrl+E` |
 | Utilidades | Agregar metadatos / Normalizar | `Ctrl+M` / `Ctrl+N` |
 | Utilidades | Agregar consecutivo / Quitar caracteres iniciales | `Ctrl+Shift+C` / `Ctrl+Shift+Q` |
+| Utilidades | Regularizar volumen | `Ctrl+Shift+V` |
+| Utilidades | Convertir a MP3 / Buscar duplicados por audio | `Ctrl+Shift+M` / `Ctrl+Shift+D` |
 | Rejilla | Ver forma de onda y ajustar recorte | `Entrar` |
 | Rejilla | Renombrar / Editar propiedades | `F2` / `Alt+Entrar` |
 | Rejilla | Abrir carpeta contenedora | `Ctrl+Shift+E` |
@@ -299,6 +348,13 @@ El botón **⌨ Atajos** de la barra de herramientas, o `F1`, muestra la lista c
 | Filtro | Ir al filtro / vaciarlo | `Ctrl+F` / `Esc` |
 | Forma de onda | Elegir la marca de inicio o de fin | `Inicio` / `Fin` |
 | Forma de onda | Mover la marca 0,01 s / 0,1 s / 1 s | `←` `→` / `Shift+←` `→` / `Ctrl+←` `→` |
+| Forma de onda | Reproducir o detener | `Espacio` |
+| Forma de onda | Aparición / Desaparición desde la selección | `Ctrl+Shift+A` / `Ctrl+Shift+D` |
+| Forma de onda | Borrar la selección / quitarla / restaurar lo borrado | `Supr` / `Esc` / `Ctrl+Shift+R` |
+| Forma de onda | Deshacer / Rehacer | `Ctrl+Z` / `Ctrl+Y` |
+| Forma de onda | Detectar silencios del resultado / Ver resultado | `F5` / `Ctrl+R` |
+| Forma de onda | Acercar / Alejar / Ver selección / Ver todo | `Ctrl++` / `Ctrl+−` / `Ctrl+E` / `Ctrl+F` |
+| Forma de onda | Guardar / Aceptar / Atajos | `Ctrl+S` / `Ctrl+Entrar` / `F1` |
 | Opciones | Parámetros avanzados / Atajos de teclado | `Ctrl+,` / `F1` |
 
 Los atajos de la rejilla funcionan con la lista de canciones seleccionada.

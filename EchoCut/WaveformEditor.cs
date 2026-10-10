@@ -1,19 +1,34 @@
 using EchoCut.Audio;
 using EchoCut.Controls;
-using EchoCut.Library;
-using EchoCut.Playback;
+using EchoCut.Objects;
 using EchoCut.Processing;
 using EchoCut.Waveforms;
+using System.ComponentModel;
 
 namespace EchoCut
 {
     /// <summary>
     /// Ventana que muestra la forma de onda de una pista —completa y en detalle sus dos bordes— con
-    /// el recorte propuesto superpuesto, y permite corregirlo a mano.
+    /// el recorte propuesto superpuesto, y permite corregirlo a mano, añadir fundidos y borrar
+    /// fragmentos.
     /// </summary>
     /// <remarks>
-    /// Solo devuelve una decisión: el tramo ajustado en <see cref="ManualRange"/>. Aplicarlo a la
-    /// fila es cosa de quien la abre, igual que con el diálogo de propiedades.
+    /// <para>
+    /// Sigue el estilo de la ventana principal: una barra de herramientas con las acciones, una barra
+    /// de estado que describe cada opción y resume el resultado, y atajos anunciados en cada tooltip
+    /// y reunidos en «Atajos» (F1). A la derecha, un inspector muestra la copia y los detalles de lo
+    /// que se haya seleccionado: la selección, un fundido o un fragmento borrado.
+    /// </para>
+    /// <para>
+    /// Es una ventana sin modo: se pueden tener varias abiertas, una por pista, y seguir usando la
+    /// ventana principal. Por eso no toca la fila por su cuenta: avisa con <see cref="Applied"/> y
+    /// expone sus decisiones en <see cref="ManualRange"/> y <see cref="Edits"/>, y quien la abre las
+    /// aplica, igual que con el diálogo de propiedades.
+    /// </para>
+    /// <para>
+    /// El resto vive en archivos parciales: la edición y el inspector, el historial de deshacer, la
+    /// escucha, el zoom y la ayuda.
+    /// </para>
     /// </remarks>
     public partial class WaveformEditor : Form
     {
@@ -23,15 +38,12 @@ namespace EchoCut
         /// <summary>Música que se muestra más allá del corte en cada vista de detalle.</summary>
         private const double EdgeContextSeconds = 5.0;
 
-        /// <summary>Texto del botón de escucha mientras su tramo suena.</summary>
-        private const string StopPlaybackText = "⏹ Detener";
-
-        private readonly TrackInfo _track;
         private readonly double _durationSeconds;
-        private readonly TrimRange? _analysisRange;
-        private readonly WaveformService _service;
-        private readonly string _ffmpegPath;
-        private readonly double _previewSeconds;
+        private readonly WaveformEditorServices _services;
+        private readonly Func<WaveformEditor, Task<string?>> _save;
+
+        /// <summary>Tramo del análisis que tenía la fila al abrir la ventana, o <c>null</c> si no estaba analizada.</summary>
+        private readonly TrimRange? _initialAnalysisRange;
 
         /// <summary>
         /// Cancela la carga y la reproducción al cerrar. No se libera: los procesos de FFmpeg que lo
@@ -41,86 +53,112 @@ namespace EchoCut
         private readonly CancellationTokenSource _closing = new();
 
         private readonly List<Waveform> _waveforms = [];
-        private AudioPreviewPlayer? _player;
-        private Button? _playingButton;
-        private string _playingButtonText = string.Empty;
-        private int _playRequest;
 
         private double _startSeconds;
         private double _endSeconds;
         private bool _manual;
         private bool _syncing;
 
-        /// <summary>Prepara la ventana para una pista.</summary>
-        /// <param name="track">Pista a mostrar.</param>
-        /// <param name="durationSeconds">Duración con la que se calcularon los cortes.</param>
-        /// <param name="current">Tramo vigente: el ajuste manual o el del análisis.</param>
-        /// <param name="analysisRange">Tramo del análisis, o <c>null</c> si la pista no se ha analizado.</param>
-        /// <param name="isManual">Si <paramref name="current"/> es un ajuste manual previo.</param>
-        /// <param name="service">Servicio que carga las formas de onda.</param>
-        /// <param name="ffmpegPath">Ruta de FFmpeg para escuchar los bordes.</param>
-        /// <param name="previewSeconds">Segundos que se escuchan de cada borde.</param>
+        /// <summary>Si se está guardando: la ventana no se puede cerrar ni editar a medias.</summary>
+        private bool _saving;
+
+        /// <summary>Prepara la ventana para una pista, partiendo de lo que ya tenga decidido su fila.</summary>
+        /// <param name="song">Fila de la pista a mostrar.</param>
+        /// <param name="services">Lo que el editor toma de la ventana principal: carga, análisis y escucha.</param>
+        /// <param name="save">
+        /// Aplica las decisiones a la fila y escribe la copia; devuelve la ruta escrita, o <c>null</c>
+        /// si no se pudo guardar (quien guarda ya habrá explicado por qué).
+        /// </param>
         public WaveformEditor(
-            TrackInfo track,
-            double durationSeconds,
-            TrimRange current,
-            TrimRange? analysisRange,
-            bool isManual,
-            WaveformService service,
-            string ffmpegPath,
-            double previewSeconds)
+            Song song,
+            WaveformEditorServices services,
+            Func<WaveformEditor, Task<string?>> save)
         {
+            ArgumentNullException.ThrowIfNull(song);
+            ArgumentNullException.ThrowIfNull(services);
             InitializeComponent();
 
-            _track = track;
-            _durationSeconds = durationSeconds;
-            _analysisRange = analysisRange;
-            _service = service;
-            _ffmpegPath = ffmpegPath;
-            _previewSeconds = previewSeconds;
-            _manual = isManual;
+            Song = song;
+            _durationSeconds = song.DurationSeconds;
+            _initialAnalysisRange = song.Analysis?.Range;
+            _services = services;
+            _save = save;
+            _manual = song.ManualRange is not null;
 
-            lblTrack.Text = track.Name;
-            btnReset.Text = analysisRange is null ? "Quitar ajuste" : "Restablecer análisis";
-            numStart.Maximum = (decimal)durationSeconds;
-            numEnd.Maximum = (decimal)durationSeconds;
+            TrimRange current = song.TrimRange ?? new TrimRange(0.0, _durationSeconds);
+            _fadeIn = song.Edits?.Fades?.FadeIn;
+            _fadeOut = song.Edits?.Fades?.FadeOut;
+            _deletions = song.Edits?.Deletions ?? DeletedRegions.Empty;
+            _lastCurveIn = _fadeIn?.Curve ?? FadeCurve.Linear;
+            _lastCurveOut = _fadeOut?.Curve ?? FadeCurve.Linear;
 
-            // Cada vista de detalle abarca su silencio y unos segundos de música, para juzgar el corte
-            // en contexto aunque la pista arrastre silencios largos.
-            double headSeconds = Math.Min(durationSeconds, Math.Max(MinimumEdgeWindowSeconds, current.StartSeconds + EdgeContextSeconds));
-            double tailSeconds = Math.Min(durationSeconds, Math.Max(MinimumEdgeWindowSeconds, durationSeconds - current.EndSeconds + EdgeContextSeconds));
+            ShowTrackName();
+            song.PropertyChanged += Song_PropertyChanged;
+            UpdateResetButton();
 
-            viewOverview.SetView(durationSeconds, 0.0, durationSeconds);
-            viewStart.SetView(durationSeconds, 0.0, headSeconds);
-            viewEnd.SetView(durationSeconds, durationSeconds - tailSeconds, durationSeconds);
-
-            foreach (WaveformView view in Views)
+            foreach (NumericUpDown field in (NumericUpDown[])[numStart, numEnd, numFrom, numTo])
             {
-                view.StatusText = "Calculando forma de onda…";
+                field.Maximum = (decimal)_durationSeconds;
             }
 
+            cmbCurve.Items.AddRange([.. FadeText.Curves.Select(FadeText.Name)]);
+
+            // Cada vista de detalle abarca su silencio y unos segundos de música, para juzgar el corte
+            // en contexto aunque la pista arrastre silencios largos, y el fundido que ya tuviera.
+            double headSeconds = Math.Min(_durationSeconds, Math.Max(MinimumEdgeWindowSeconds, Math.Max(current.StartSeconds, _fadeIn?.EndSeconds ?? 0.0) + EdgeContextSeconds));
+            double tailSeconds = Math.Min(_durationSeconds, Math.Max(MinimumEdgeWindowSeconds, _durationSeconds - Math.Min(current.EndSeconds, _fadeOut?.StartSeconds ?? _durationSeconds) + EdgeContextSeconds));
+            InitializeViews(headSeconds, tailSeconds);
+
             ApplyRange(current.StartSeconds, current.EndSeconds);
+            ApplyFades();
+            ApplyDeletions();
+            ApplySelection(null);
+            ShowInspector(InspectorTarget.None);
+            InitializeHelp();
+            MarkApplied();
         }
 
-        /// <summary>Tramo elegido a mano al aceptar.</summary>
+        /// <summary>Se produce cuando el usuario pide llevar sus decisiones a la fila, al aceptar o al guardar.</summary>
+        public event EventHandler? Applied;
+
+        /// <value>Fila de la pista que se edita.</value>
+        public Song Song { get; }
+
+        /// <summary>Tramo elegido a mano.</summary>
         /// <value>
-        /// El tramo ajustado, o <c>null</c> si al aceptar mandaba el análisis, ya fuera porque no se
-        /// movió nada o porque se restableció.
+        /// El tramo ajustado, o <c>null</c> si manda el análisis, ya sea porque no se movió nada o
+        /// porque se restableció.
         /// </value>
-        public TrimRange? ManualRange { get; private set; }
+        public TrimRange? ManualRange => _manual ? new TrimRange(_startSeconds, _endSeconds) : null;
+
+        /// <summary>Fundidos y borrados elegidos.</summary>
+        /// <value>Las ediciones de la pista, o <c>null</c> si no lleva ninguna.</value>
+        public AudioEdits? Edits => AudioEdits.From(CurrentFades, _deletions);
 
         private IEnumerable<WaveformView> Views => [viewOverview, viewStart, viewEnd];
+
+        /// <summary>Tramo que conservará la copia; nunca vacío, aunque las marcas lleguen a tocarse.</summary>
+        private TrimRange KeptRange => new(_startSeconds, Math.Max(_endSeconds, _startSeconds + WaveformView.MinimumGapSeconds));
+
+        /// <summary>Cierra la ventana descartando los cambios sin preguntar.</summary>
+        /// <remarks>Para cuando la fila deja de existir: preguntar si aplicar a algo que ya no está no tiene sentido.</remarks>
+        public void Discard()
+        {
+            MarkApplied();
+            Close();
+        }
 
         private async void WaveformEditor_Shown(object? sender, EventArgs e)
         {
             CancellationToken token = _closing.Token;
+            string filePath = Song.FilePath;
 
             // La pista completa alimenta la vista general y el detalle del principio; el final se
             // carga aparte porque debe situarse con la misma referencia que el corte final, y llega
             // mucho antes que la pista entera.
             await Task.WhenAll(
-                LoadAsync(_service.LoadAsync(_track.FilePath, token), viewOverview, viewStart),
-                LoadAsync(_service.LoadTailAsync(_track.FilePath, _durationSeconds - viewEnd.ViewStartSeconds, _durationSeconds, token), viewEnd))
+                LoadAsync(_services.Waveforms.LoadAsync(filePath, token), viewOverview, viewStart),
+                LoadAsync(_services.Waveforms.LoadTailAsync(filePath, _durationSeconds - viewEnd.ViewStartSeconds, _durationSeconds, token), viewEnd))
                 .ConfigureAwait(true);
         }
 
@@ -141,9 +179,20 @@ namespace EchoCut
                 }
 
                 _waveforms.Add(waveform);
+                RememberWaveform(waveform, views);
                 foreach (WaveformView view in views)
                 {
-                    view.Waveform = waveform;
+                    // En la vista del resultado, el detalle del final usa la pista completa: su cola
+                    // no basta para juntar lo que queda a ambos lados de un borrado.
+                    if (!(_showingResult && view == viewEnd))
+                    {
+                        view.Waveform = waveform;
+                    }
+                }
+
+                if (_showingResult && views.Contains(viewOverview))
+                {
+                    viewEnd.Waveform = waveform;
                 }
             }
             catch (OperationCanceledException)
@@ -162,12 +211,32 @@ namespace EchoCut
             }
         }
 
+        /// <summary>El nombre de la pista va también en el título: con varias ventanas abiertas, es lo que las distingue en la barra de tareas.</summary>
+        private void ShowTrackName()
+        {
+            lblTrack.Text = Song.Name;
+            Text = $"{Song.Name} — Forma de onda, recorte y fundidos";
+        }
+
+        /// <summary>La fila puede renombrarse mientras la ventana sigue abierta.</summary>
+        private void Song_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(Song.Name) && !IsDisposed)
+            {
+                ShowTrackName();
+            }
+        }
+
+        // ------------------------------------------------------------------------------- Recorte
+
         private void View_MarkersChanged(object? sender, EventArgs e)
         {
             if (sender is WaveformView view)
             {
+                BeginChange();
                 _manual = true;
-                ApplyRange(view.StartMarkerSeconds, view.EndMarkerSeconds);
+                ApplyRange(ToSourceSeconds(view.StartMarkerSeconds), ToSourceSeconds(view.EndMarkerSeconds));
+                EndChange();
             }
         }
 
@@ -178,8 +247,10 @@ namespace EchoCut
                 return;
             }
 
+            BeginChange();
             _manual = true;
-            ApplyRange(Math.Min((double)numStart.Value, _endSeconds - WaveformView.MinimumGapSeconds), _endSeconds);
+            ApplyRange(Math.Min(ToSourceSeconds((double)numStart.Value), _endSeconds - WaveformView.MinimumGapSeconds), _endSeconds);
+            EndChange();
         }
 
         private void numEnd_ValueChanged(object? sender, EventArgs e)
@@ -189,124 +260,20 @@ namespace EchoCut
                 return;
             }
 
+            BeginChange();
             _manual = true;
-            ApplyRange(_startSeconds, Math.Max((double)numEnd.Value, _startSeconds + WaveformView.MinimumGapSeconds));
-        }
-
-        private void chkDecibels_CheckedChanged(object? sender, EventArgs e)
-        {
-            AmplitudeScale scale = chkDecibels.Checked ? AmplitudeScale.Decibels : AmplitudeScale.Linear;
-            foreach (WaveformView view in Views)
-            {
-                view.AmplitudeScale = scale;
-            }
+            ApplyRange(_startSeconds, Math.Max(ToSourceSeconds((double)numEnd.Value), _startSeconds + WaveformView.MinimumGapSeconds));
+            EndChange();
         }
 
         private void btnReset_Click(object? sender, EventArgs e)
         {
-            TrimRange range = _analysisRange ?? new TrimRange(0.0, _durationSeconds);
+            BeginChange();
+            TrimRange range = AnalysisRange ?? new TrimRange(0.0, _durationSeconds);
             _manual = false;
             ApplyRange(range.StartSeconds, range.EndSeconds);
-        }
-
-        private void btnAccept_Click(object? sender, EventArgs e) =>
-            ManualRange = _manual ? new TrimRange(_startSeconds, _endSeconds) : null;
-
-        private async void btnPlayStart_Click(object? sender, EventArgs e) =>
-            await TogglePlaybackAsync(
-                btnPlayStart,
-                new PreviewWindow(_startSeconds, Math.Min(_previewSeconds, _endSeconds - _startSeconds))).ConfigureAwait(true);
-
-        private async void btnPlayEnd_Click(object? sender, EventArgs e)
-        {
-            double from = Math.Max(_startSeconds, _endSeconds - _previewSeconds);
-            await TogglePlaybackAsync(btnPlayEnd, new PreviewWindow(from, _endSeconds - from)).ConfigureAwait(true);
-        }
-
-        /// <summary>
-        /// Reproduce un borde tal como sonaría en la copia recortada, o lo detiene si es el que ya
-        /// suena. Mientras suena, el botón ofrece detenerlo y las vistas muestran el cursor.
-        /// </summary>
-        /// <remarks>Nunca lanza: es el cuerpo de manejadores <c>async void</c>.</remarks>
-        private async Task TogglePlaybackAsync(Button button, PreviewWindow window)
-        {
-            bool stopRequested = ReferenceEquals(button, _playingButton);
-            StopPlayback();
-            if (stopRequested)
-            {
-                return;
-            }
-
-            // Un clic posterior invalida este: solo la última petición toca la interfaz al terminar
-            // de decodificar.
-            int request = ++_playRequest;
-
-            try
-            {
-                _player ??= CreatePlayer();
-                await _player.PlayAsync(_track.FilePath, window, _closing.Token).ConfigureAwait(true);
-
-                if (IsDisposed || request != _playRequest || !_player.IsPlaying)
-                {
-                    return;
-                }
-
-                _playingButton = button;
-                _playingButtonText = button.Text;
-                button.Text = StopPlaybackText;
-                playheadTimer.Start();
-            }
-            catch (OperationCanceledException)
-            {
-                // La ventana se cerró mientras se preparaba el audio.
-            }
-            catch (Exception exception)
-            {
-                if (!IsDisposed)
-                {
-                    MessageBox.Show(this, exception.Message, "No se pudo reproducir", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Crea el reproductor en el hilo de la interfaz, donde avisará del final del tramo para
-        /// devolver el botón y retirar el cursor.
-        /// </summary>
-        private AudioPreviewPlayer CreatePlayer()
-        {
-            AudioPreviewPlayer player = new(_ffmpegPath);
-            player.PlaybackCompleted += (_, _) => StopPlayback();
-            return player;
-        }
-
-        /// <summary>Detiene lo que suene, retira el cursor y devuelve el botón a su texto.</summary>
-        private void StopPlayback()
-        {
-            _playRequest++;
-            _player?.Stop();
-            playheadTimer.Stop();
-
-            foreach (WaveformView view in Views)
-            {
-                view.PlayheadSeconds = null;
-            }
-
-            if (_playingButton is { } button)
-            {
-                button.Text = _playingButtonText;
-                _playingButton = null;
-            }
-        }
-
-        /// <summary>Lleva a las vistas el instante que está sonando, según el propio dispositivo.</summary>
-        private void playheadTimer_Tick(object? sender, EventArgs e)
-        {
-            double? position = _player?.PositionSeconds;
-            foreach (WaveformView view in Views)
-            {
-                view.PlayheadSeconds = position;
-            }
+            EndChange();
+            SetStatus(AnalysisRange is null ? "Se quitó el ajuste: la copia conserva la pista completa." : "Se restableció el recorte del análisis.");
         }
 
         /// <summary>Lleva el tramo a todas las vistas, a los campos numéricos y al resumen.</summary>
@@ -320,11 +287,12 @@ namespace EchoCut
             {
                 foreach (WaveformView view in Views)
                 {
-                    view.SetMarkers(_startSeconds, _endSeconds);
+                    view.SetMarkers(ToViewSeconds(_startSeconds), ToViewSeconds(_endSeconds));
                 }
 
-                numStart.Value = Math.Clamp((decimal)Math.Round(_startSeconds, 3), numStart.Minimum, numStart.Maximum);
-                numEnd.Value = Math.Clamp((decimal)Math.Round(_endSeconds, 3), numEnd.Minimum, numEnd.Maximum);
+                // Los campos hablan en la línea de tiempo que se ve: en la del resultado, sus segundos.
+                numStart.Value = Math.Clamp((decimal)Math.Round(ToViewSeconds(_startSeconds), 3), numStart.Minimum, numStart.Maximum);
+                numEnd.Value = Math.Clamp((decimal)Math.Round(ToViewSeconds(_endSeconds), 3), numEnd.Minimum, numEnd.Maximum);
             }
             finally
             {
@@ -334,25 +302,119 @@ namespace EchoCut
             UpdateSummary();
         }
 
-        private void UpdateSummary()
-        {
-            double removedStart = _startSeconds;
-            double removedEnd = _durationSeconds - _endSeconds;
-            string origin = _manual ? "Ajuste manual." : _analysisRange is null ? "Sin análisis." : "Según el análisis.";
+        // -------------------------------------------------------------------- Aplicar y guardar
 
-            lblSummary.Text = removedStart + removedEnd < 0.0005
-                ? $"No se eliminará nada: la pista se conserva completa. {origin}"
-                : $"Se eliminarán {removedStart:0.00} s al inicio y {removedEnd:0.00} s al final ({removedStart + removedEnd:0.00} s en total). {origin}";
+        private void btnAccept_Click(object? sender, EventArgs e)
+        {
+            Apply();
+            Close();
         }
 
+        private void btnCancel_Click(object? sender, EventArgs e) => Close();
+
+        /// <summary>Lleva las decisiones a la fila y escribe la copia sin cerrar la ventana.</summary>
+        /// <remarks>Nunca lanza: es el cuerpo de un manejador <c>async void</c>.</remarks>
+        private async void btnSave_Click(object? sender, EventArgs e)
+        {
+            if (_saving)
+            {
+                return;
+            }
+
+            if (Edits is { } edits && edits.KeptSeconds(KeptRange) < WaveformView.MinimumGapSeconds)
+            {
+                MessageBox.Show(this, "Lo borrado no deja audio en la copia: restaura algo antes de guardar.", "Nada que guardar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            StopPlayback();
+            SetSaving(true);
+            try
+            {
+                string? written = await _save(this).ConfigureAwait(true);
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                SetStatus(written is not null
+                    ? $"Guardado en «{Path.GetFileName(Path.GetDirectoryName(written))}{Path.DirectorySeparatorChar}{Path.GetFileName(written)}»."
+                    : "No se guardó la copia; el motivo está en la ventana principal.");
+            }
+            catch (Exception exception)
+            {
+                if (!IsDisposed)
+                {
+                    SetStatus($"No se guardó la copia: {exception.Message}");
+                }
+            }
+            finally
+            {
+                if (!IsDisposed)
+                {
+                    SetSaving(false);
+                }
+            }
+        }
+
+        /// <summary>Avisa a quien abrió la ventana para que lleve las decisiones a la fila.</summary>
+        internal void Apply()
+        {
+            Applied?.Invoke(this, EventArgs.Empty);
+            MarkApplied();
+        }
+
+        /// <summary>Mientras se guarda, nada de la ventana se puede tocar.</summary>
+        private void SetSaving(bool saving)
+        {
+            _saving = saving;
+            tableMain.Enabled = !saving;
+            toolStrip.Enabled = !saving;
+            UseWaitCursor = saving;
+            if (saving)
+            {
+                SetStatus("Guardando la copia…");
+            }
+        }
+
+        /// <summary>Si hay cambios sin aplicar, pregunta qué hacer con ellos antes de cerrar.</summary>
         private void WaveformEditor_FormClosing(object? sender, FormClosingEventArgs e)
         {
+            if (_saving)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            if (IsDirty)
+            {
+                DialogResult answer = MessageBox.Show(
+                    this,
+                    $"¿Aplicar a «{Song.Name}» los cambios hechos en esta ventana?",
+                    "Cambios sin aplicar",
+                    MessageBoxButtons.YesNoCancel,
+                    MessageBoxIcon.Question);
+
+                if (answer == DialogResult.Cancel)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
+                if (answer == DialogResult.Yes)
+                {
+                    Apply();
+                }
+            }
+
             _closing.Cancel();
             StopPlayback();
         }
 
         private void WaveformEditor_FormClosed(object? sender, FormClosedEventArgs e)
         {
+            Song.PropertyChanged -= Song_PropertyChanged;
+
             foreach (WaveformView view in Views)
             {
                 view.Waveform = null;

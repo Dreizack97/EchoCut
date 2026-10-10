@@ -72,6 +72,9 @@ namespace EchoCut
                 new(Keys.Control | Keys.N, mnuNormalize, GroupUtilities),
                 new(Keys.Control | Keys.Shift | Keys.C, mnuAddSequence, GroupUtilities),
                 new(Keys.Control | Keys.Shift | Keys.Q, mnuRemoveLeading, GroupUtilities),
+                new(Keys.Control | Keys.Shift | Keys.V, mnuVolume, GroupUtilities),
+                new(Keys.Control | Keys.Shift | Keys.M, mnuConvertMp3, GroupUtilities),
+                new(Keys.Control | Keys.Shift | Keys.D, mnuFindDuplicates, GroupUtilities),
 
                 // Entrar abre la opción en negrita del menú contextual, como el verbo por defecto
                 // en el Explorador, y Alt+Entrar las propiedades, como allí.
@@ -259,11 +262,9 @@ namespace EchoCut
                 new(GroupGrid, "Confirmar o descartar el nombre al renombrar", "Entrar / Esc"),
                 new(GroupFilter, "Ir al filtro por nombre", ShortcutText.Of(Keys.Control | Keys.F)),
                 new(GroupFilter, "Vaciar el filtro", "Esc"),
-                new(GroupWaveform, "Elegir la marca de inicio o la de fin", "Inicio / Fin"),
-                new(GroupWaveform, "Mover la marca elegida 0,01 s", "← / →"),
-                new(GroupWaveform, "Mover la marca elegida 0,1 s", "Shift+← / →"),
-                new(GroupWaveform, "Mover la marca elegida 1 s", "Ctrl+← / →"),
-                new(GroupWaveform, "Aceptar o cancelar el ajuste", "Entrar / Esc"),
+
+                // Los del editor salen de su propia tabla, la misma que atiende sus teclas.
+                .. WaveformEditor.DescribeShortcuts().Select(entry => entry with { Group = GroupWaveform }),
             ];
 
             // OrderBy es estable: dentro de cada grupo se conserva el orden de la lista.

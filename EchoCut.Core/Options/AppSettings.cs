@@ -1,5 +1,6 @@
 using EchoCut.Audio;
 using EchoCut.Library;
+using EchoCut.Loudness;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -44,6 +45,20 @@ public sealed class AppSettings
     /// añadido después solo descarta un bit, en vez de fallar al leer el JSON entero.
     /// </value>
     public NormalizableFields NormalizeFields { get; set; } = NormalizableFields.All;
+
+    /// <summary>Calidad con la que «Convertir a MP3» codifica.</summary>
+    /// <value>
+    /// La elegida la última vez; por defecto, VBR V0, transparente con menos tamaño que 320 kbps. Se
+    /// guarda como número, igual que <see cref="NormalizeFields"/>.
+    /// </value>
+    public Mp3Quality Mp3Quality { get; set; } = Mp3Quality.VbrV0;
+
+    /// <summary>Nivel al que «Regularizar volumen» lleva las canciones, en la escala de ReplayGain.</summary>
+    /// <value>
+    /// El elegido la última vez; por defecto, 89 dB, la referencia de ReplayGain y de MP3Gain. Se
+    /// acota a <c>[75, 105]</c> al cargar.
+    /// </value>
+    public double VolumeTargetDb { get; set; } = GainPlanner.DefaultTargetDb;
 
     /// <summary>
     /// Por defecto se acotan los hilos: pasado cierto punto el cuello de botella deja de ser la CPU.
@@ -97,6 +112,16 @@ public sealed class AppSettings
                     {
                         loaded.NormalizeFields = NormalizableFields.All;
                     }
+
+                    if (!Enum.IsDefined(loaded.Mp3Quality))
+                    {
+                        loaded.Mp3Quality = Mp3Quality.VbrV0;
+                    }
+
+                    loaded.VolumeTargetDb = double.IsFinite(loaded.VolumeTargetDb)
+                        ? Math.Clamp(loaded.VolumeTargetDb, GainPlanner.MinimumTargetDb, GainPlanner.MaximumTargetDb)
+                        : GainPlanner.DefaultTargetDb;
+
                     return loaded;
                 }
             }

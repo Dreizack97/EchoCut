@@ -1,3 +1,5 @@
+using EchoCut.Audio;
+
 namespace EchoCut.Waveforms;
 
 /// <summary>Pinta un tramo de una <see cref="Waveform"/> en un búfer de píxeles ARGB de 32 bits.</summary>
@@ -19,6 +21,18 @@ public static class WaveformRenderer
     /// <param name="endSeconds">Instante del archivo en el borde derecho.</param>
     /// <param name="scale">Escala vertical.</param>
     /// <param name="palette">Colores.</param>
+    /// <param name="edits">
+    /// Ediciones con las que dibujar la onda, o <c>null</c> para dibujar el original tal cual. Los
+    /// fundidos atenúan cada columna con la ganancia de su instante.
+    /// </param>
+    /// <param name="collapseDeletions">
+    /// Si el tramo se expresa en la línea de tiempo del resultado: lo borrado desaparece y cada
+    /// columna junta los tramos del original que suenan en ella, como la copia.
+    /// </param>
+    /// <remarks>
+    /// El resultado se dibuja a partir del resumen del original, sin decodificar otra vez: cambiar un
+    /// fundido o borrar algo solo cuesta repintar.
+    /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Se lanza si las dimensiones no son positivas, si <paramref name="stride"/> es menor que la
     /// anchura o si el tramo de tiempo está vacío.
@@ -33,7 +47,9 @@ public static class WaveformRenderer
         double startSeconds,
         double endSeconds,
         AmplitudeScale scale,
-        WaveformPalette palette)
+        WaveformPalette palette,
+        AudioEdits? edits = null,
+        bool collapseDeletions = false)
     {
         ArgumentNullException.ThrowIfNull(waveform);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
@@ -55,7 +71,7 @@ public static class WaveformRenderer
             FillColumn(pixels, x, 0, height - 1, stride, palette.Background);
             SetPixel(pixels, x, center, stride, palette.CenterLine);
 
-            if (!waveform.TrySummarize(t0, t0 + secondsPerPixel, out WaveformPeak peak))
+            if (!TrySummarize(waveform, t0, t0 + secondsPerPixel, edits, collapseDeletions, out WaveformPeak peak))
             {
                 continue;
             }
@@ -76,6 +92,58 @@ public static class WaveformRenderer
     }
 
     /// <summary>Fila que corresponde a una altura relativa, con <c>1</c> en la fila superior.</summary>
+    /// <summary>Envolvente de una columna, con las ediciones aplicadas.</summary>
+    /// <remarks>
+    /// Cada tramo del original se atenúa con la ganancia de su punto medio: dentro de una columna la
+    /// ganancia apenas cambia, y así un fundido se ve tal como sonará. Al juntar tramos, los extremos
+    /// se toman de todos y el nivel eficaz se pondera por la duración de cada uno.
+    /// </remarks>
+    private static bool TrySummarize(
+        Waveform waveform,
+        double fromSeconds,
+        double toSeconds,
+        AudioEdits? edits,
+        bool collapseDeletions,
+        out WaveformPeak peak)
+    {
+        if (edits is null)
+        {
+            return waveform.TrySummarize(fromSeconds, toSeconds, out peak);
+        }
+
+        IEnumerable<TimeRegion> spans = collapseDeletions
+            ? edits.Deletions.SourceSpans(fromSeconds, toSeconds)
+            : [new TimeRegion(fromSeconds, toSeconds)];
+
+        float min = float.MaxValue;
+        float max = float.MinValue;
+        double energy = 0.0;
+        double seconds = 0.0;
+
+        foreach (TimeRegion span in spans)
+        {
+            if (!waveform.TrySummarize(span.StartSeconds, span.EndSeconds, out WaveformPeak part))
+            {
+                continue;
+            }
+
+            float gain = (float)(edits.Fades?.GainAt((span.StartSeconds + span.EndSeconds) / 2.0) ?? 1.0);
+            min = Math.Min(min, part.Min * gain);
+            max = Math.Max(max, part.Max * gain);
+            energy += part.Rms * gain * part.Rms * gain * span.DurationSeconds;
+            seconds += span.DurationSeconds;
+        }
+
+        if (seconds <= 0.0)
+        {
+            peak = default;
+            return false;
+        }
+
+        peak = new WaveformPeak(min, max, (float)Math.Sqrt(energy / seconds));
+        return true;
+    }
+
     private static int RowFor(double height, int rows) =>
         Math.Clamp((int)Math.Round((1.0 - height) * (rows - 1) / 2.0), 0, rows - 1);
 

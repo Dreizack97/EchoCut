@@ -37,6 +37,14 @@ namespace EchoCut
         private CancellationTokenSource? _normalizeCts;
         private CancellationTokenSource? _tagCts;
         private CancellationTokenSource? _renameCts;
+        private CancellationTokenSource? _convertCts;
+        private CancellationTokenSource? _duplicatesCts;
+
+        /// <summary>
+        /// Editores de forma de onda abiertos, uno por fila: volver a abrir una pista trae al frente
+        /// su ventana en lugar de abrir otra que compita con ella por las mismas decisiones.
+        /// </summary>
+        private readonly Dictionary<Song, WaveformEditor> _editors = [];
 
         /// <summary>Reproducción de previsualización, creada al primer uso porque necesita FFmpeg.</summary>
         private AudioPreviewPlayer? _preview;
@@ -129,7 +137,7 @@ namespace EchoCut
             }
         }
 
-        private bool IsBusy => _analysisCts is not null || _trimCts is not null || _cleanCts is not null || _normalizeCts is not null || _tagCts is not null || _renameCts is not null;
+        private bool IsBusy => _analysisCts is not null || _trimCts is not null || _cleanCts is not null || _normalizeCts is not null || _tagCts is not null || _renameCts is not null || _convertCts is not null || _duplicatesCts is not null;
 
         /// <summary>
         /// Si la ventana sigue viva. Un lote que ya había terminado hace que la espera del cierre
@@ -352,6 +360,7 @@ namespace EchoCut
 
             if (replace)
             {
+                DiscardEditors();
                 _songs.Clear();
                 _rows.Clear();
             }
@@ -388,7 +397,9 @@ namespace EchoCut
 
             StopPreview();
 
-            List<TrackInfo> pending = _songs.Select(x => x.Track).ToList();
+            // Las filas con fundidos o borrados se analizan sobre su resultado, que es lo que quedará
+            // en la copia; las demás, con el sondeo rápido de los bordes del original.
+            List<AnalysisRequest> pending = [.. _songs.Select(x => new AnalysisRequest(x.Track, x.Edits))];
 
             using CancellationTokenSource cts = new();
             _analysisCts = cts;
@@ -469,6 +480,8 @@ namespace EchoCut
             _normalizeCts?.Cancel();
             _tagCts?.Cancel();
             _renameCts?.Cancel();
+            _convertCts?.Cancel();
+            _duplicatesCts?.Cancel();
         }
 
         // ------------------------------------------------------------------ Acciones de fila
@@ -570,7 +583,7 @@ namespace EchoCut
                 SetStatus($"Preparando el final de {song.Name}…");
 
                 await _preview
-                    .PlayAsync(song.FilePath, window, cts.Token)
+                    .PlayAsync(song.FilePath, window, song.Edits, cts.Token)
                     .ConfigureAwait(true);
 
                 if (!IsAlive || cts.IsCancellationRequested)
@@ -643,7 +656,7 @@ namespace EchoCut
 
             List<TrimRequest> targets = _songs
                 .Where(x => x.ShouldTrim && x.TrimRange is not null)
-                .Select(x => new TrimRequest(x.Track, x.TrimRange!.Value))
+                .Select(x => new TrimRequest(x.Track, x.TrimRange!.Value, x.Edits))
                 .ToList();
 
             if (targets.Count == 0)
@@ -759,11 +772,12 @@ namespace EchoCut
         /// marshalar, y encolar la mutación la haría llegar después del «Recortado» que se fija
         /// tras el <c>await</c>, dejando la fila clavada en «Recortando…».
         /// </remarks>
-        private async Task TrimSingleAsync(Song song)
+        /// <returns>Ruta de la copia escrita, o <c>null</c> si no se escribió.</returns>
+        private async Task<string?> TrimSingleAsync(Song song)
         {
             if (IsBusy || !EnsureFFmpeg() || song.TrimRange is not { } range)
             {
-                return;
+                return null;
             }
 
             // El archivo que se va a reescribir no puede estar sonando.
@@ -787,25 +801,28 @@ namespace EchoCut
             try
             {
                 Task<TrimOutcome> trim = _trimmer.TrimOneAsync(
-                    new TrimRequest(song.Track, range),
+                    new TrimRequest(song.Track, range, song.Edits),
                     outputDirectory,
                     cts.Token);
 
                 _running = trim;
-                await trim.ConfigureAwait(true);
+                TrimOutcome outcome = await trim.ConfigureAwait(true);
 
                 song.Estatus = Song.StatusTrimmed;
                 SetStatus($"Recortado en «{outputDirectory}»: {song.Name}.");
+                return outcome.OutputPath;
             }
             catch (OperationCanceledException)
             {
                 song.Estatus = Song.StatusCancelled;
                 SetStatus("Recorte detenido.");
+                return null;
             }
             catch (Exception exception)
             {
                 song.Fail(exception);
                 ShowError("No se pudo recortar la pista.", exception);
+                return null;
             }
             finally
             {
@@ -1003,18 +1020,23 @@ namespace EchoCut
             bool normalizing = _normalizeCts is not null;
             bool tagging = _tagCts is not null;
             bool renaming = _renameCts is not null;
+            bool converting = _convertCts is not null;
+            bool searching = _duplicatesCts is not null;
             bool hasSongs = _songs.Count > 0;
 
             btnPath.Enabled = !IsBusy;
             btnFile.Enabled = !IsBusy;
             btnAnalyze.Enabled = !IsBusy && hasSongs;
             btnCropAll.Enabled = !IsBusy && hasSongs;
-            btnStop.Enabled = analyzing || cleaning || normalizing || tagging || renaming || trimming;
+            btnStop.Enabled = analyzing || cleaning || normalizing || tagging || renaming || trimming || converting || searching;
             btnExport.Enabled = !IsBusy && hasSongs;
             ddbUtilities.Enabled = !IsBusy;
             mnuMetadata.Enabled = hasSongs;
             mnuNormalize.Enabled = hasSongs;
             mnuRename.Enabled = hasSongs;
+            mnuVolume.Enabled = hasSongs;
+            mnuConvertMp3.Enabled = hasSongs;
+            mnuFindDuplicates.Enabled = _songs.Count > 1;
             btnAdvanced.Enabled = !IsBusy;
             numericThreads.Enabled = !IsBusy;
             numericTolerance.Enabled = !IsBusy;
@@ -1041,6 +1063,19 @@ namespace EchoCut
 
         private async void Main_FormClosing(object sender, FormClosingEventArgs e)
         {
+            // Cada editor pregunta qué hacer con sus cambios; si alguno se queda abierto, el usuario
+            // decidió seguir trabajando y la aplicación no se cierra.
+            foreach (WaveformEditor editor in _editors.Values.ToList())
+            {
+                editor.Close();
+            }
+
+            if (_editors.Count > 0)
+            {
+                e.Cancel = true;
+                return;
+            }
+
             StopPreview();
             _preview?.Dispose();
             _preview = null;
@@ -1064,6 +1099,8 @@ namespace EchoCut
             _normalizeCts?.Cancel();
             _tagCts?.Cancel();
             _renameCts?.Cancel();
+            _convertCts?.Cancel();
+            _duplicatesCts?.Cancel();
             SetStatus("Cerrando: esperando a que terminen las tareas en curso…");
 
             try
@@ -1198,42 +1235,101 @@ namespace EchoCut
         }
 
         /// <summary>
-        /// Abre la forma de onda de la pista seleccionada para ver sus silencios y corregir el
-        /// recorte a mano.
+        /// Abre la forma de onda de la pista seleccionada para ver sus silencios, corregir el
+        /// recorte a mano, añadir fundidos y borrar fragmentos.
         /// </summary>
         /// <remarks>
-        /// Funciona también con pistas sin analizar: el tramo parte de la pista completa y el ajuste
-        /// manual basta para recortarla.
+        /// <para>
+        /// La ventana no tiene modo: se pueden abrir varias, una por pista, sin dejar de usar esta. Si
+        /// la pista ya tiene la suya, se trae al frente.
+        /// </para>
+        /// <para>
+        /// Funciona también con pistas sin analizar y mientras corre un lote: hasta que el usuario
+        /// acepta o guarda, el editor no toca la fila.
+        /// </para>
         /// </remarks>
         private void mnuWaveform_Click(object? sender, EventArgs e)
         {
-            if (IsBusy || GetSelectedSong() is not { } song || !EnsureFFmpeg())
+            if (GetSelectedSong() is not { } song || !EnsureFFmpeg())
             {
                 return;
             }
 
-            StopPreview();
-
-            double duration = song.DurationSeconds;
-            using WaveformEditor dialog = new(
-                song.Track,
-                duration,
-                song.TrimRange ?? new TrimRange(0.0, duration),
-                song.Analysis?.Range,
-                song.ManualRange is not null,
-                _waveforms,
-                _locator.Require().FFmpeg,
-                _settings.Silence.PreviewSeconds);
-
-            if (dialog.ShowDialog(this) != DialogResult.OK)
+            if (_editors.TryGetValue(song, out WaveformEditor? open))
             {
+                if (open.WindowState == FormWindowState.Minimized)
+                {
+                    open.WindowState = FormWindowState.Normal;
+                }
+
+                open.Activate();
                 return;
             }
 
-            song.AdjustManually(dialog.ManualRange);
-            SetStatus(dialog.ManualRange is null
-                ? $"{song.Name}: se usa el recorte del análisis."
-                : $"{song.Name}: recorte ajustado a mano, {song.Crop:0.00} s a eliminar.");
+            WaveformEditorServices services = new(_waveforms, _analysis, _locator.Require().FFmpeg, _settings.Silence.PreviewSeconds, CurrentOptions);
+            WaveformEditor editor = new(song, services, SaveFromEditorAsync);
+            editor.Applied += (_, _) => ApplyEditorDecisions(editor);
+            editor.FormClosed += (_, _) => _editors.Remove(song);
+            _editors[song] = editor;
+            editor.Show();
+        }
+
+        /// <summary>Lleva a la fila lo decidido en su editor: el tramo, los fundidos y los borrados.</summary>
+        private void ApplyEditorDecisions(WaveformEditor editor)
+        {
+            Song song = editor.Song;
+            song.AdjustManually(editor.ManualRange);
+            song.ApplyEdits(editor.Edits);
+
+            // Si en el editor se detectaron los silencios del resultado, ese análisis pasa a ser el de
+            // la fila: sus columnas de silencio describen ya la copia y no el original.
+            if (editor.ResultAnalysis is { } analysis)
+            {
+                song.Complete(analysis);
+            }
+
+            string trim = editor.ManualRange is null
+                ? "se usa el recorte del análisis"
+                : $"recorte ajustado a mano, {song.Crop:0.00} s a eliminar";
+            string edits = song.Edits is null ? string.Empty : "; la copia llevará ediciones y se volverá a codificar";
+            SetStatus($"{song.Name}: {trim}{edits}.");
+        }
+
+        /// <summary>Guarda desde un editor: aplica sus decisiones a la fila y escribe la copia en «Recortados».</summary>
+        /// <returns>Ruta de la copia escrita, o <c>null</c> si no se pudo escribir.</returns>
+        /// <remarks>
+        /// Pasa por el mismo recorte individual que la rejilla, con su progreso, su cancelación y su
+        /// estado de fila; por eso espera a que no haya otro lote en curso.
+        /// </remarks>
+        private async Task<string?> SaveFromEditorAsync(WaveformEditor editor)
+        {
+            if (IsBusy)
+            {
+                MessageBox.Show(
+                    editor,
+                    "Hay una tarea en curso en la ventana principal. Espera a que termine para guardar.",
+                    "Guardar",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return null;
+            }
+
+            editor.Apply();
+            return await TrimSingleAsync(editor.Song).ConfigureAwait(true);
+        }
+
+        /// <summary>Cierra sin preguntar los editores de filas que dejan de existir.</summary>
+        /// <param name="songs">Filas que se van; todas si es <c>null</c>.</param>
+        private void DiscardEditors(IEnumerable<Song>? songs = null)
+        {
+            List<WaveformEditor> closing = songs is null
+                ? [.. _editors.Values]
+                : [.. songs.Where(_editors.ContainsKey).Select(song => _editors[song])];
+
+            foreach (WaveformEditor editor in closing)
+            {
+                editor.Discard();
+            }
         }
 
         private void mnuEditSong_Click(object? sender, EventArgs e)
@@ -1337,6 +1433,7 @@ namespace EchoCut
                 }
             }
 
+            DiscardEditors(successfullyDeleted);
             foreach (Song song in successfullyDeleted)
             {
                 _rows.Remove(song.FilePath);
