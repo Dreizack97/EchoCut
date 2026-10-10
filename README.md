@@ -168,6 +168,19 @@ Para comparar una biblioteca entera sin enfrentar cada canción con todas las de
 
 ---
 
+## 🔊 Igualación de Volumen sin Pérdida (ReplayGain)
+
+Para que una biblioteca suene pareja, sin saltos de volumen entre canciones, EchoCut porta el método de **MP3Gain**: mide la sonoridad percibida de cada pista y la ajusta **sin decodificar ni recodificar**.
+
+1. **Medida ReplayGain 1.0** (`ReplayGainAnalyzer`, port de `gain_analysis.c`): cada canal, decodificado en estéreo a su frecuencia original, pasa por un filtro Yule-Walker de orden 10 que imita la curva de igual sonoridad del oído y por un Butterworth paso alto a 150 Hz. Se mide el RMS en ventanas de 50 ms y se toma el **percentil 95**: el nivel que solo supera el 5 % más fuerte, para que una intro tranquila o unos golpes aislados no falseen la medida. La ganancia es la distancia a la referencia de **89 dB**.
+2. **Ajuste en la trama** (`Mp3GainEditor`): cada gránulo MP3 guarda un `global_gain` de 8 bits que escala sus muestras por 2^(n/4). Sumarle un entero cambia el volumen en pasos de **1.5 dB** sin tocar los datos cuantizados, así que no se pierde calidad y el cambio se deshace restando lo mismo. Se recalcula el CRC de las tramas que lo llevan y se respetan los gránulos de silencio digital.
+3. **Protección contra saturación** (`GainPlanner`): una subida se limita a lo que permite el pico de la pista; bajar nunca se limita.
+4. **Seguro y reversible**: cada archivo se reescribe en una copia temporal que sustituye al original solo al terminar, y el cambio se anota en la etiqueta APE con los mismos campos que MP3Gain (`MP3GAIN_UNDO`, `MP3GAIN_MINMAX`), además de corregir los valores ReplayGain para que ningún reproductor aplique la ganancia dos veces. Se puede deshacer desde EchoCut o con el propio MP3Gain.
+
+Solo se aplica a MP3: el truco de `global_gain` es exclusivo de MPEG Layer III y cualquier otro formato exigiría recodificar.
+
+---
+
 ## 🎛️ Parámetros del Algoritmo
 
 EchoCut incluye 24 parámetros calibrados exhaustivamente para música comercial masterizada. Puedes ajustarlos desde el diálogo **Avanzado**:
@@ -303,6 +316,7 @@ dotnet run --project EchoCut/EchoCut.csproj -c Release
      - *Agregar consecutivo…*: Antepone un número con ceros a la izquierda, por ejemplo `0001 - Artista - Nombre.mp3`; se eligen el número inicial, los dígitos y el separador.
      - *Quitar caracteres iniciales…*: Elimina una cantidad de caracteres del principio del nombre y, opcionalmente, los espacios y separadores que queden delante.
    - **Exportar (`Exportar`)**: Genera un archivo CSV codificado en UTF-8 con BOM y separador regional, listo para abrirse en Microsoft Excel con todas las métricas acústicas de cada pista.
+   - **Regularizar volumen (`Utilidades › Regularizar volumen…`)**: Abre una ventana con las canciones MP3 cargadas (las demás se omiten). *Analizar* (`F5`) mide su volumen sin tocarlas y la lista muestra, por canción, el **volumen** actual, el **ajuste** propuesto, el **resultado** previsto, el **pico**, si **satura** o si la subida se limitó para no saturar, y el ajuste **acumulado** respecto a su volumen original. El **volumen objetivo** —89 dB por defecto, entre 75 y 105 dB y recordado entre sesiones— recalcula las propuestas al instante. *Aplicar ajuste* (`Ctrl+Entrar`) modifica los originales marcados **sin recodificar**, en pasos de 1.5 dB, y cada fila pasa a enseñar el volumen de antes, el ajuste aplicado y cómo quedó. *Restaurar original* devuelve las marcadas a su volumen de siempre, también si el ajuste se hizo con MP3Gain. Las columnas se ordenan con un clic en su encabezado.
    - **Convertir a MP3 (`Utilidades › Convertir a MP3…`)**: Escribe una copia en MP3 de las canciones cargadas en la subcarpeta `MP3/` junto a cada original, que no se modifica, con sus etiquetas y su carátula. Se elige la calidad —*VBR V0* (~245 kbps, recomendada), *VBR V2* (~190 kbps), *CBR 320* o *CBR 192*— y se recuerda entre sesiones. Las que ya son MP3 se omiten, porque volver a codificarlas solo les quitaría calidad. Se convierte el original tal cual: el recorte y las ediciones se siguen aplicando con *Recortar*.
    - **Buscar duplicados por audio (`Utilidades › Buscar duplicados por audio…`)**: Encuentra las canciones que contienen la misma grabación aunque tengan otro nombre, formato, tasa de bits o volumen, o silencios de distinta duración. Muestra los grupos con su parecido, duración, formato, bitrate, tamaño y carpeta; en cada uno propone conservar la de mejor calidad (sin pérdida, más bitrate, más duración) y deja marcadas las demás. Se puede escuchar cada copia, abrir su ubicación y cambiar las marcas antes de enviar las marcadas a la **Papelera de reciclaje**, de donde se pueden recuperar. Una mezcla o un popurrí que contiene una canción no se toma por copia suya.
    - **Integrar con el Explorador de Windows (`Utilidades`)**: Agrega o quita «Abrir con EchoCut» en el menú contextual de los archivos de audio y las carpetas, sin permisos de administrador. En Windows 11 aparece en «Mostrar más opciones». Lo abierto desde el Explorador se suma al listado de la ventana ya abierta; si se mueve la carpeta de EchoCut, basta con volver a activar la opción.
@@ -320,6 +334,7 @@ El botón **⌨ Atajos** de la barra de herramientas, o `F1`, muestra la lista c
 | Procesar | Exportar CSV | `Ctrl+E` |
 | Utilidades | Agregar metadatos / Normalizar | `Ctrl+M` / `Ctrl+N` |
 | Utilidades | Agregar consecutivo / Quitar caracteres iniciales | `Ctrl+Shift+C` / `Ctrl+Shift+Q` |
+| Utilidades | Regularizar volumen | `Ctrl+Shift+V` |
 | Utilidades | Convertir a MP3 / Buscar duplicados por audio | `Ctrl+Shift+M` / `Ctrl+Shift+D` |
 | Rejilla | Ver forma de onda y ajustar recorte | `Entrar` |
 | Rejilla | Renombrar / Editar propiedades | `F2` / `Alt+Entrar` |
