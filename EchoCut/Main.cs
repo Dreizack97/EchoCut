@@ -35,6 +35,16 @@ namespace EchoCut
         private CancellationTokenSource? _trimCts;
         private CancellationTokenSource? _cleanCts;
         private CancellationTokenSource? _normalizeCts;
+        private CancellationTokenSource? _tagCts;
+        private CancellationTokenSource? _renameCts;
+        private CancellationTokenSource? _convertCts;
+        private CancellationTokenSource? _duplicatesCts;
+
+        /// <summary>
+        /// Editores de forma de onda abiertos, uno por fila: volver a abrir una pista trae al frente
+        /// su ventana en lugar de abrir otra que compita con ella por las mismas decisiones.
+        /// </summary>
+        private readonly Dictionary<Song, WaveformEditor> _editors = [];
 
         /// <summary>Reproducción de previsualización, creada al primer uso porque necesita FFmpeg.</summary>
         private AudioPreviewPlayer? _preview;
@@ -43,7 +53,12 @@ namespace EchoCut
 
         /// <summary>Carpetas escaneadas, origen de las pistas cargadas.</summary>
         private readonly List<string> _sourceDirectories = [];
-        private readonly ToolTip _pathToolTip = new();
+
+        /// <summary>Si se está arrastrando encima algo que se puede soltar; resalta la zona de arrastre.</summary>
+        private bool _dropHighlighted;
+
+        /// <summary>Fuente del título de la zona de arrastre, creada al primer repintado de la lista vacía.</summary>
+        private Font? _dropZoneTitleFont;
 
         /// <summary>
         /// Lote en curso. Cerrar la ventana debe esperarlo: cancelar sin esperar deja procesos de
@@ -67,16 +82,23 @@ namespace EchoCut
                 _settings.ThreadCount > 0 ? _settings.ThreadCount : AppSettings.DefaultThreadCount);
 
             dataGrid.DefaultCellStyle.SelectionBackColor = SongPresentation.Selection;
-            dataGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dataGrid.DataSource = _songs;
 
             _songs.ListChanged += Songs_ListChanged;
 
+            // El submenú necesita algún elemento para mostrar su flecha y abrirse; al abrirse se
+            // reconstruye con las columnas ya generadas.
+            BuildColumnItems(mnuColumns.DropDownItems);
+            Disposed += (_, _) => _dropZoneTitleFont?.Dispose();
+
             UpdateButtons();
+            RefreshSummary();
+            InitializeShortcuts();
         }
 
         /// <summary>
-        /// Fuerza el repintado de toda la fila cuando cambia <see cref="Song.Estatus"/>.
+        /// Mantiene al día el resumen de la barra de estado y fuerza el repintado de toda la fila
+        /// cuando cambia <see cref="Song.Estatus"/>.
         /// </summary>
         /// <remarks>
         /// El color de texto de cada columna depende del estado, pero <c>ListChanged</c> solo marca
@@ -86,18 +108,36 @@ namespace EchoCut
         /// </remarks>
         private void Songs_ListChanged(object? sender, ListChangedEventArgs e)
         {
-            if (!IsAlive
-                || e.ListChangedType != ListChangedType.ItemChanged
-                || e.PropertyDescriptor?.Name != nameof(Song.Estatus)
-                || e.NewIndex < 0 || e.NewIndex >= dataGrid.Rows.Count)
+            if (!IsAlive)
             {
                 return;
             }
 
-            dataGrid.InvalidateRow(e.NewIndex);
+            string? property = e.PropertyDescriptor?.Name;
+
+            // El resumen depende de cuántas filas hay y de su estado o recorte; el resto de cambios
+            // (metadatos renombrados, por ejemplo) no lo alteran.
+            if (e.ListChangedType is not ListChangedType.ItemChanged
+                || property is nameof(Song.Estatus) or nameof(Song.Crop))
+            {
+                QueueSummaryRefresh();
+            }
+
+            if (e.ListChangedType == ListChangedType.ItemChanged
+                && property == nameof(Song.Estatus)
+                && e.NewIndex >= 0 && e.NewIndex < dataGrid.Rows.Count)
+            {
+                dataGrid.InvalidateRow(e.NewIndex);
+            }
+
+            // Normalizar o editar una pista puede cambiar su nombre y, con él, si pasa el filtro.
+            if (e.ListChangedType == ListChangedType.ItemChanged && property == nameof(Song.Name))
+            {
+                ApplyFilter(e.NewIndex);
+            }
         }
 
-        private bool IsBusy => _analysisCts is not null || _trimCts is not null || _cleanCts is not null || _normalizeCts is not null;
+        private bool IsBusy => _analysisCts is not null || _trimCts is not null || _cleanCts is not null || _normalizeCts is not null || _tagCts is not null || _renameCts is not null || _convertCts is not null || _duplicatesCts is not null;
 
         /// <summary>
         /// Si la ventana sigue viva. Un lote que ya había terminado hace que la espera del cierre
@@ -148,20 +188,39 @@ namespace EchoCut
             }
         }
 
-        private void Main_DragEnter(object sender, DragEventArgs e)
+        /// <remarks>
+        /// La rejilla ocupa casi toda la ventana y cada control decide por sí mismo si acepta lo que
+        /// se le suelta, así que comparte estos manejadores con el formulario: de lo contrario solo
+        /// funcionaría soltar sobre la franja de la ruta.
+        /// </remarks>
+        private void Main_DragEnter(object? sender, DragEventArgs e)
         {
-            if (!IsBusy && e.Data?.GetDataPresent(DataFormats.FileDrop) == true)
+            bool accepted = !IsBusy && e.Data?.GetDataPresent(DataFormats.FileDrop) == true;
+            e.Effect = accepted ? DragDropEffects.Copy : DragDropEffects.None;
+            SetDropHighlight(accepted);
+        }
+
+        private void Main_DragLeave(object? sender, EventArgs e) => SetDropHighlight(false);
+
+        private void SetDropHighlight(bool highlighted)
+        {
+            if (_dropHighlighted == highlighted)
             {
-                e.Effect = DragDropEffects.Copy;
+                return;
             }
-            else
+
+            _dropHighlighted = highlighted;
+
+            if (_songs.Count == 0)
             {
-                e.Effect = DragDropEffects.None;
+                dataGrid.Invalidate();
             }
         }
 
-        private void Main_DragDrop(object sender, DragEventArgs e)
+        private void Main_DragDrop(object? sender, DragEventArgs e)
         {
+            SetDropHighlight(false);
+
             if (IsBusy || e.Data?.GetData(DataFormats.FileDrop) is not string[] dropped || dropped.Length == 0)
             {
                 return;
@@ -212,46 +271,20 @@ namespace EchoCut
                 return;
             }
 
-            txtPath.Text = _sourceDirectories.Count switch
-            {
-                1 => _sourceDirectories[0],
-                _ => string.Join("; ", _sourceDirectories)
-            };
-            _pathToolTip.SetToolTip(txtPath, string.Join(Environment.NewLine, _sourceDirectories));
+            ShowSourceDirectories();
 
             ScanResult scan = TrackScanner.Scan(_sourceDirectories);
 
-            _songs.RaiseListChangedEvents = false;
-            _songs.Clear();
-            _rows.Clear();
-
-            foreach (TrackInfo track in scan.Tracks)
-            {
-                if (_rows.ContainsKey(track.FilePath))
-                {
-                    continue;
-                }
-
-                Song song = new(track);
-                _songs.Add(song);
-                _rows[track.FilePath] = song;
-            }
-
-            _songs.RaiseListChangedEvents = true;
-            _songs.ResetBindings();
-
-            // Cargar otra selección de carpetas no debe dejar la cabecera marcada con un orden obsoleto.
-            _songs.ReapplySort();
+            AddTracks(scan.Tracks, replace: true);
 
             string folderSummary = _sourceDirectories.Count == 1
                 ? "1 carpeta"
                 : $"{_sourceDirectories.Count} carpetas";
 
-            lblStatus.Text = scan.SkippedCount == 0
+            SetStatus(scan.SkippedCount == 0
                 ? $"{_songs.Count} archivo(s) encontrados en {folderSummary}."
-                : $"{_songs.Count} archivo(s) encontrados en {folderSummary}; {scan.SkippedCount} ilegible(s) omitido(s).";
+                : $"{_songs.Count} archivo(s) encontrados en {folderSummary}; {scan.SkippedCount} ilegible(s) omitido(s).");
 
-            progressBar.Value = 0;
             UpdateButtons();
         }
 
@@ -279,21 +312,60 @@ namespace EchoCut
                 .Where(d => !string.IsNullOrWhiteSpace(d))
                 .Distinct(StringComparer.OrdinalIgnoreCase)!);
 
+            ShowSourceDirectories();
+
+            ScanResult scan = TrackScanner.ScanFiles(validFiles);
+
+            AddTracks(scan.Tracks, replace: true);
+
+            string originSummary = _sourceDirectories.Count == 1
+                ? $"de la carpeta «{Path.GetFileName(_sourceDirectories[0])}»"
+                : $"de {_sourceDirectories.Count} carpetas";
+
+            SetStatus(scan.SkippedCount == 0
+                ? $"{_songs.Count} archivo(s) cargados {originSummary}."
+                : $"{_songs.Count} archivo(s) cargados {originSummary}; {scan.SkippedCount} ilegible(s) o no compatible(s) omitido(s).");
+
+            UpdateButtons();
+        }
+
+        /// <summary>Muestra en el campo «Origen» las carpetas de las pistas cargadas.</summary>
+        private void ShowSourceDirectories()
+        {
             txtPath.Text = _sourceDirectories.Count switch
             {
                 0 => string.Empty,
                 1 => _sourceDirectories[0],
                 _ => string.Join("; ", _sourceDirectories)
             };
-            _pathToolTip.SetToolTip(txtPath, string.Join(Environment.NewLine, _sourceDirectories));
+            toolTip.SetToolTip(txtPath, string.Join(Environment.NewLine, _sourceDirectories));
+        }
 
-            ScanResult scan = TrackScanner.ScanFiles(validFiles);
-
+        /// <summary>
+        /// Añade a la rejilla las pistas indicadas que aún no estén en ella.
+        /// </summary>
+        /// <param name="tracks">Pistas escaneadas.</param>
+        /// <param name="replace">Si se vacía antes el listado, como al abrir carpetas o archivos.</param>
+        /// <returns>Cuántas pistas se añadieron.</returns>
+        /// <remarks>
+        /// Los avisos de la lista se suspenden mientras se añade: con cientos de pistas, repintar la
+        /// rejilla por cada una tarda más que el propio escaneo. Al terminar se reaplica el orden,
+        /// porque cargar no debe dejar la cabecera marcada con un orden obsoleto, y se ajustan las
+        /// columnas a los nombres nuevos.
+        /// </remarks>
+        private int AddTracks(IEnumerable<TrackInfo> tracks, bool replace)
+        {
+            int added = 0;
             _songs.RaiseListChangedEvents = false;
-            _songs.Clear();
-            _rows.Clear();
 
-            foreach (TrackInfo track in scan.Tracks)
+            if (replace)
+            {
+                DiscardEditors();
+                _songs.Clear();
+                _rows.Clear();
+            }
+
+            foreach (TrackInfo track in tracks)
             {
                 if (_rows.ContainsKey(track.FilePath))
                 {
@@ -303,24 +375,15 @@ namespace EchoCut
                 Song song = new(track);
                 _songs.Add(song);
                 _rows[track.FilePath] = song;
+                added++;
             }
 
             _songs.RaiseListChangedEvents = true;
             _songs.ResetBindings();
-
-            // Cargar nueva lista de pistas no debe dejar la cabecera marcada con un orden obsoleto.
             _songs.ReapplySort();
+            AutoSizeColumns();
 
-            string originSummary = _sourceDirectories.Count == 1
-                ? $"de la carpeta «{Path.GetFileName(_sourceDirectories[0])}»"
-                : $"de {_sourceDirectories.Count} carpetas";
-
-            lblStatus.Text = scan.SkippedCount == 0
-                ? $"{_songs.Count} archivo(s) cargados {originSummary}."
-                : $"{_songs.Count} archivo(s) cargados {originSummary}; {scan.SkippedCount} ilegible(s) o no compatible(s) omitido(s).";
-
-            progressBar.Value = 0;
-            UpdateButtons();
+            return added;
         }
 
         // ---------------------------------------------------------------------------- Análisis
@@ -334,7 +397,9 @@ namespace EchoCut
 
             StopPreview();
 
-            List<TrackInfo> pending = _songs.Select(x => x.Track).ToList();
+            // Las filas con fundidos o borrados se analizan sobre su resultado, que es lo que quedará
+            // en la copia; las demás, con el sondeo rápido de los bordes del original.
+            List<AnalysisRequest> pending = [.. _songs.Select(x => new AnalysisRequest(x.Track, x.Edits))];
 
             using CancellationTokenSource cts = new();
             _analysisCts = cts;
@@ -407,11 +472,16 @@ namespace EchoCut
             AdvanceProgress(progress.CompletedCount);
         }
 
-        private void btnCancel_Click(object sender, EventArgs e)
+        private void btnStop_Click(object sender, EventArgs e)
         {
             _analysisCts?.Cancel();
+            _trimCts?.Cancel();
             _cleanCts?.Cancel();
             _normalizeCts?.Cancel();
+            _tagCts?.Cancel();
+            _renameCts?.Cancel();
+            _convertCts?.Cancel();
+            _duplicatesCts?.Cancel();
         }
 
         // ------------------------------------------------------------------ Acciones de fila
@@ -513,7 +583,7 @@ namespace EchoCut
                 SetStatus($"Preparando el final de {song.Name}…");
 
                 await _preview
-                    .PlayAsync(song.FilePath, window, cts.Token)
+                    .PlayAsync(song.FilePath, window, song.Edits, cts.Token)
                     .ConfigureAwait(true);
 
                 if (!IsAlive || cts.IsCancellationRequested)
@@ -586,7 +656,7 @@ namespace EchoCut
 
             List<TrimRequest> targets = _songs
                 .Where(x => x.ShouldTrim && x.TrimRange is not null)
-                .Select(x => new TrimRequest(x.Track, x.TrimRange!.Value))
+                .Select(x => new TrimRequest(x.Track, x.TrimRange!.Value, x.Edits))
                 .ToList();
 
             if (targets.Count == 0)
@@ -691,8 +761,6 @@ namespace EchoCut
             AdvanceProgress(progress.CompletedCount);
         }
 
-        private void btnStop_Click(object sender, EventArgs e) => _trimCts?.Cancel();
-
         /// <summary>
         /// Recorta una sola pista, la de la fila pulsada.
         /// </summary>
@@ -704,11 +772,12 @@ namespace EchoCut
         /// marshalar, y encolar la mutación la haría llegar después del «Recortado» que se fija
         /// tras el <c>await</c>, dejando la fila clavada en «Recortando…».
         /// </remarks>
-        private async Task TrimSingleAsync(Song song)
+        /// <returns>Ruta de la copia escrita, o <c>null</c> si no se escribió.</returns>
+        private async Task<string?> TrimSingleAsync(Song song)
         {
             if (IsBusy || !EnsureFFmpeg() || song.TrimRange is not { } range)
             {
-                return;
+                return null;
             }
 
             // El archivo que se va a reescribir no puede estar sonando.
@@ -732,25 +801,28 @@ namespace EchoCut
             try
             {
                 Task<TrimOutcome> trim = _trimmer.TrimOneAsync(
-                    new TrimRequest(song.Track, range),
+                    new TrimRequest(song.Track, range, song.Edits),
                     outputDirectory,
                     cts.Token);
 
                 _running = trim;
-                await trim.ConfigureAwait(true);
+                TrimOutcome outcome = await trim.ConfigureAwait(true);
 
                 song.Estatus = Song.StatusTrimmed;
                 SetStatus($"Recortado en «{outputDirectory}»: {song.Name}.");
+                return outcome.OutputPath;
             }
             catch (OperationCanceledException)
             {
                 song.Estatus = Song.StatusCancelled;
                 SetStatus("Recorte detenido.");
+                return null;
             }
             catch (Exception exception)
             {
                 song.Fail(exception);
                 ShowError("No se pudo recortar la pista.", exception);
+                return null;
             }
             finally
             {
@@ -787,7 +859,7 @@ namespace EchoCut
                     CsvExporter.Build(_songs.Select(x => x.ToRecord())),
                     CsvExporter.Encoding);
 
-                lblStatus.Text = $"Resultados exportados a {Path.GetFileName(saveFileDialog.FileName)}.";
+                SetStatus($"Resultados exportados a {Path.GetFileName(saveFileDialog.FileName)}.");
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
@@ -804,7 +876,7 @@ namespace EchoCut
             {
                 _settings.Silence = dialog.Result;
                 _settings.Save();
-                lblStatus.Text = "Parámetros avanzados actualizados.";
+                SetStatus("Parámetros avanzados actualizados.");
 
                 // Activar o desactivar el principio, o cambiar sus mínimos, debe reflejarse ya en
                 // las pistas analizadas en lugar de esperar a un nuevo análisis.
@@ -895,7 +967,7 @@ namespace EchoCut
                 }
                 catch (Exception exception)
                 {
-                    lblStatus.Text = $"Error al actualizar la interfaz: {exception.Message}";
+                    SetStatus($"Error al actualizar la interfaz: {exception.Message}");
                 }
             });
 
@@ -940,48 +1012,37 @@ namespace EchoCut
             return true;
         }
 
-        private void StartProgress(int total, string message)
-        {
-            progressBar.Maximum = Math.Max(1, total);
-            progressBar.Value = 0;
-            lblStatus.Text = message;
-        }
-
-        private void AdvanceProgress(int completed) =>
-            progressBar.Value = Math.Min(completed, progressBar.Maximum);
-
-        private void EndProgress() => progressBar.Value = progressBar.Maximum;
-
         private void UpdateButtons()
         {
             bool analyzing = _analysisCts is not null;
             bool trimming = _trimCts is not null;
             bool cleaning = _cleanCts is not null;
             bool normalizing = _normalizeCts is not null;
+            bool tagging = _tagCts is not null;
+            bool renaming = _renameCts is not null;
+            bool converting = _convertCts is not null;
+            bool searching = _duplicatesCts is not null;
             bool hasSongs = _songs.Count > 0;
 
             btnPath.Enabled = !IsBusy;
             btnFile.Enabled = !IsBusy;
             btnAnalyze.Enabled = !IsBusy && hasSongs;
-            btnCancel.Enabled = analyzing || cleaning || normalizing;
             btnCropAll.Enabled = !IsBusy && hasSongs;
-            btnStop.Enabled = trimming;
+            btnStop.Enabled = analyzing || cleaning || normalizing || tagging || renaming || trimming || converting || searching;
             btnExport.Enabled = !IsBusy && hasSongs;
-            btnClean.Enabled = !IsBusy && hasSongs;
-            btnNormalize.Enabled = !IsBusy && hasSongs;
+            ddbUtilities.Enabled = !IsBusy;
+            mnuMetadata.Enabled = hasSongs;
+            mnuNormalize.Enabled = hasSongs;
+            mnuRename.Enabled = hasSongs;
+            mnuVolume.Enabled = hasSongs;
+            mnuConvertMp3.Enabled = hasSongs;
+            mnuFindDuplicates.Enabled = _songs.Count > 1;
             btnAdvanced.Enabled = !IsBusy;
             numericThreads.Enabled = !IsBusy;
             numericTolerance.Enabled = !IsBusy;
             mnuEditSong.Enabled = !IsBusy && hasSongs;
+            mnuRenameSong.Enabled = !IsBusy && hasSongs;
             mnuDeleteSong.Enabled = !IsBusy && hasSongs;
-        }
-
-        private void SetStatus(string message)
-        {
-            if (IsAlive)
-            {
-                lblStatus.Text = message;
-            }
         }
 
         private void ShowError(string message, Exception exception)
@@ -991,7 +1052,7 @@ namespace EchoCut
                 return;
             }
 
-            lblStatus.Text = message;
+            SetStatus(message);
             MessageBox.Show(
                 this,
                 $"{message}\n\n{exception.Message}",
@@ -1002,10 +1063,22 @@ namespace EchoCut
 
         private async void Main_FormClosing(object sender, FormClosingEventArgs e)
         {
+            // Cada editor pregunta qué hacer con sus cambios; si alguno se queda abierto, el usuario
+            // decidió seguir trabajando y la aplicación no se cierra.
+            foreach (WaveformEditor editor in _editors.Values.ToList())
+            {
+                editor.Close();
+            }
+
+            if (_editors.Count > 0)
+            {
+                e.Cancel = true;
+                return;
+            }
+
             StopPreview();
             _preview?.Dispose();
             _preview = null;
-            _pathToolTip.Dispose();
 
             _settings.Silence.ToleranceSeconds = (double)numericTolerance.Value;
             _settings.ThreadCount = (int)numericThreads.Value;
@@ -1024,6 +1097,10 @@ namespace EchoCut
             _trimCts?.Cancel();
             _cleanCts?.Cancel();
             _normalizeCts?.Cancel();
+            _tagCts?.Cancel();
+            _renameCts?.Cancel();
+            _convertCts?.Cancel();
+            _duplicatesCts?.Cancel();
             SetStatus("Cerrando: esperando a que terminen las tareas en curso…");
 
             try
@@ -1049,23 +1126,49 @@ namespace EchoCut
         {
             if (e.Button == MouseButtons.Right && e.RowIndex >= 0 && e.ColumnIndex >= 0)
             {
-                // Si la fila pulsada con clic derecho no forma parte de la selección actual,
-                // se restablece la selección a dicha fila; de lo contrario, se conserva la multiselección.
-                if (!dataGrid.Rows[e.RowIndex].Selected)
+                // Si la fila pulsada con clic derecho no forma parte de la selección actual, la
+                // selección pasa a ser solo esa fila; si forma parte, se conserva la multiselección
+                // para que el menú actúe sobre todas, como en el Explorador.
+                DataGridViewCell cell = dataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                if (dataGrid.Rows[e.RowIndex].Selected)
+                {
+                    SetCurrentCellKeepingSelection(cell);
+                }
+                else
                 {
                     dataGrid.ClearSelection();
-                    dataGrid.Rows[e.RowIndex].Selected = true;
+                    dataGrid.CurrentCell = cell;
                 }
 
-                dataGrid.CurrentCell = dataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex];
-                mnuEditSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count == 1;
-                mnuDeleteSong.Enabled = !IsBusy && dataGrid.SelectedRows.Count > 0;
+                UpdateRowMenuState();
             }
         }
 
+        /// <summary>
+        /// Habilita las opciones del menú contextual según la selección: las de una sola pista
+        /// solo con una fila seleccionada.
+        /// </summary>
+        /// <remarks>
+        /// Se llama al abrir el menú con el ratón y antes de cada atajo de la rejilla, porque la
+        /// selección también cambia con el teclado.
+        /// </remarks>
+        private void UpdateRowMenuState()
+        {
+            int selected = dataGrid.SelectedRows.Count;
+            mnuEditSong.Enabled = !IsBusy && selected == 1;
+            mnuRenameSong.Enabled = !IsBusy && selected == 1;
+            mnuDeleteSong.Enabled = !IsBusy && selected > 0;
+        }
+
+        /// <summary>Pistas seleccionadas y visibles, en el orden de la rejilla.</summary>
+        /// <remarks>
+        /// Se descartan las filas ocultas por el filtro: una acción sobre la selección, como
+        /// eliminar del disco, nunca debe alcanzar una pista que el usuario no está viendo.
+        /// </remarks>
         private List<Song> GetSelectedSongs() =>
             dataGrid.SelectedRows
                 .Cast<DataGridViewRow>()
+                .Where(r => r.Visible)
                 .OrderBy(r => r.Index)
                 .Select(r => r.DataBoundItem)
                 .OfType<Song>()
@@ -1132,42 +1235,101 @@ namespace EchoCut
         }
 
         /// <summary>
-        /// Abre la forma de onda de la pista seleccionada para ver sus silencios y corregir el
-        /// recorte a mano.
+        /// Abre la forma de onda de la pista seleccionada para ver sus silencios, corregir el
+        /// recorte a mano, añadir fundidos y borrar fragmentos.
         /// </summary>
         /// <remarks>
-        /// Funciona también con pistas sin analizar: el tramo parte de la pista completa y el ajuste
-        /// manual basta para recortarla.
+        /// <para>
+        /// La ventana no tiene modo: se pueden abrir varias, una por pista, sin dejar de usar esta. Si
+        /// la pista ya tiene la suya, se trae al frente.
+        /// </para>
+        /// <para>
+        /// Funciona también con pistas sin analizar y mientras corre un lote: hasta que el usuario
+        /// acepta o guarda, el editor no toca la fila.
+        /// </para>
         /// </remarks>
         private void mnuWaveform_Click(object? sender, EventArgs e)
         {
-            if (IsBusy || GetSelectedSong() is not { } song || !EnsureFFmpeg())
+            if (GetSelectedSong() is not { } song || !EnsureFFmpeg())
             {
                 return;
             }
 
-            StopPreview();
-
-            double duration = song.DurationSeconds;
-            using WaveformEditor dialog = new(
-                song.Track,
-                duration,
-                song.TrimRange ?? new TrimRange(0.0, duration),
-                song.Analysis?.Range,
-                song.ManualRange is not null,
-                _waveforms,
-                _locator.Require().FFmpeg,
-                _settings.Silence.PreviewSeconds);
-
-            if (dialog.ShowDialog(this) != DialogResult.OK)
+            if (_editors.TryGetValue(song, out WaveformEditor? open))
             {
+                if (open.WindowState == FormWindowState.Minimized)
+                {
+                    open.WindowState = FormWindowState.Normal;
+                }
+
+                open.Activate();
                 return;
             }
 
-            song.AdjustManually(dialog.ManualRange);
-            SetStatus(dialog.ManualRange is null
-                ? $"{song.Name}: se usa el recorte del análisis."
-                : $"{song.Name}: recorte ajustado a mano, {song.Crop:0.00} s a eliminar.");
+            WaveformEditorServices services = new(_waveforms, _analysis, _locator.Require().FFmpeg, _settings.Silence.PreviewSeconds, CurrentOptions);
+            WaveformEditor editor = new(song, services, SaveFromEditorAsync);
+            editor.Applied += (_, _) => ApplyEditorDecisions(editor);
+            editor.FormClosed += (_, _) => _editors.Remove(song);
+            _editors[song] = editor;
+            editor.Show();
+        }
+
+        /// <summary>Lleva a la fila lo decidido en su editor: el tramo, los fundidos y los borrados.</summary>
+        private void ApplyEditorDecisions(WaveformEditor editor)
+        {
+            Song song = editor.Song;
+            song.AdjustManually(editor.ManualRange);
+            song.ApplyEdits(editor.Edits);
+
+            // Si en el editor se detectaron los silencios del resultado, ese análisis pasa a ser el de
+            // la fila: sus columnas de silencio describen ya la copia y no el original.
+            if (editor.ResultAnalysis is { } analysis)
+            {
+                song.Complete(analysis);
+            }
+
+            string trim = editor.ManualRange is null
+                ? "se usa el recorte del análisis"
+                : $"recorte ajustado a mano, {song.Crop:0.00} s a eliminar";
+            string edits = song.Edits is null ? string.Empty : "; la copia llevará ediciones y se volverá a codificar";
+            SetStatus($"{song.Name}: {trim}{edits}.");
+        }
+
+        /// <summary>Guarda desde un editor: aplica sus decisiones a la fila y escribe la copia en «Recortados».</summary>
+        /// <returns>Ruta de la copia escrita, o <c>null</c> si no se pudo escribir.</returns>
+        /// <remarks>
+        /// Pasa por el mismo recorte individual que la rejilla, con su progreso, su cancelación y su
+        /// estado de fila; por eso espera a que no haya otro lote en curso.
+        /// </remarks>
+        private async Task<string?> SaveFromEditorAsync(WaveformEditor editor)
+        {
+            if (IsBusy)
+            {
+                MessageBox.Show(
+                    editor,
+                    "Hay una tarea en curso en la ventana principal. Espera a que termine para guardar.",
+                    "Guardar",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return null;
+            }
+
+            editor.Apply();
+            return await TrimSingleAsync(editor.Song).ConfigureAwait(true);
+        }
+
+        /// <summary>Cierra sin preguntar los editores de filas que dejan de existir.</summary>
+        /// <param name="songs">Filas que se van; todas si es <c>null</c>.</param>
+        private void DiscardEditors(IEnumerable<Song>? songs = null)
+        {
+            List<WaveformEditor> closing = songs is null
+                ? [.. _editors.Values]
+                : [.. songs.Where(_editors.ContainsKey).Select(song => _editors[song])];
+
+            foreach (WaveformEditor editor in closing)
+            {
+                editor.Discard();
+            }
         }
 
         private void mnuEditSong_Click(object? sender, EventArgs e)
@@ -1206,15 +1368,6 @@ namespace EchoCut
             };
 
             dialog.ShowDialog(this);
-        }
-
-        private void dataGrid_KeyDown(object? sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Delete)
-            {
-                e.Handled = true;
-                DeleteSelectedSongs();
-            }
         }
 
         private void mnuDeleteSong_Click(object? sender, EventArgs e)
@@ -1280,6 +1433,7 @@ namespace EchoCut
                 }
             }
 
+            DiscardEditors(successfullyDeleted);
             foreach (Song song in successfullyDeleted)
             {
                 _rows.Remove(song.FilePath);
@@ -1305,323 +1459,6 @@ namespace EchoCut
                     "Error al eliminar archivos",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
-            }
-        }
-
-        private async void btnClean_Click(object sender, EventArgs e)
-        {
-            if (IsBusy || _songs.Count == 0)
-            {
-                return;
-            }
-
-            int count = _songs.Count;
-            string confirmationMessage = count == 1
-                ? $"¿Está seguro de que desea eliminar todos los metadatos de «{_songs[0].Name}»?\n\nEsta operación modificará el archivo directamente en el disco."
-                : $"¿Está seguro de que desea eliminar todos los metadatos de las {count} canciones cargadas en la lista?\n\nEsta operación modificará los archivos directamente en el disco.";
-
-            DialogResult confirmation = MessageBox.Show(
-                this,
-                confirmationMessage,
-                "Confirmar limpieza de metadatos",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button2);
-
-            if (confirmation != DialogResult.Yes)
-            {
-                return;
-            }
-
-            StopPreview();
-
-            List<Song> songsToClean = [.. _songs];
-            using CancellationTokenSource cts = new();
-            _cleanCts = cts;
-            UpdateButtons();
-
-            StartProgress(songsToClean.Count, "Limpiando metadatos…");
-
-            int completed = 0;
-            int successCount = 0;
-            List<string> errors = [];
-            int degreeOfParallelism = Math.Clamp((int)numericThreads.Value, 1, 8);
-
-            try
-            {
-                _running = Task.Run(async () =>
-                {
-                    ParallelOptions parallelOptions = new()
-                    {
-                        MaxDegreeOfParallelism = degreeOfParallelism,
-                        CancellationToken = cts.Token,
-                    };
-
-                    await Parallel.ForEachAsync(songsToClean, parallelOptions, (song, token) =>
-                    {
-                        token.ThrowIfCancellationRequested();
-
-                        try
-                        {
-                            TrackInfo updated = TrackEditor.StripMetadata(song.FilePath);
-                            if (IsAlive)
-                            {
-                                try
-                                {
-                                    BeginInvoke(() =>
-                                    {
-                                        if (IsAlive)
-                                        {
-                                            song.UpdateTrack(updated);
-                                        }
-                                    });
-                                }
-                                catch (InvalidOperationException)
-                                {
-                                }
-                            }
-
-                            Interlocked.Increment(ref successCount);
-                        }
-                        catch (Exception exception)
-                        {
-                            lock (errors)
-                            {
-                                errors.Add($"{song.Name}: {exception.Message}");
-                            }
-                        }
-                        finally
-                        {
-                            int current = Interlocked.Increment(ref completed);
-                            if (IsAlive)
-                            {
-                                try
-                                {
-                                    BeginInvoke(() =>
-                                    {
-                                        if (IsAlive)
-                                        {
-                                            AdvanceProgress(current);
-                                        }
-                                    });
-                                }
-                                catch (InvalidOperationException)
-                                {
-                                }
-                            }
-                        }
-
-                        return ValueTask.CompletedTask;
-                    }).ConfigureAwait(false);
-                }, cts.Token);
-
-                await _running.ConfigureAwait(true);
-
-                if (IsAlive)
-                {
-                    _songs.ReapplySort();
-
-                    if (successCount == 1)
-                    {
-                        SetStatus("Metadatos eliminados correctamente para 1 canción.");
-                    }
-                    else
-                    {
-                        SetStatus($"Metadatos eliminados correctamente en {successCount} de {songsToClean.Count} canciones.");
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                SetStatus("Limpieza de metadatos cancelada.");
-            }
-            catch (Exception exception)
-            {
-                ShowError("No se pudo completar la limpieza de metadatos.", exception);
-            }
-            finally
-            {
-                _cleanCts = null;
-                _running = null;
-
-                if (IsAlive)
-                {
-                    EndProgress();
-                    UpdateButtons();
-                }
-            }
-
-            if (errors.Count > 0 && IsAlive)
-            {
-                MessageBox.Show(
-                    this,
-                    $"No se pudieron limpiar los metadatos de algunos archivos:\n\n{string.Join(Environment.NewLine, errors)}",
-                    "Aviso de limpieza",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-            }
-        }
-
-        private async void btnNormalize_Click(object sender, EventArgs e)
-        {
-            if (IsBusy || _songs.Count == 0)
-            {
-                return;
-            }
-
-            int count = _songs.Count;
-            string confirmationMessage = count == 1
-                ? $"¿Está seguro de que desea normalizar «{_songs[0].Name}»?\n\nEsta operación removerá los acentos (conservando la letra «ñ») y convertirá las palabras a TitleCase tanto en los metadatos como en el nombre del archivo en disco."
-                : $"¿Está seguro de que desea normalizar las {count} canciones cargadas en la lista?\n\nEsta operación removerá los acentos (conservando la letra «ñ») y convertirá las palabras a TitleCase tanto en los metadatos como en el nombre del archivo en disco.";
-
-            DialogResult confirmation = MessageBox.Show(
-                this,
-                confirmationMessage,
-                "Confirmar normalización de canciones",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question,
-                MessageBoxDefaultButton.Button2);
-
-            if (confirmation != DialogResult.Yes)
-            {
-                return;
-            }
-
-            StopPreview();
-
-            List<Song> songsToNormalize = [.. _songs];
-            using CancellationTokenSource cts = new();
-            _normalizeCts = cts;
-            UpdateButtons();
-
-            StartProgress(songsToNormalize.Count, "Normalizando información de canciones…");
-
-            int completed = 0;
-            int successCount = 0;
-            List<string> errors = [];
-            int degreeOfParallelism = Math.Clamp((int)numericThreads.Value, 1, 8);
-
-            try
-            {
-                _running = Task.Run(async () =>
-                {
-                    ParallelOptions parallelOptions = new()
-                    {
-                        MaxDegreeOfParallelism = degreeOfParallelism,
-                        CancellationToken = cts.Token,
-                    };
-
-                    await Parallel.ForEachAsync(songsToNormalize, parallelOptions, (song, token) =>
-                    {
-                        token.ThrowIfCancellationRequested();
-
-                        try
-                        {
-                            string oldPath = song.FilePath;
-                            TrackInfo updated = TrackEditor.NormalizeTrack(oldPath);
-
-                            if (IsAlive)
-                            {
-                                try
-                                {
-                                    BeginInvoke(() =>
-                                    {
-                                        if (IsAlive)
-                                        {
-                                            string newPath = updated.FilePath;
-                                            if (!string.Equals(oldPath, newPath, StringComparison.Ordinal))
-                                            {
-                                                _rows.Remove(oldPath);
-                                                _rows[newPath] = song;
-                                            }
-
-                                            song.UpdateTrack(updated);
-                                        }
-                                    });
-                                }
-                                catch (InvalidOperationException)
-                                {
-                                }
-                            }
-
-                            Interlocked.Increment(ref successCount);
-                        }
-                        catch (Exception exception)
-                        {
-                            lock (errors)
-                            {
-                                errors.Add($"{song.Name}: {exception.Message}");
-                            }
-                        }
-                        finally
-                        {
-                            int current = Interlocked.Increment(ref completed);
-                            if (IsAlive)
-                            {
-                                try
-                                {
-                                    BeginInvoke(() =>
-                                    {
-                                        if (IsAlive)
-                                        {
-                                            AdvanceProgress(current);
-                                        }
-                                    });
-                                }
-                                catch (InvalidOperationException)
-                                {
-                                }
-                            }
-                        }
-
-                        return ValueTask.CompletedTask;
-                    }).ConfigureAwait(false);
-                }, cts.Token);
-
-                await _running.ConfigureAwait(true);
-
-                if (IsAlive)
-                {
-                    _songs.ReapplySort();
-
-                    if (successCount == 1)
-                    {
-                        SetStatus("Normalización completada para 1 canción.");
-                    }
-                    else
-                    {
-                        SetStatus($"Normalización completada en {successCount} de {songsToNormalize.Count} canciones.");
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                SetStatus("Normalización de canciones cancelada.");
-            }
-            catch (Exception exception)
-            {
-                ShowError("No se pudo completar la normalización de canciones.", exception);
-            }
-            finally
-            {
-                _normalizeCts = null;
-                _running = null;
-
-                if (IsAlive)
-                {
-                    EndProgress();
-                    UpdateButtons();
-                }
-            }
-
-            if (errors.Count > 0 && IsAlive)
-            {
-                MessageBox.Show(
-                    this,
-                    $"No se pudieron normalizar algunos archivos:\n\n{string.Join(Environment.NewLine, errors)}",
-                    "Aviso de normalización",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
             }
         }
     }

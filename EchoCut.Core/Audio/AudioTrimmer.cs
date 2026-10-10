@@ -36,11 +36,11 @@ public sealed class AudioTrimmer
     /// instantánea. A cambio, cada extremo se alinea a un límite de paquete comprimido, y lo hace de
     /// forma distinta según el códec (medido con FFmpeg 8.1):
     /// <list type="bullet">
-    ///   <item>WAV y M4A/AAC: inicio exacto; MP3: a medio paquete del pedido (±13 ms).</item>
+    ///   <item>WAV y M4A/AAC: inicio exacto; MP3 y MP2: a medio paquete del pedido (±13 ms).</item>
     ///   <item>FLAC y Vorbis: el inicio retrocede al bloque o página anterior (hasta ~93 ms y ~0.9 s).</item>
     ///   <item>
-    ///     MP3, AAC y Opus: los primeros milisegundos de la copia no coinciden con el original
-    ///     (~8 ms en MP3 y AAC, ~110 ms atenuados en Opus) porque el decodificador arranca sin el
+    ///     MP3, MP2, AAC y Opus: los primeros milisegundos de la copia no coinciden con el original
+    ///     (~8 ms en MP3, MP2 y AAC, ~110 ms atenuados en Opus) porque el decodificador arranca sin el
     ///     estado de los paquetes previos.
     ///   </item>
     /// </list>
@@ -60,18 +60,33 @@ public sealed class AudioTrimmer
         CancellationToken cancellationToken)
     {
         range.ThrowIfInvalid();
+        string destination = PrepareDestination(filePath, outputDirectory);
 
+        await FFmpegRunner
+            .RunCheckedAsync(_ffmpegPath, BuildArguments(filePath, range, destination), cancellationToken)
+            .ConfigureAwait(false);
+
+        return destination;
+    }
+
+    /// <summary>Crea la carpeta de salida y calcula la ruta de la copia, sin pisar nunca el original.</summary>
+    /// <param name="filePath">Ruta del archivo original.</param>
+    /// <param name="outputDirectory">Carpeta donde escribir la copia; se crea si no existe.</param>
+    /// <param name="extension">
+    /// Extensión de la copia, con el punto, si cambia de formato; <c>null</c> para conservar la del original.
+    /// </param>
+    /// <returns>Ruta completa de la copia, con el mismo nombre que el original.</returns>
+    /// <exception cref="FFmpegException">Se lanza si el destino calculado coincide con el original.</exception>
+    internal static string PrepareDestination(string filePath, string outputDirectory, string? extension = null)
+    {
         Directory.CreateDirectory(outputDirectory);
-        string destination = Path.Combine(outputDirectory, Path.GetFileName(filePath));
+        string fileName = extension is null ? Path.GetFileName(filePath) : Path.GetFileNameWithoutExtension(filePath) + extension;
+        string destination = Path.Combine(outputDirectory, fileName);
 
         if (string.Equals(Path.GetFullPath(destination), Path.GetFullPath(filePath), StringComparison.OrdinalIgnoreCase))
         {
             throw new FFmpegException("El archivo de salida coincide con el original; se omite para no sobrescribirlo.");
         }
-
-        await FFmpegRunner
-            .RunCheckedAsync(_ffmpegPath, BuildArguments(filePath, range, destination), cancellationToken)
-            .ConfigureAwait(false);
 
         return destination;
     }

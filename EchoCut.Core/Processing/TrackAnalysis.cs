@@ -32,15 +32,50 @@ public sealed record TrackAnalysis(
     double AnalysisMilliseconds,
     double DecodedSeconds)
 {
+    /// <summary>Ediciones con las que se analizó: el análisis miró el resultado, no el original.</summary>
+    /// <value>Los fundidos y borrados aplicados al analizar, o <c>null</c> si se analizó el archivo tal cual.</value>
+    /// <remarks>
+    /// Sirve para saber si el análisis sigue describiendo la copia: si las ediciones de la pista
+    /// cambian, los silencios medidos ya no son los del resultado.
+    /// </remarks>
+    public AudioEdits? AnalyzedEdits { get; init; }
+
+    /// <summary>Fragmentos que estaban borrados cuando se analizó.</summary>
+    /// <value>Lo borrado al analizar; <see cref="DeletedRegions.Empty"/> si se analizó el archivo tal cual.</value>
+    /// <remarks>
+    /// Los silencios se miden en la línea de tiempo del resultado, que es lo que sonará; los cortes
+    /// se traducen al original con esto, porque el tramo de la copia siempre se expresa en tiempo
+    /// del original. Al rehacer la decisión con otra tolerancia se conserva, así que la traducción
+    /// sigue valiendo.
+    /// </remarks>
+    public DeletedRegions Timeline => AnalyzedEdits?.Deletions ?? DeletedRegions.Empty;
+
+    /// <summary>Duración del resultado analizado.</summary>
+    /// <value>La duración del original menos lo borrado al analizar.</value>
+    public double ResultSeconds => DurationSeconds - Timeline.TotalSeconds;
+
     /// <summary>Instante en el que empieza la copia recortada.</summary>
-    /// <value>Segundos desde el principio del archivo; <c>0</c> si el principio no se recorta.</value>
-    public double StartSeconds => Leading.ShouldTrim ? Leading.RemovedSeconds : 0.0;
+    /// <value>Segundos desde el principio del archivo original; <c>0</c> si el principio no se recorta.</value>
+    public double StartSeconds => Leading.ShouldTrim ? Timeline.SourceSecondsAt(0.0, Leading.RemovedSeconds) : 0.0;
 
     /// <summary>Instante en el que termina la copia recortada.</summary>
-    /// <value>Segundos desde el principio del archivo; la duración completa si el final no se recorta.</value>
-    public double EndSeconds => Trailing.ShouldTrim
-        ? Math.Clamp(DurationSeconds - Trailing.RemovedSeconds, StartSeconds, DurationSeconds)
-        : DurationSeconds;
+    /// <value>Segundos desde el principio del archivo original; la duración completa si el final no se recorta.</value>
+    public double EndSeconds
+    {
+        get
+        {
+            if (!Trailing.ShouldTrim)
+            {
+                return DurationSeconds;
+            }
+
+            double resultStart = Leading.ShouldTrim ? Leading.RemovedSeconds : 0.0;
+            double resultEnd = Math.Clamp(ResultSeconds - Trailing.RemovedSeconds, resultStart, ResultSeconds);
+            return resultEnd >= ResultSeconds
+                ? DurationSeconds
+                : Math.Clamp(Timeline.SourceSecondsAt(0.0, resultEnd), StartSeconds, DurationSeconds);
+        }
+    }
 
     /// <summary>Tramo del original que conserva la copia recortada.</summary>
     /// <value>De <see cref="StartSeconds"/> a <see cref="EndSeconds"/>.</value>
@@ -74,6 +109,28 @@ public sealed record TrackAnalysis(
             : Leading with { ShouldTrim = false },
         Trailing = Trailing.Reconsider(options.MinSilenceSeconds, options),
     };
+
+    /// <summary>Proyecta el análisis de un resultado editado a sus cifras presentables.</summary>
+    /// <param name="report">Informe de <see cref="SilenceAnalyzer.AnalyzeEditedAsync"/>, en la línea de tiempo del resultado.</param>
+    /// <param name="edits">Ediciones aplicadas al analizar; lo borrado traduce los cortes al original.</param>
+    /// <returns>El análisis, con la duración del original y los cortes en su línea de tiempo.</returns>
+    public static TrackAnalysis FromEdited(AnalysisReport report, AudioEdits edits)
+    {
+        ArgumentNullException.ThrowIfNull(edits);
+        return From(report) with
+        {
+            DurationSeconds = report.DurationSeconds + edits.Deletions.TotalSeconds,
+            AnalyzedEdits = edits,
+        };
+    }
+
+    /// <summary>Si el análisis sigue describiendo la copia con las ediciones indicadas.</summary>
+    /// <param name="edits">Ediciones vigentes de la pista, o <c>null</c> si no lleva ninguna.</param>
+    /// <returns>
+    /// <c>true</c> si se analizó el original tal cual —sus medidas no dependen de las ediciones— o si
+    /// se analizó el resultado con estas mismas ediciones.
+    /// </returns>
+    public bool Describes(AudioEdits? edits) => AnalyzedEdits is null || AnalyzedEdits.SameAs(edits);
 
     /// <summary>Proyecta el informe crudo del analizador a sus cifras presentables.</summary>
     /// <param name="report">Informe devuelto por <see cref="SilenceAnalyzer"/>.</param>

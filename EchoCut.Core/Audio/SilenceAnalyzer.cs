@@ -127,6 +127,65 @@ public sealed class SilenceAnalyzer
     }
 
     /// <summary>
+    /// Analiza el silencio del resultado editado de un archivo: lo que quedará tras aplicar sus
+    /// fundidos y quitar lo borrado.
+    /// </summary>
+    /// <param name="filePath">Ruta del archivo original.</param>
+    /// <param name="edits">Ediciones de la pista, en tiempo del original.</param>
+    /// <param name="options">Parámetros del algoritmo de detección.</param>
+    /// <param name="cancellationToken">Token de cancelación para la decodificación.</param>
+    /// <returns>
+    /// El análisis en la línea de tiempo del resultado: su duración es la del resultado, y los
+    /// silencios, los que tendrá la copia. Quien lo recibe lo traduce al original.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// Es lo que permite descubrir silencios que antes no existían: una desaparición que deja la
+    /// cola en −60 dB, o un fragmento borrado que deja el final de la pista en silencio.
+    /// </para>
+    /// <para>
+    /// No hay sondeo progresivo: un borrado desplaza todo lo que viene después, así que la cola del
+    /// resultado no se puede pedir con <c>-sseof</c>. Se decodifica el archivo entero una vez, a la
+    /// frecuencia de análisis y en mono, y el principio se analiza sobre las mismas tramas.
+    /// </para>
+    /// </remarks>
+    public async Task<AnalysisReport> AnalyzeEditedAsync(
+        string filePath,
+        AudioEdits edits,
+        SilenceOptions options,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(edits);
+        long startedAt = Stopwatch.GetTimestamp();
+
+        using LevelFramer framer = new(
+            _decoder.SampleRate,
+            options.FrameMilliseconds,
+            expectedFrames: 0,
+            options.HighPassHz);
+
+        EditedSampleSink sink = new(framer, edits, _decoder.SampleRate);
+        await _decoder.DecodeAllIntoAsync(filePath, sink, cancellationToken).ConfigureAwait(false);
+        framer.Complete();
+
+        double resultSeconds = framer.AnalyzedSeconds;
+        SilenceResult trailing = SilenceDetector.AnalyzeFrames(
+            framer.Levels,
+            framer.FrameSeconds,
+            framer.LastFrameSeconds,
+            framer.PeakDbfs,
+            resultSeconds,
+            options);
+
+        return new AnalysisReport(
+            trailing,
+            options.TrimLeadingSilence ? AnalyzeLeading(framer, options) : null,
+            resultSeconds,
+            resultSeconds + edits.Deletions.TotalSeconds,
+            (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+    }
+
+    /// <summary>
     /// Decodifica un borde con una ventana creciente hasta que el análisis encuentra música o la
     /// ventana cubre el archivo entero.
     /// </summary>

@@ -7,6 +7,93 @@ y este proyecto se adhiere a [Versionado Semántico (SemVer)](https://semver.org
 
 ---
 
+## [Sin publicar]
+
+---
+
+## [1.3.0] - 2026-10-09
+
+### Añadido
+#### Regularización de Volumen sin Pérdida
+* **Ventana «Regularizar volumen»** (`Utilidades › Regularizar volumen…`, `Ctrl+Shift+V`): Lista las canciones MP3 cargadas con su volumen, el ajuste propuesto, el resultado previsto, el pico, la saturación y el ajuste acumulado. *Analizar* mide sin modificar; *Aplicar ajuste* cambia los originales marcados sin recodificar y cada fila enseña el volumen de antes, lo aplicado y cómo quedó; *Restaurar original* los devuelve a su volumen de siempre leyendo `MP3GAIN_UNDO`, también en archivos ajustados con MP3Gain. Objetivo de 89 dB por defecto, ajustable entre 75 y 105 dB, que recalcula las propuestas al instante y se recuerda en `AppSettings.VolumeTargetDb`. Las subidas que saturarían se limitan a lo que permite el pico. `VolumeRow` concentra la presentación con la paleta accesible y glifos redundantes al color.
+* **`EchoCut.Loudness`**: `ReplayGainAnalyzer` porta el análisis ReplayGain 1.0 de MP3Gain (Yule-Walker de orden 10 + Butterworth a 150 Hz, RMS en ventanas de 50 ms, percentil 95, referencia de 89 dB); `Mp3GainEditor` recorre las tramas Layer III y suma pasos de 1.5 dB a `global_gain`, recalcula el CRC y reescribe sobre una copia temporal que sustituye al original al terminar; `GainPlanner` decide los pasos con protección contra saturación; `Mp3GainTags` escribe `MP3GAIN_UNDO`, `MP3GAIN_MINMAX` y corrige los valores ReplayGain. `LoudnessService` separa medir, aplicar y restaurar por lote; el resultado no se vuelve a medir porque `ReplayGainResult.AfterSteps` lo calcula de forma exacta.
+* **`AudioDecoder`** admite pedir varios canales intercalados (`channels`), que ReplayGain necesita para filtrar cada uno por separado.
+
+#### Conversión a MP3 y Duplicados por Audio
+* **Convertir a MP3** (`Utilidades`, `Ctrl+Shift+M`): Copia en MP3 de las canciones cargadas en la subcarpeta `MP3/` junto a cada original, con etiquetas y carátula; calidad VBR V0, VBR V2, CBR 320 o CBR 192, recordada en `AppSettings.Mp3Quality`. Las que ya son MP3 se omiten. `Mp3Converter`, `Mp3Quality` y `ConversionService` en el motor.
+* **Buscar duplicados por audio** (`Utilidades`, `Ctrl+Shift+D`): Huella acústica propia según Haitsma y Kalker —33 bandas logarítmicas entre 300 y 2000 Hz, 32 bits por trama de 23 ms— en `EchoCut.Fingerprints` (`FftPlan`, `FingerprintBuilder`, `AudioFingerprint`), con búsqueda de candidatas por índice invertido y verificación por tasa de bits distintos tras alinear (`DuplicateDetector`). Reconoce la misma grabación en otro formato, tasa de bits o volumen y con silencios distintos; exige que coincida el 80 % de lo que suena en ambas para no confundir una mezcla con la canción que contiene.
+* **Ventana de duplicados**: Grupos con parecido, duración, formato, bitrate, tamaño y carpeta; propone conservar la copia de mejor calidad (`DuplicateFinder`), permite escuchar, abrir la ubicación y cambiar las marcas, y envía las marcadas a la Papelera de reciclaje tras confirmarlo, retirando sus filas del listado.
+
+#### Edición de la Biblioteca y Renombrado
+* **Renombrar con `F2`** (y *Renombrar* en el menú contextual): Cuadro de edición sobre la celda «Nombre», con confirmación con `Entrar` o al perder el foco y descarte con `Esc`. Un nombre no válido o repetido se explica y reabre la edición con lo escrito. `TrackEditor.RenameTrack` cambia solo el nombre, sin reescribir las etiquetas.
+* **Agregar consecutivo… y Quitar caracteres iniciales…** (`Utilidades › Renombrar`, `Ctrl+Shift+C` / `Ctrl+Shift+Q`): Antepone un número con ceros a la izquierda, por ejemplo `0001 - Artista - Nombre`, o quita caracteres del principio, con una vista previa que no deja continuar si algún nombre no es válido, se repite o ya existe. `TrackNaming` calcula ambas cosas como funciones puras, para que la vista previa y el renombrado real coincidan.
+* **Agregar metadatos…** (`Utilidades › Metadatos`): Aplica artista, título, álbum, género y comentarios a todo el listado; los campos en blanco no se tocan, el título puede tomarse del nombre del archivo y los archivos que ya tienen esos valores no se reescriben. `TagPatch` y `TrackEditor.ApplyTags`.
+* **Normalizar por propiedades** (`Utilidades › Normalizar…`): Diálogo con una casilla por propiedad que recuerda la última elección (`AppSettings.NormalizeFields`) y confirma antes de procesar, indicando si habrá renombrados. `NormalizableFields` solo escribe las etiquetas elegidas, sin partir las listas de intérpretes con «/».
+
+#### Rejilla, Atajos y Presentación
+* **Filtro por nombre** (`Ctrl+F`, `Esc` para vaciarlo): Oculta mientras se escribe las filas cuyo nombre no contiene el texto, sin distinguir mayúsculas ni acentos. Es solo de presentación: los lotes y la exportación siguen actuando sobre todas las pistas, y la barra de estado indica cuántas se ven.
+* **Columnas ocultables**: Clic derecho sobre una cabecera —o la opción *Columnas visibles* del menú de las filas— para mostrar u ocultar cada columna, con *Mostrar todas*. La elección se guarda en `AppSettings.HiddenColumns`, por nombre y no por posición. «Nombre» siempre queda visible.
+* **Anchos ajustados al contenido**: Las columnas se miden por su contenido en todas las filas, sin cortar los nombres largos; Nombre, Título, Artista y Álbum se limitan al 40 % del ancho visible. *Ajustar anchos al contenido* lo repite a mano.
+* **Columnas de acción fijas**: Las de reproducir y recortar siguen a la vista al desplazarse en horizontal.
+* **Barra de estado** (`StatusStrip`): Mensaje de la última acción, progreso y contador durante los lotes, y un resumen permanente de pistas, recortables, recortadas y errores con los mismos glifos y colores de la rejilla.
+* **Zona de arrastre**: Con la lista vacía, la rejilla invita a arrastrar carpetas o archivos y se resalta mientras se arrastra encima algo aceptable.
+* **Tooltips explicativos** en la barra de herramientas, en los parámetros de tolerancia e hilos y en la ruta de origen, que indica dónde se escriben las copias.
+* **Tabla única de atajos** (`Main.Shortcuts.cs`): Los de la ventana principal se ejecutan, se anuncian en el menú y en los tooltips y se listan en *Atajos* (`F1`) desde la misma tabla.
+
+#### Integración con el Sistema y Formatos
+* **Integrar con el Explorador de Windows** (`Utilidades › Integrar con el Explorador de Windows`): Agrega o quita «Abrir con EchoCut» para las extensiones de audio, las carpetas y el fondo de una carpeta abierta. Se registra en `HKEY_CURRENT_USER` sin permisos de administrador y sin cambiar el reproductor asociado a cada extensión.
+* **Una sola ventana**: Abrir archivos o carpetas desde el Explorador mientras EchoCut ya está abierto entrega sus rutas a la ventana existente por una tubería con nombre (`SingleInstance`), que las agrupa unos instantes y las suma al listado sin duplicarlas.
+* **Soporte para `.mp2`** (MPEG Audio Layer II): Se escanea, se edita y se recorta con `-c copy`; las copias con fundidos o borrados se recodifican con el codificador MP2 de FFmpeg y con etiquetas ID3v2.3.
+
+#### Resultado Editado y Detección de Silencios Posteriores
+* **Onda con las ediciones aplicadas**: `WaveformRenderer` pinta cada columna con la ganancia de los fundidos y, en la línea de tiempo del resultado, juntando los tramos del original que suenan en ella; se dibuja a partir del resumen ya cargado, sin volver a decodificar.
+* **«Ver resultado»** (`Ctrl+R`): Las tres vistas pasan a la línea de tiempo de la copia, sin lo borrado y con los empalmes marcados en morado; el detalle del final usa la pista completa para poder juntar lo que queda a ambos lados de un borrado.
+* **Ajuste del recorte sobre el resultado**: Con «Ver resultado» activo, las marcas de inicio y final se arrastran o se mueven con el teclado, y los campos de «Copia» muestran y aceptan tiempos del resultado; todo se traduce al original, y un borde llevado a un empalme o al final del resultado queda exactamente ahí. `WaveformView.MarkersOnly` deja mover solo las marcas, y un clic marca desde dónde escuchar. Deshacer sigue disponible y rehace la vista si cambia lo borrado.
+* **«Detectar silencios»** (`F5`): Analiza el resultado editado y propone el comienzo y el final de la copia; se deshace con `Ctrl+Z` y la fila adopta el análisis al aceptar o guardar.
+* **`SilenceAnalyzer.AnalyzeEditedAsync` y `EditedSampleSink`**: Análisis del resultado decodificando el archivo completo a través de `PcmEditor`, el mismo código que escribe la copia, porque un borrado impide el sondeo de la cola con `-sseof`.
+* **`TrackAnalysis.AnalyzedEdits` y `Timeline`**: Los silencios se miden en el resultado y los cortes se traducen al original; la traducción sobrevive a los cambios de tolerancia. `DeletedRegions` gana `OutputSecondsAt` y `SourceSpans` para traducir entre ambas líneas de tiempo.
+* **Análisis por lote del resultado**: `AnalysisRequest` lleva las ediciones de cada fila; las editadas se analizan sobre su resultado y las demás siguen con el sondeo rápido de los bordes.
+
+### Cambiado
+* **`Song.ApplyEdits`** descarta un análisis hecho sobre el resultado si las ediciones cambian, porque sus silencios eran los de otra copia.
+* **Editor de forma de onda**: Recibe sus servicios en `WaveformEditorServices`; los botones de zoom y la escala en dB se compactan para que la barra quepa entera, y la ventana se abre a 1280 × 820.
+* **Utilidades › Metadatos y Normalizar**: Metadatos pasa a ser un submenú con *Eliminar metadatos* y *Agregar metadatos…*; *Normalizar* deja de tocar todas las propiedades a la vez.
+
+#### Editor de Forma de Onda Rediseñado
+* **Estilo de la ventana principal**: Barra de herramientas con las acciones agrupadas (reproducir | aplicar a la selección | deshacer | zoom, con ayuda y escala en dB a la derecha) y barra de estado que describe cada opción al pasar el ratón y resume la copia: duración final, fundidos, borrado y si saldrá sin pérdida o se recodificará. Desaparecen los marcos de grupo y la barra de selección.
+* **Inspector**: Panel a la derecha con la copia (comienzo, final, duración final y escucha de los bordes) y una sección contextual para la selección, un fundido —con su curva dibujada y su nivel a mitad de camino— o un fragmento borrado, todos con sus instantes editables. Un clic sobre un fundido o sobre lo borrado lo muestra.
+* **Deshacer y rehacer** (`Ctrl+Z` / `Ctrl+Y`): Historial de instantáneas del tramo, los fundidos y los borrados; un arrastre cuenta como un solo cambio, y el aviso de cambios sin aplicar compara con lo que tiene la fila.
+* **Reproducción general** (`Espacio`): Suena la selección o, sin ella, desde el punto marcado con un clic, con las ediciones aplicadas.
+* **Zoom y desplazamiento**: Rueda para desplazar y `Ctrl`+rueda para acercar bajo el puntero en cualquier vista, además de *Acercar*, *Alejar*, *Ver selección* y *Ver todo* sobre la última vista tocada; la vista del final no sale del audio cargado.
+* **Tabla única de atajos**: Los del editor se atienden, se anuncian en tooltips y barra de estado, se listan en su ventana *Atajos* (`F1`) y aparecen en la de la ventana principal desde la misma tabla.
+
+#### Selección, Borrado y Ventanas de Forma de Onda
+* **Seleccionar y luego actuar**: Como en Audacity, se arrastra en cualquiera de las tres vistas —también la de la pista completa— para seleccionar un tramo, compartido por todas, y se le aplica una aparición, una desaparición, un borrado o una restauración desde la nueva barra de selección. Los bordes de la selección y de los fundidos se arrastran en cualquier vista.
+* **Borrar selección** (`Supr`): Quita el audio seleccionado y une lo anterior con lo posterior, como el `WaveTrack::Clear` de Audacity: muestras ajustadas a la más cercana y empalme en seco. Lo borrado se dibuja gris y rayado; un clic sobre él lo selecciona y *Restaurar* lo devuelve.
+* **`TimeRegion`, `DeletedRegions`, `AudioEdits` y `PcmEditor`** (`EchoCut.Core/Audio`): Tramo de tiempo, conjunto normalizado e inmutable de fragmentos borrados con su traducción a tramas y al cursor, agregado de fundidos y borrados, y editor de PCM por bloques que comparten la copia y la escucha.
+* **Botón «Guardar»**: Aplica los ajustes a la fila y escribe la copia en `Recortados/` sin cerrar el editor, por la misma vía que el recorte individual de la rejilla.
+* **Varias ventanas de forma de onda**: El editor deja de ser modal; hay una ventana por pista, con su nombre en el título y en la barra de tareas, y volver a abrirla la trae al frente. Al cerrarla con cambios sin aplicar pregunta qué hacer; se cierra sola si su fila desaparece.
+* **Escucha de la selección** (hasta 30 s) con las ediciones aplicadas, y reproducción exclusiva en toda la aplicación: empezar a escuchar en una ventana detiene lo que sonara en otra.
+
+#### Fundidos de Aparición y Desaparición
+* **`Fade`, `TrackFades` y `FadeShape`** (`EchoCut.Core/Audio`): Modelo inmutable del fundido sobre la selección del usuario (tiempo absoluto del original) y curvas portadas de los preajustes de «Adjustable fade» de Audacity: lineal, curva S, coseno, redondeada, logarítmica (−3 dB a mitad) y exponencial (desde −60 dB).
+* **`FadeEnvelope`**: Aplicación muestra a muestra con la indexación del `FadeEffectBase` de Audacity (`n/N` al aparecer, `(N−1−n)/N` al desaparecer), misma ganancia en todos los canales y bloques fuera del fundido sin recorrer.
+* **`AudioRenderer`**: Copia editada mediante dos procesos de FFmpeg unidos por tubería (decodificación `f32le` exacta a la muestra → fundidos y borrados → codificación), sin materializar el audio y borrando la salida a medias si falla o se cancela.
+* **`AudioStreamInfo` y `AudioEncoding`**: Sondeo del formato con ffprobe y recodificación al mismo códec, tasa de bits y resolución del original (MP3, AAC, Vorbis, Opus, WMA, FLAC, ALAC, WavPack y PCM).
+* **`TrackEditor.CopyTags`**: Copia de etiquetas y carátula del original a la copia recodificada con TagLibSharp.
+* **Editor de forma de onda**: Selección del tramo de aparición y desaparición arrastrando sobre el detalle de cada borde (con imán a las marcas de recorte y bordes ajustables), casilla, campos numéricos y curva por fundido, envolvente ámbar en las tres vistas y escucha con el fundido aplicado.
+
+### Cambiado
+* **`AudioPreviewPlayer`**: Decodifica en flotante para pasar por `PcmEditor` y sitúa el cursor saltando lo borrado.
+* **`TrimService`**: Las pistas sin fundido que llegue a la copia siguen recortándose con `-c copy`; solo las que lo llevan se recodifican.
+* **`Song`**: Los fundidos (`Fades`) duran la sesión, hacen recortable la pista aunque no se elimine silencio y la marcan como «Ajustado».
+* **`FFmpegRunner.Start`**: Puede redirigir la entrada estándar.
+
+### Corregido
+* **Forma de onda**: La etiqueta del fundido ya no queda tapada por las referencias de amplitud.
+* **Clic derecho en la rejilla**: Conserva la multiselección cuando el clic cae sobre una fila ya seleccionada.
+* **Arrastre a la rejilla**: Acepta carpetas y archivos soltados sobre ella.
+
 ## [1.2.0] - 2026-10-02
 
 ### Añadido
